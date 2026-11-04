@@ -186,8 +186,15 @@
   const titulo = $(".hero__title");
   if (titulo && !titulo.querySelector(".w")) {
     titulo.setAttribute("aria-label", titulo.textContent.trim());
+    // La B de "Bookea" es la B del isotipo, sin el fondo: panzas verde agua y naranja, palo noche
+    // (el crema del logo se perdería sobre el blanco). Mismo dibujo que marca/isotipo.svg.
+    const isotipo = `<svg class="marca-b" viewBox="263 180 487 640" aria-hidden="true"><defs><mask id="hb-panzas" maskUnits="userSpaceOnUse" x="0" y="0" width="1000" height="1000">`
+      + `<path d="M391,180 H520 A175,175 0 0 1 520,530 H391 Z" fill="#fff"/><path d="M391,426 H545 A197,197 0 0 1 545,820 H391 Z" fill="#fff"/>`
+      + `<path d="M391,284 H520 A71,71 0 0 1 520,426 H391 Z" fill="#000"/><path d="M391,530 H545 A93,93 0 0 1 545,716 H391 Z" fill="#000"/></mask></defs>`
+      + `<g transform="translate(8,0)"><g mask="url(#hb-panzas)"><polygon points="0,0 1000,0 1000,553.38 0,377.06" fill="#1fa08c"/>`
+      + `<polygon points="0,377.06 1000,553.38 1000,1000 0,1000" fill="#e4572e"/></g><rect x="255" y="180" width="136" height="640" fill="#11151c"/></g></svg>`;
     titulo.innerHTML = titulo.textContent.trim().split(/\s+/)
-      .map((w, i) => `<span class="w" aria-hidden="true"><span style="--i:${i}">${w}</span></span>`).join(" ");
+      .map((w, i) => `<span class="w" aria-hidden="true"><span style="--i:${i}">${w === "Bookea" ? isotipo + "ookea" : w}</span></span>`).join(" ");
   }
 
   // ---------- Hero: persiana del escenario ----------
