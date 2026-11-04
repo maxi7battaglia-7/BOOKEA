@@ -7,7 +7,7 @@ Turnos online con seña para canchas de pádel, fútbol y tenis y para barbería
   - pantalla de carga con el logo
   - mosaico de fotos
   - buscador de turnos para el cliente
-  - la parte para negocios: cómo funciona, funciones, precios, formulario para sumarse y preguntas frecuentes
+  - la parte para negocios: cómo funciona, funciones, formulario para sumarse y preguntas frecuentes
 - **Reservas** (`reservar.html`, `app.css`, `reservar.js`): turnos libres de cada lugar y reserva en cuatro pasos. Por ahora los negocios son de ejemplo y el pago de la seña es simulado.
 - **Marca** (`marca/`): isotipo B en SVG y PNG, lámina de construcción y filosofía "Franja Exacta".
 - **Dirección de diseño** (`DESIGN.md`): referencias, sistema aplicado y decisiones.
@@ -24,7 +24,7 @@ python3 scripts/preview.py   # crea dist/bookea.html y dist/reservar.html
 ## Pendiente
 - El formulario para negocios todavía no envía datos.
 - Las reservas usan datos de ejemplo y un pago simulado: falta el servidor, la base de negocios y Mercado Pago.
-- Los precios, los negocios de ejemplo, `hola@bookea.ar` y `bookea.ar/losalamos` son provisorios.
+- Los negocios de ejemplo, `hola@bookea.ar` y `bookea.ar/losalamos` son provisorios.
 
 ## Créditos
 Las fotos son de Wikimedia Commons. El detalle de cada una está en `assets/credits.json` y en el pie de la página.

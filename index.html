@@ -15,7 +15,7 @@
   <link rel="stylesheet" href="styles.css" />
   <script>
     document.documentElement.classList.add("js");
-    // Al cargar o refrescar, siempre arriba de todo, diga lo que diga la dirección (#precios, etc.).
+    // Al cargar o refrescar, siempre arriba de todo, diga lo que diga la dirección (#preguntas, etc.).
     // Única excepción: si venís de reservar.html con "Sumá tu negocio", ese link deja anotada la sección.
     if ("scrollRestoration" in history) history.scrollRestoration = "manual";
     var bkIr = "";
@@ -88,7 +88,6 @@
     <nav class="nav__links" aria-label="Principal">
       <a href="reservar.html">Reservar turno</a>
       <a href="#como-funciona">Para negocios</a>
-      <a href="#precios">Precios</a>
       <a href="#preguntas">Preguntas</a>
     </nav>
     <a href="#sumate" class="btn btn--ink nav__cta">Sumá tu negocio</a>
@@ -105,7 +104,7 @@
           <li><p class="preguntas__fija"><span class="pq">¿Quiénes somos?</span><span class="pr">Una app hecha para que sacar un turno deje de ser un dolor de cabeza.</span></p></li>
           <li><a href="#como-funciona"><span class="pq">¿Qué hacemos?</span><span class="pr">Juntamos los turnos libres de canchas y barberías en un solo lugar.</span></a></li>
           <li><a href="#funciones"><span class="pq">¿Para qué sirve?</span><span class="pr">Para reservar sin llamar, y para que el negocio cobre la seña y no pierda turnos.</span></a></li>
-          <li><a href="#sumate"><span class="pq">Laburá con nosotros</span><span class="pr">¿Tenés canchas o una barbería? Sumala gratis durante el piloto.</span></a></li>
+          <li><a href="#sumate"><span class="pq">Laburá con nosotros</span><span class="pr">¿Tenés canchas o una barbería? Sumala a Bookea.</span></a></li>
         </ul>
       </div>
 
@@ -344,22 +343,6 @@
       </div>
     </section>
 
-    <!-- ===== Precios ===== -->
-    <section class="pricing frame" id="precios" aria-labelledby="price-t">
-      <h2 id="price-t" class="sr-only">Precios</h2>
-      <div class="plans" role="tablist" aria-label="Planes">
-        <button type="button" class="plan" role="tab" data-plan="piloto" aria-selected="true" id="tab-piloto" aria-controls="plan-stage">Piloto</button>
-        <button type="button" class="plan" role="tab" data-plan="esencial" aria-selected="false" id="tab-esencial" aria-controls="plan-stage">Esencial</button>
-        <button type="button" class="plan" role="tab" data-plan="completo" aria-selected="false" id="tab-completo" aria-controls="plan-stage">Completo</button>
-      </div>
-      <div class="plan-stage" id="plan-stage" role="tabpanel" aria-labelledby="tab-piloto">
-        <p class="plan-stage__price"><span id="pl-price">$ 0</span> <span class="plan-stage__per" id="pl-per">durante el piloto</span></p>
-        <p class="plan-stage__desc" id="pl-desc">Para los primeros negocios de Mendoza. Tenés todo lo del plan Completo sin costo, te ayudamos a cargar la agenda en persona y a cambio nos contás qué mejorar.</p>
-        <p class="plan-stage__fee">Sin comisión por reserva. La seña va directo a tu Mercado Pago.</p>
-        <a href="#sumate" class="btn btn--orange btn--lg" id="pl-btn">Sumarme al piloto</a>
-      </div>
-    </section>
-
     <!-- ===== Sumate ===== -->
     <section class="join" id="sumate" aria-labelledby="join-t">
       <div class="frame join__inner">
@@ -418,7 +401,7 @@
       <div class="faq__list">
         <details name="faq" open>
           <summary>¿Quién recibe la plata de la seña?</summary>
-          <p>Vos. La seña se cobra con tu cuenta de Mercado Pago y entra directo ahí. Bookea no la retiene ni cobra comisión por reserva.</p>
+          <p>Vos. La seña se cobra con tu cuenta de Mercado Pago y entra directo ahí. Bookea no la retiene.</p>
         </details>
         <details name="faq">
           <summary>¿Qué pasa si un cliente cancela?</summary>
@@ -447,7 +430,6 @@
         <a href="reservar.html">Reservar turno</a>
         <a href="#como-funciona">Cómo funciona</a>
         <a href="#funciones">Funciones</a>
-        <a href="#precios">Precios</a>
         <a href="#preguntas">Preguntas</a>
       </nav>
       <div class="tile tile--time">

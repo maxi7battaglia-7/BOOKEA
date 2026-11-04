@@ -326,7 +326,7 @@ h1, h2, h3 { font-family: var(--f-display); font-stretch: var(--display-ancho); 
 .dot--ok { background: var(--teal); }
 
 /* ---------- Funciones ---------- */
-.features { padding-top: var(--section); } /* sin padding abajo: Precios ya trae su aire */
+.features { padding-block: var(--section); }
 .features .h-sec { margin-bottom: 56px; }
 .cells { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .cell {
@@ -379,31 +379,6 @@ h1, h2, h3 { font-family: var(--f-display); font-stretch: var(--display-ancho); 
 .ph__slots .is-off { color: var(--soft); text-decoration: line-through; background: var(--raised); }
 .ph__slots .is-pick { background: var(--teal); border-color: var(--teal); color: var(--ink); }
 .ph__note { margin-top: 12px; font-size: 13px; color: var(--soft); }
-
-/* ---------- Precios ---------- */
-.pricing {
-  display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: var(--gap);
-  padding-block: var(--section); align-items: start;
-}
-.plans { grid-column: 1 / 7; display: grid; justify-items: start; }
-.plan {
-  position: relative; border: 0; background: transparent; padding: 0 0 0 0.55em;
-  font-family: var(--f-display); font-stretch: var(--display-ancho); font-weight: 600; font-size: var(--s-xl); line-height: 1.1; letter-spacing: -0.03em;
-  color: var(--faint); text-align: left; transition: color var(--t-hover) ease;
-}
-.plan::before {
-  content: ""; position: absolute; left: 0; top: 50%; width: 0.3em; height: 0.3em; border-radius: 50%;
-  background: var(--orange); opacity: 0; transform: translateY(-50%) scale(0.6); transition: transform var(--t-ui) var(--ease-out), opacity var(--t-ui) ease;
-}
-.plan[aria-selected="true"] { color: var(--ink); }
-.plan[aria-selected="true"]::before { opacity: 1; transform: translateY(-50%) scale(1); }
-@media (hover: hover) and (pointer: fine) { .plan:not([aria-selected="true"]):hover { color: var(--soft); } }
-.plan-stage { grid-column: 8 / -1; display: grid; gap: 20px; justify-items: start; padding-top: 12px; transition: opacity 200ms ease; }
-.plan-stage.is-swap { opacity: 0; }
-.plan-stage__price { font-family: var(--f-display); font-stretch: var(--display-ancho); font-weight: 600; font-size: var(--s-xl); line-height: 1; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
-.plan-stage__per { font-family: var(--f-text); font-size: var(--s-b); letter-spacing: 0; color: var(--soft); font-weight: 400; }
-.plan-stage__desc { font-size: var(--s-b); max-width: 44ch; }
-.plan-stage__fee { font-size: var(--s-s); color: var(--soft); }
 
 /* ---------- Sumate ---------- */
 .join { background: var(--orange); color: var(--ink); }
@@ -639,9 +614,6 @@ h1, h2, h3 { font-family: var(--f-display); font-stretch: var(--display-ancho); 
   .cell--rev .frag--phone { margin: 8px auto -1px; border-radius: 18px 18px 0 0; }
 
 
-  .pricing { display: block; }
-  .plans { margin-bottom: 32px; }
-  .plan-stage .btn { width: 100%; }
 
   .join__next, .form { grid-column: 1 / -1; }
   .field-row { grid-template-columns: 1fr; }

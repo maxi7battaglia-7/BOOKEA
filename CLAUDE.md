@@ -11,3 +11,4 @@
 - Rubros del MVP: pádel, fútbol, tenis y barberías. Mercado inicial: Mendoza (Valle de Uco, San Rafael, Gran Mendoza).
 - No inventar testimonios, cifras de clientes ni logos.
 - A futuro habrá app y registro: no prometer en ningún texto "sin bajar una app" ni "sin crear cuenta".
+- Un solo plan para todos y sin precio visible en la página: no poner montos de Bookea, planes, "gratis" ni "sin comisión".

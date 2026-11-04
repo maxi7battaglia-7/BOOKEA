@@ -194,3 +194,7 @@ El dueño pidió cambiarla por completo.
 - Cada paso es un bloque gris propio con un número en círculo (1 verde agua, 2 noche, 3 naranja), un título y una explicación corta a la izquierda, y la pantalla de ejemplo a la derecha.
 - Debajo de "Así funciona" va una línea que dice para quién es.
 - En tablet y celular, cada bloque apila la explicación arriba y la pantalla abajo.
+
+## Sin precios ni planes (pedido del dueño)
+- Se borró la sección Precios (Piloto, Esencial y Completo), su link en el menú y en el pie, y el código de las pestañas.
+- Va a haber un solo plan para todos y el precio no se muestra en la página. No volver a poner montos de Bookea, "gratis", "piloto" ni "sin comisión".

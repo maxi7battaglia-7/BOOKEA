@@ -25,24 +25,6 @@
   tick(); setInterval(tick, 30000);
   const y = $("#year"); if (y) y.textContent = new Date().getFullYear();
 
-  // ---------- Pestañas accesibles: flechas, Inicio y Fin, una sola en el orden de tabulación ----------
-  function tablist(list, onSelect) {
-    const tabs = $$('[role="tab"]', list);
-    const sync = () => tabs.forEach((t) => t.tabIndex = t.getAttribute("aria-selected") === "true" ? 0 : -1);
-    sync();
-    tabs.forEach((t, i) => {
-      t.addEventListener("click", () => { onSelect(t); sync(); });
-      t.addEventListener("keydown", (e) => {
-        const n = tabs.length;
-        const to = { ArrowRight: i + 1, ArrowDown: i + 1, ArrowLeft: i - 1, ArrowUp: i - 1, Home: 0, End: n - 1 }[e.key];
-        if (to === undefined) return;
-        e.preventDefault();
-        const next = tabs[(to + n) % n];
-        next.focus(); onSelect(next); sync();
-      });
-    });
-  }
-
   // ---------- Buscador de turnos: arma la búsqueda y lleva a reservar.html ----------
   const DIAS = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
   const hoyMendoza = () => {
@@ -78,30 +60,6 @@
   $$("[data-step]").forEach((b) => b.addEventListener("click", () => { horas = Math.min(48, Math.max(1, horas + +b.dataset.step)); nota(); }));
   const sw = $(".switch");
   if (sw) sw.addEventListener("click", () => { devuelve = !devuelve; sw.setAttribute("aria-checked", String(devuelve)); nota(); });
-
-  // ---------- Precios ----------
-  const PLANES = {
-    piloto: { price: "$ 0", per: "durante el piloto", btn: "Sumarme al piloto",
-      desc: "Para los primeros negocios de Mendoza. Tenés todo lo del plan Completo sin costo, te ayudamos a cargar la agenda en persona y a cambio nos contás qué mejorar." },
-    esencial: { price: "$ 24.900", per: "por mes", btn: "Empezar con Esencial",
-      desc: "Una agenda con hasta 4 canchas o 3 barberos, link de reservas, seña con Mercado Pago, recordatorios por WhatsApp y turnos fijos." },
-    completo: { price: "$ 44.900", per: "por mes", btn: "Empezar con Completo",
-      desc: "Todo lo de Esencial, con canchas y barberos sin límite, precio según el horario, reglas de cancelación, varias sedes y el resumen del mes." },
-  };
-  const stage = $("#plan-stage");
-  const elegir = (btn) => {
-    if (btn.getAttribute("aria-selected") === "true") return;
-    const p = PLANES[btn.dataset.plan];
-    $$(".plan").forEach((x) => x.setAttribute("aria-selected", String(x === btn)));
-    stage.setAttribute("aria-labelledby", btn.id);
-    const swap = () => {
-      $("#pl-price").textContent = p.price; $("#pl-per").textContent = p.per;
-      $("#pl-desc").textContent = p.desc; $("#pl-btn").textContent = p.btn;
-      stage.classList.remove("is-swap");
-    };
-    if (reduce) swap(); else { stage.classList.add("is-swap"); setTimeout(swap, 200); }
-  };
-  tablist($(".plans"), elegir);
 
   // ---------- Copiar ----------
   $$("[data-copy]").forEach((b) => b.addEventListener("click", async () => {
@@ -197,7 +155,6 @@
     [".intro", [".intro__title"]],
     [".how", [".h-sec", ".how__sub", ".ex"]],
     [".features", [".h-sec", ".cell"]],
-    [".pricing", [".plan", ".plan-stage"]],
     [".join", [".join__title", ".join__next li", ".form"]],
     [".faq", [".faq__title", ".faq details"]],
     [".foot", [".tile"]],
