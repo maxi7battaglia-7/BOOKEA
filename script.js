@@ -149,8 +149,50 @@
   // ---------- Preguntas: signo + / − ----------
   $$(".faq summary").forEach((s) => { const pm = document.createElement("span"); pm.className = "pm"; pm.setAttribute("aria-hidden", "true"); s.appendChild(pm); });
 
+  // ---------- Preguntas: se despliegan y se pliegan con una animación corta ----------
+  // Una abierta por vez. El "name" del HTML hace eso sin JS, pero cierra las otras de golpe:
+  // acá se saca y se cierran animadas.
+  const faqs = $$(".faq details");
+  const curva = "cubic-bezier(0.22, 1, 0.36, 1)";
+  const animarAlto = (d, desde, hasta, ms) => {
+    if (d._anim) d._anim.cancel();
+    d.style.overflow = "hidden";
+    const a = d.animate({ height: [`${desde}px`, `${hasta}px`] }, { duration: ms, easing: curva });
+    d._anim = a;
+    const fin = () => { if (d._anim === a) { d._anim = null; d.style.overflow = ""; } };
+    a.onfinish = fin; a.oncancel = fin;
+    return a;
+  };
+  const cerrar = (d) => {
+    if (!d.open || d.classList.contains("is-cerrando")) return;
+    if (reduce) { d.open = false; return; }
+    const desde = d.offsetHeight, hasta = d.querySelector("summary").offsetHeight;
+    d.classList.add("is-cerrando");
+    animarAlto(d, desde, hasta, 260).onfinish = () => {
+      d.open = false; d.classList.remove("is-cerrando"); d._anim = null; d.style.overflow = "";
+    };
+  };
+  const abrir = (d) => {
+    faqs.forEach((o) => o !== d && cerrar(o));
+    if (d.open && !d.classList.contains("is-cerrando")) return;
+    const desde = d.offsetHeight;
+    d.classList.remove("is-cerrando");
+    d.open = true;
+    if (reduce) return;
+    animarAlto(d, desde, d.scrollHeight, 340);
+    const p = d.querySelector("p");
+    if (p) p.animate({ opacity: [0, 1], transform: ["translateY(-8px)", "none"] }, { duration: 320, delay: 60, easing: curva, fill: "backwards" });
+  };
+  faqs.forEach((d) => {
+    d.removeAttribute("name");
+    d.querySelector("summary").addEventListener("click", (e) => {
+      e.preventDefault();
+      if (d.open && !d.classList.contains("is-cerrando")) cerrar(d); else abrir(d);
+    });
+  });
+
   // "¿Quiénes somos?" lleva a Preguntas frecuentes con su respuesta abierta
-  $$("[data-abrir]").forEach((a) => a.addEventListener("click", () => { const d = document.getElementById(a.dataset.abrir); if (d) d.open = true; }));
+  $$("[data-abrir]").forEach((a) => a.addEventListener("click", () => { const d = document.getElementById(a.dataset.abrir); if (d) abrir(d); }));
 
   // ---------- Entradas ----------
   const grupos = [

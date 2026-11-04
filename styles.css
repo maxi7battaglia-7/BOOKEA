@@ -432,6 +432,9 @@ h1, h2, h3 { font-family: var(--f-display); font-stretch: var(--display-ancho); 
 .pm::before, .pm::after { content: ""; position: absolute; left: 0; top: 6.5px; width: 16px; height: 3px; background: currentColor; border-radius: 1px; transition: transform var(--t-ui) var(--ease-out); }
 .pm::after { transform: rotate(90deg); }
 .faq details[open] .pm::after { transform: rotate(0deg); }
+/* mientras se pliega (script.js), ya vuelve al gris y al + */
+.faq details.is-cerrando { background: var(--raised); }
+.faq details.is-cerrando .pm::after { transform: rotate(90deg); }
 .faq details p { padding: 0 24px 24px; font-size: var(--s-b); max-width: 52ch; }
 
 /* ---------- Pie ---------- */
