@@ -1,0 +1,456 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Bookea</title>
+  <meta name="description" content="Bookea: agenda online para canchas de pádel, fútbol y tenis y para barberías de Mendoza. Seña con Mercado Pago y recordatorio por WhatsApp." />
+  <meta name="theme-color" content="#ffffff" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap" rel="stylesheet" />
+  <link rel="icon" href="marca/isotipo.svg" type="image/svg+xml" />
+  <link rel="icon" href="marca/isotipo-32.png" sizes="32x32" type="image/png" />
+  <link rel="apple-touch-icon" href="marca/isotipo-192.png" />
+  <link rel="stylesheet" href="styles.css" />
+  <script>document.documentElement.classList.add("js")</script>
+</head>
+<body>
+  <a class="skip" href="#main">Saltar al contenido</a>
+
+  <!-- ===== Navegación ===== -->
+  <header class="banda" id="top">
+    <div class="mosaico" aria-hidden="true">
+      <span class="m-foto m-canchas"><img src="assets/m-padel-canchas.webp" alt="" width="1200" height="800" /></span>
+      <span class="m-color m-naranja"></span>
+      <span class="m-foto m-peine"><img src="assets/m-barberia-peine.webp" alt="" width="800" height="800" /></span>
+      <span class="m-color m-noche"></span>
+      <span class="m-foto m-tenis"><img src="assets/m-tenis.webp" alt="" width="800" height="800" /></span>
+      <span class="m-color m-crema"></span>
+      <span class="m-foto m-futbol"><img src="assets/m-futbol-noche.webp" alt="" width="800" height="800" /></span>
+      <span class="m-color m-verde"></span>
+      <span class="m-foto m-barbero"><img src="assets/m-barbero.webp" alt="" width="800" height="800" /></span>
+      <span class="m-foto m-paletas"><img src="assets/m-paletas.webp" alt="" width="800" height="800" /></span>
+    </div>
+    <div class="nav frame">
+    <a href="#top" class="brand" aria-label="Bookea, inicio">
+<svg class="brand__mark" viewBox="0 0 1000 1000" aria-hidden="true">
+        <defs>
+    <mask id="bk-panzas" maskUnits="userSpaceOnUse" x="0" y="0" width="1000" height="1000">
+      <path d="M391,180 H520 A175,175 0 0 1 520,530 H391 Z" fill="#fff"/><path d="M391,426 H545 A197,197 0 0 1 545,820 H391 Z" fill="#fff"/>
+      <path d="M391,284 H520 A71,71 0 0 1 520,426 H391 Z" fill="#000"/><path d="M391,530 H545 A93,93 0 0 1 545,716 H391 Z" fill="#000"/>
+    </mask>
+  </defs>
+  <rect width="1000" height="1000" rx="200" fill="#11151c"/>
+  <g transform="translate(8,0)">
+    <g mask="url(#bk-panzas)">
+      <polygon points="0,0 1000,0 1000,553.38 0,377.06" fill="#1fa08c"/>
+      <polygon points="0,377.06 1000,553.38 1000,1000 0,1000" fill="#e4572e"/>
+    </g>
+    <g fill="#f5ecd7"><rect x="255" y="180" width="136" height="640"/></g>
+  </g>
+      </svg>
+      <span class="brand__word">Bookea</span>
+    </a>
+    <nav class="nav__links" aria-label="Principal">
+      <a href="#como-funciona">Cómo funciona</a>
+      <a href="#funciones">Funciones</a>
+      <a href="#precios">Precios</a>
+      <a href="#preguntas">Preguntas</a>
+    </nav>
+    <a href="#sumate" class="btn btn--ink nav__cta">Sumá tu negocio</a>
+  </div>
+  </header>
+
+  <main id="main">
+    <!-- ===== Hero: la agenda en escena ===== -->
+    <section class="hero frame" aria-labelledby="titulo">
+      <h1 id="titulo" class="hero__title">Turnos con seña, sin vueltas.</h1>
+      <div class="hero__copy">
+        <p class="hero__lead">Bookea es la agenda online para canchas y barberías de Mendoza. Tus clientes reservan desde un link, pagan la seña con Mercado Pago y reciben el recordatorio por WhatsApp.</p>
+        <a href="#sumate" class="btn btn--ink btn--lg">Sumá tu negocio gratis</a>
+        <p class="hero__hint">Tocá un horario libre de la agenda y mirá qué pasa.</p>
+      </div>
+
+      <div class="stage shutter">
+        <div class="stage__inner">
+          <!-- Fragmento de producto: agenda del día -->
+          <div class="agenda" data-ui>
+            <div class="agenda__bar">
+              <div class="agenda__tabs" role="tablist" aria-label="Rubro">
+                <button type="button" role="tab" class="tab" data-rubro="padel" id="tab-padel" aria-controls="ag-grid" aria-selected="true">Pádel</button>
+                <button type="button" role="tab" class="tab" data-rubro="futbol" id="tab-futbol" aria-controls="ag-grid" aria-selected="false">Fútbol 5</button>
+                <button type="button" role="tab" class="tab" data-rubro="tenis" id="tab-tenis" aria-controls="ag-grid" aria-selected="false">Tenis</button>
+                <button type="button" role="tab" class="tab" data-rubro="barberia" id="tab-barberia" aria-controls="ag-grid" aria-selected="false">Barbería</button>
+              </div>
+            </div>
+            <div class="agenda__head">
+              <div>
+                <p class="agenda__venue" id="ag-venue">Club Los Álamos</p>
+                <p class="agenda__date" id="ag-date">Martes 10 de noviembre · turnos de 90 min</p>
+              </div>
+              <div class="agenda__kpi">
+                <p class="agenda__kpi-v" id="ag-occ">10 de 15</p>
+                <p class="agenda__kpi-k" id="ag-money">$ 288.000 reservados</p>
+              </div>
+            </div>
+            <div class="agenda__grid" id="ag-grid" role="tabpanel" aria-labelledby="tab-padel"></div>
+            <p class="sr-only" id="ag-status" role="status" aria-atomic="true"></p>
+          </div>
+
+          <!-- Fragmento: confirmación por WhatsApp -->
+          <div class="wa" data-ui>
+            <p class="wa__from">WhatsApp · Bookea</p>
+            <div class="wa__bubble" id="wa-text" role="status" aria-atomic="true">
+              <p>¡Listo, Pato! Tu turno en <b>Club Los Álamos</b> quedó confirmado.</p>
+              <p>Martes 10/11 · 21:30 · Cancha 1</p>
+              <p>Seña de $ 8.500 recibida por Mercado Pago. Te recordamos 3 horas antes.</p>
+            </div>
+            <p class="wa__time" id="wa-time">21:04</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Planteo ===== -->
+    <section class="intro frame" aria-labelledby="intro-t">
+      <h2 id="intro-t" class="intro__title">Cada turno vacío es plata que no vuelve.</h2>
+    </section>
+
+    <!-- ===== Cómo funciona: lo que das y lo que vuelve ===== -->
+    <section class="how frame" id="como-funciona" aria-labelledby="how-t">
+      <h2 id="how-t" class="h-sec">Así funciona</h2>
+      <ol class="how__list">
+        <li class="ex">
+          <p class="ex__say">Primero, armás tu agenda.</p>
+          <div class="call" data-ui>
+            <span class="call__label">Tu negocio</span>
+            <p class="call__input">Pádel · 3 canchas · de 17 a 00:30 · turnos de 90 min</p>
+          </div>
+          <div class="resp" data-ui>
+            <div class="chips">
+              <span class="chip">Cancha 1</span><span class="chip">Cancha 2</span><span class="chip">Cancha 3 · techada</span>
+            </div>
+            <table class="mini-table">
+              <caption class="sr-only">Precios por franja</caption>
+              <tbody>
+                <tr><th scope="row">17:00 a 20:00</th><td>$ 28.000</td><td>seña $ 7.000</td></tr>
+                <tr><th scope="row">20:00 a 00:30</th><td>$ 34.000</td><td>seña $ 8.500</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </li>
+        <li class="ex">
+          <p class="ex__say">Después, compartís tu link.</p>
+          <div class="call call--link" data-ui>
+            <label class="call__label" for="link">Tu link de reservas</label>
+            <div class="call__row">
+              <input id="link" class="call__input" value="bookea.ar/losalamos" readonly />
+              <button class="call__copy" type="button" data-copy="bookea.ar/losalamos">Copiar</button>
+            </div>
+          </div>
+          <div class="resp resp--chat" data-ui>
+            <p class="msg msg--in">¿Tenés cancha hoy a las 21?</p>
+            <p class="msg msg--out">¡Hola! Elegí tu horario y reservá acá: <u>bookea.ar/losalamos</u></p>
+          </div>
+        </li>
+        <li class="ex ex--final">
+          <p class="ex__say">Y te reservan con seña.</p>
+          <div class="call" data-ui>
+            <span class="call__label">Martina eligió</span>
+            <p class="call__picked">Cancha 2 · Martes 21:30 · $ 34.000</p>
+          </div>
+          <div class="result" data-ui>
+            <div class="result__col">
+              <p class="result__k">Mercado Pago</p>
+              <p class="result__v">$ 8.500</p>
+              <p class="result__s"><span class="dot dot--ok"></span>Seña acreditada en tu cuenta</p>
+            </div>
+            <div class="result__col">
+              <p class="result__k">WhatsApp</p>
+              <p class="result__msg">Martina, te esperamos hoy 21:30 en Cancha 2.</p>
+              <p class="result__s">Recordatorio programado 18:30</p>
+            </div>
+            <div class="result__col">
+              <p class="result__k">Tu agenda</p>
+              <p class="result__slot">21:30 · Cancha 2<br /><b>Martina G.</b></p>
+              <p class="result__s">10 de 15 turnos</p>
+            </div>
+          </div>
+        </li>
+      </ol>
+    </section>
+
+    <!-- ===== Buscador: escribí como tu cliente ===== -->
+    <section class="search" aria-labelledby="search-t">
+      <div class="frame search__inner">
+        <h2 id="search-t" class="search__title">Tu cliente escribe, Bookea encuentra el turno.</h2>
+        <div class="search__line" data-ui>
+          <label for="q" class="sr-only">Buscar un turno</label>
+          <input id="q" class="search__input" value="pádel el jueves a las 21" autocomplete="off" spellcheck="false" />
+        </div>
+        <div class="search__answer" data-ui role="status" aria-atomic="true">
+          <p class="answer__head" id="ans-head">Pádel · jueves 12/11 · cerca de las 21</p>
+          <ul class="answer__rows" id="ans-rows"></ul>
+        </div>
+        <div class="search__examples" aria-label="Ejemplos">
+          <button type="button" class="ex-btn" data-q="fútbol 5 hoy a las 22">fútbol 5 hoy a las 22</button>
+          <button type="button" class="ex-btn" data-q="corte y barba el sábado a las 11">corte y barba el sábado a las 11</button>
+          <button type="button" class="ex-btn" data-q="tenis mañana temprano">tenis mañana temprano</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Funciones ===== -->
+    <section class="features frame" id="funciones" aria-labelledby="feat-t">
+      <h2 id="feat-t" class="h-sec">Lo que hace por vos</h2>
+      <div class="cells">
+        <article class="cell">
+          <div class="cell__text">
+            <h3>Seña con Mercado Pago</h3>
+            <p>La seña se cobra al reservar y entra directo a tu cuenta. Bookea no toca tu plata.</p>
+          </div>
+          <div class="frag frag--pay" data-ui>
+            <p class="frag__k">Señas de hoy</p>
+            <ul class="pay">
+              <li><span>Martina G. · C2 21:30</span><b>$ 8.500</b></li>
+              <li><span>Los del martes · C1 20:00</span><b>$ 8.500</b></li>
+              <li><span>Nico R. · C3 18:30</span><b>$ 7.000</b></li>
+              <li class="pay__total"><span>Total cobrado</span><b>$ 24.000</b></li>
+            </ul>
+          </div>
+        </article>
+        <article class="cell cell--rev">
+          <div class="frag frag--wa" data-ui>
+            <p class="bub">Hola Nico, te esperamos hoy a las 18:30 en la Cancha 3. Si no podés venir, avisanos y liberamos el turno.</p>
+            <div class="bub-actions"><span>Voy</span><span>Liberar turno</span></div>
+          </div>
+          <div class="cell__text">
+            <h3>Recordatorio por WhatsApp</h3>
+            <p>Confirmación al reservar y aviso horas antes. Si alguien no puede, libera el turno en un toque.</p>
+          </div>
+        </article>
+        <article class="cell">
+          <div class="cell__text">
+            <h3>Turnos fijos</h3>
+            <p>“Todos los martes a las 20.” Lo cargás una vez y se repite solo, con su seña cada semana.</p>
+          </div>
+          <div class="frag frag--fixed" data-ui>
+            <p class="fixed__name">Los del martes</p>
+            <p class="fixed__rule">Cancha 1 · martes 20:00 · cada semana</p>
+            <div class="fixed__dates"><span>10/11</span><span>17/11</span><span>24/11</span><span>1/12</span><span>8/12</span></div>
+          </div>
+        </article>
+        <article class="cell cell--rev">
+          <div class="frag frag--price" data-ui>
+            <p class="frag__k">Precio por horario</p>
+            <table class="price-t">
+              <caption class="sr-only">Precio del turno de 90 minutos</caption>
+              <tbody>
+                <tr><th scope="row">Lun a vie · 17 a 20</th><td>$ 28.000</td></tr>
+                <tr class="is-on"><th scope="row">Lun a vie · 20 a 00:30</th><td>$ 34.000</td></tr>
+                <tr><th scope="row">Sáb y dom</th><td>$ 36.000</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="cell__text">
+            <h3>Precio según el horario</h3>
+            <p>La noche vale más que la tarde. Cada franja tiene su precio y su seña.</p>
+          </div>
+        </article>
+        <article class="cell">
+          <div class="cell__text">
+            <h3>Cancelaciones con tus reglas</h3>
+            <p>Vos decidís hasta cuándo se puede cancelar y si la seña se devuelve. Bookea lo aplica solo.</p>
+          </div>
+          <div class="frag frag--rules" data-ui>
+            <div class="rule">
+              <span>Cancelar hasta</span>
+              <span class="stepper"><button type="button" data-step="-1" aria-label="Menos horas">−</button><b id="hrs">6 h</b><button type="button" data-step="1" aria-label="Más horas">+</button></span>
+            </div>
+            <div class="rule">
+              <span id="sw-l">Devolver la seña</span>
+              <button type="button" class="switch" role="switch" aria-checked="true" aria-labelledby="sw-l"><span></span></button>
+            </div>
+            <p class="rule__note" id="rule-note">Si cancela con más de 6 h, la seña vuelve sola.</p>
+          </div>
+        </article>
+        <article class="cell cell--rev">
+          <div class="frag frag--phone" data-ui>
+            <p class="ph__venue">Barbería Don Ruiz</p>
+            <p class="ph__k">Corte y barba · 45 min · $ 18.000</p>
+            <div class="ph__slots"><span>17:00</span><span class="is-off">17:45</span><span class="is-pick">18:30</span><span>19:15</span></div>
+            <p class="ph__note">De 13 a 17 cerramos por la siesta.</p>
+          </div>
+          <div class="cell__text">
+            <h3>Sin app para tus clientes</h3>
+            <p>Reservan desde el navegador del celular, sin bajar nada ni crear cuenta.</p>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <!-- ===== Mendoza ===== -->
+    <section class="place" aria-labelledby="place-t">
+      <figure class="place__pic">
+        <img src="assets/valle-de-uco.webp" alt="Viñedos del Valle de Uco con la cordillera de los Andes nevada al fondo" width="1600" height="992" loading="lazy" />
+        <figcaption>Valle de Uco, Mendoza.</figcaption>
+      </figure>
+      <div class="frame place__inner">
+        <h2 id="place-t" class="place__title">Hecho en Mendoza, para Mendoza.</h2>
+        <article class="letter">
+          <div class="letter__sheet">
+            <p>Arrancamos en el Valle de Uco porque es donde más lo vimos: complejos que llenan la noche por WhatsApp, señas que se pierden entre comprobantes y turnos que nadie avisa que no va a usar.</p>
+            <p>Bookea nace para ese día a día. Una agenda que entiende la siesta, los turnos fijos de los martes y que la seña tiene que llegar a tu Mercado Pago, no al nuestro.</p>
+            <p>Por eso <mark>vamos a tu negocio y la dejamos andando con vos</mark>. Después seguimos del otro lado del WhatsApp, como un vecino más.</p>
+            <p>Si tenés canchas o una barbería en Tunuyán, Tupungato, San Carlos, San Rafael o el Gran Mendoza, nos encantaría que seas de los primeros.</p>
+            <p class="letter__sign">El equipo de Bookea</p>
+            <p class="letter__role">Mendoza, noviembre de 2026</p>
+          </div>
+          <figure class="letter__pic">
+            <img src="assets/acequia.webp" alt="Acequia y plátanos en una calle de Godoy Cruz" width="1200" height="1600" loading="lazy" />
+            <figcaption>Acequia en Godoy Cruz.</figcaption>
+          </figure>
+        </article>
+      </div>
+    </section>
+
+    <!-- ===== Precios ===== -->
+    <section class="pricing frame" id="precios" aria-labelledby="price-t">
+      <h2 id="price-t" class="sr-only">Precios</h2>
+      <div class="plans" role="tablist" aria-label="Planes">
+        <button type="button" class="plan" role="tab" data-plan="piloto" aria-selected="true" id="tab-piloto" aria-controls="plan-stage">Piloto</button>
+        <button type="button" class="plan" role="tab" data-plan="esencial" aria-selected="false" id="tab-esencial" aria-controls="plan-stage">Esencial</button>
+        <button type="button" class="plan" role="tab" data-plan="completo" aria-selected="false" id="tab-completo" aria-controls="plan-stage">Completo</button>
+      </div>
+      <div class="plan-stage" id="plan-stage" role="tabpanel" aria-labelledby="tab-piloto">
+        <p class="plan-stage__price"><span id="pl-price">$ 0</span> <span class="plan-stage__per" id="pl-per">durante el piloto</span></p>
+        <p class="plan-stage__desc" id="pl-desc">Para los primeros negocios de Mendoza. Tenés todo lo del plan Completo sin costo, te ayudamos a cargar la agenda en persona y a cambio nos contás qué mejorar.</p>
+        <p class="plan-stage__fee">Sin comisión por reserva. La seña va directo a tu Mercado Pago.</p>
+        <a href="#sumate" class="btn btn--orange btn--lg" id="pl-btn">Sumarme al piloto</a>
+      </div>
+    </section>
+
+    <!-- ===== Sumate ===== -->
+    <section class="join" id="sumate" aria-labelledby="join-t">
+      <div class="frame join__inner">
+        <div class="join__copy">
+          <h2 id="join-t" class="join__title">Sumá tu negocio al piloto.</h2>
+          <ol class="join__next">
+            <li><b>Te escribimos por WhatsApp</b> el mismo día para conocer tu negocio.</li>
+            <li><b>Vamos a verte</b> y cargamos juntos canchas o barberos, horarios y precios.</li>
+            <li><b>Compartís tu link</b> y empezás a recibir reservas con seña.</li>
+          </ol>
+        </div>
+        <form class="form" id="form-sumate" novalidate data-ui aria-labelledby="join-t">
+          <div class="field">
+            <label for="f-nombre">Tu nombre</label>
+            <input id="f-nombre" name="nombre" autocomplete="name" required aria-describedby="f-nombre-err" />
+            <p class="field__err" id="f-nombre-err" hidden>Escribí tu nombre.</p>
+          </div>
+          <div class="field">
+            <label for="f-negocio">Nombre del negocio</label>
+            <input id="f-negocio" name="negocio" autocomplete="organization" required aria-describedby="f-negocio-err" />
+            <p class="field__err" id="f-negocio-err" hidden>Escribí el nombre de tu negocio.</p>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label for="f-rubro">Rubro</label>
+              <select id="f-rubro" name="rubro" required aria-describedby="f-rubro-err">
+                <option value="">Elegí</option>
+                <option>Pádel</option>
+                <option>Fútbol</option>
+                <option>Tenis</option>
+                <option>Barbería</option>
+                <option>Otro</option>
+              </select>
+            <p class="field__err" id="f-rubro-err" hidden>Elegí el rubro de tu negocio.</p>
+            </div>
+            <div class="field">
+              <label for="f-localidad">Localidad</label>
+              <input id="f-localidad" name="localidad" placeholder="Por ejemplo, Tunuyán" required aria-describedby="f-localidad-err" />
+            <p class="field__err" id="f-localidad-err" hidden>Escribí la localidad, por ejemplo Tunuyán.</p>
+            </div>
+          </div>
+          <div class="field">
+            <label for="f-whatsapp">WhatsApp</label>
+            <input id="f-whatsapp" name="whatsapp" type="tel" inputmode="tel" autocomplete="tel" placeholder="261 555 1234" required aria-describedby="f-whatsapp-err" />
+            <p class="field__err" id="f-whatsapp-err" hidden>Escribí un WhatsApp con código de área, por ejemplo 261 555 1234.</p>
+          </div>
+          <button class="btn btn--ink btn--lg btn--block" type="submit">Quiero probarlo</button>
+          <p class="form__msg" role="status" aria-live="polite"></p>
+        </form>
+      </div>
+    </section>
+
+    <!-- ===== Preguntas ===== -->
+    <section class="faq frame" id="preguntas" aria-labelledby="faq-t">
+      <h2 id="faq-t" class="faq__title">Preguntas frecuentes</h2>
+      <div class="faq__list">
+        <details name="faq" open>
+          <summary>¿Mis clientes tienen que bajar una app?</summary>
+          <p>No. Reservan desde un link que se abre en el navegador del celular o la compu, sin crear cuenta.</p>
+        </details>
+        <details name="faq">
+          <summary>¿Quién recibe la plata de la seña?</summary>
+          <p>Vos. La seña se cobra con tu cuenta de Mercado Pago y entra directo ahí. Bookea no la retiene ni cobra comisión por reserva.</p>
+        </details>
+        <details name="faq">
+          <summary>¿Qué pasa si un cliente cancela?</summary>
+          <p>Se aplican tus reglas: hasta cuántas horas antes puede cancelar y si la seña se devuelve. El turno se libera solo y vuelve a estar disponible.</p>
+        </details>
+        <details name="faq">
+          <summary>¿Puedo seguir tomando turnos por teléfono?</summary>
+          <p>Sí. Los cargás en tu agenda en dos toques y conviven con los del link, así nunca se pisan.</p>
+        </details>
+        <details name="faq">
+          <summary>¿Sirve para turnos fijos semanales?</summary>
+          <p>Sí. Cargás el turno fijo una vez y se repite cada semana. Podés pedir la seña en cada fecha o solo la primera vez.</p>
+        </details>
+        <details name="faq">
+          <summary>¿Funciona para barberías?</summary>
+          <p>Sí. En lugar de canchas cargás a tus barberos y tus servicios con su duración: corte, barba o los dos. El cliente elige barbero o “el primero libre”.</p>
+        </details>
+        <details name="faq">
+          <summary>¿En qué zonas están?</summary>
+          <p>Arrancamos en Mendoza: Valle de Uco, San Rafael y Gran Mendoza. Si estás en otra zona, escribinos igual.</p>
+        </details>
+      </div>
+    </section>
+  </main>
+
+  <!-- ===== Pie de tiles ===== -->
+  <footer class="foot">
+    <div class="foot__grid">
+      <div class="tile tile--statement">
+        <p class="tile__big">Turnos con seña para canchas y barberías de Mendoza.</p>
+        <p class="tile__small">© <span id="year">2026</span> Bookea</p>
+      </div>
+      <nav class="tile tile--nav" aria-label="Pie">
+        <a href="#como-funciona">Cómo funciona</a>
+        <a href="#funciones">Funciones</a>
+        <a href="#precios">Precios</a>
+        <a href="#preguntas">Preguntas</a>
+      </nav>
+      <div class="tile tile--time">
+        <p class="tile__k">Ahora en Mendoza</p>
+        <p class="tile__clock" id="clock">21:04</p>
+        <p class="tile__small" id="clock-note">Las canchas de la noche ya se están llenando.</p>
+      </div>
+      <div class="tile tile--mail">
+        <p class="tile__k">Escribinos</p>
+        <p class="tile__mail">hola@bookea.ar</p>
+        <button type="button" class="tile__copy" data-copy="hola@bookea.ar">Copiar</button>
+      </div>
+      <div class="tile tile--word" aria-hidden="true"><span>Bookea</span></div>
+      <a class="tile tile--go" href="#sumate">
+        <span>Sumá tu negocio</span>
+        <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M10 38 38 10M16 10h22v22" fill="none" stroke="currentColor" stroke-width="4"/></svg>
+      </a>
+    </div>
+    <p class="credits frame">Fotos: <a href="https://commons.wikimedia.org/wiki/File:Multiple_Paddle_tennis_players_engage_in_a_lively_match_on_blue_courts_surrounded_by_lush_greenery.jpg">“Multiple Paddle tennis players…”</a>, Nenad Stojković, CC BY 2.0; <a href="https://commons.wikimedia.org/wiki/File:Barber_cutting_hair_with_comb._Back_view_of_young_man_in_barber_shop.jpg">“Barber cutting hair with comb…”</a>, Nenad Stojkovic, CC BY 2.0; <a href="https://commons.wikimedia.org/w/index.php?curid=4217148">“Tennis racket and ball”</a>, nao2g, CC BY 3.0; <a href="https://commons.wikimedia.org/wiki/File:DFC_5331_A_late-night_match_at_Klet_Kaeo_a_player_in_red_sprints_toward_goal_as_defenders_close_in_under_the_floodlights.jpg">“DFC 5331 A late-night match at Klet Kaeo…”</a>, PattayaPatrol, CC BY-SA 4.0; <a href="https://commons.wikimedia.org/wiki/File:Young_men_with_trendy_haircut_at_barber_shop.jpg">“Young men with trendy haircut at barber shop”</a>, Nenad Stojkovic, CC BY 2.0; <a href="https://commons.wikimedia.org/wiki/File:Padel_rackets_and_balls.jpg">“Padel rackets and balls”</a>, Anton Gustafsson, CC BY 2.0; <a href="https://commons.wikimedia.org/wiki/File:Vineyard_in_Mendoza,_Argentina.jpg">“Vineyard in Mendoza, Argentina”</a>, David, CC BY 2.0; <a href="https://commons.wikimedia.org/wiki/File:Acequia_en_Godoy_Cruz.JPG">“Acequia en Godoy Cruz”</a>, Thialfi, dominio público. Todas vía Wikimedia Commons, en blanco y negro en el mosaico. Los negocios y nombres de la agenda son ejemplos.</p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>

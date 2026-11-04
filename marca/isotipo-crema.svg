@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" role="img" aria-label="Bookea">
+  <defs>
+    <mask id="panzas" maskUnits="userSpaceOnUse" x="0" y="0" width="1000" height="1000">
+      <path d="M391,180 H520 A175,175 0 0 1 520,530 H391 Z" fill="#fff"/><path d="M391,426 H545 A197,197 0 0 1 545,820 H391 Z" fill="#fff"/>
+      <path d="M391,284 H520 A71,71 0 0 1 520,426 H391 Z" fill="#000"/><path d="M391,530 H545 A93,93 0 0 1 545,716 H391 Z" fill="#000"/>
+    </mask>
+  </defs>
+  <rect width="1000" height="1000" rx="200" fill="#f5ecd7"/>
+  <g transform="translate(8,0)">
+    <g mask="url(#panzas)">
+      <polygon points="0,0 1000,0 1000,553.38 0,377.06" fill="#1fa08c"/>
+      <polygon points="0,377.06 1000,553.38 1000,1000 0,1000" fill="#e4572e"/>
+    </g>
+    <g fill="#11151c"><rect x="255" y="180" width="136" height="640"/></g>
+  </g>
+</svg>

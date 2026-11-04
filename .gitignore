@@ -1,0 +1,10 @@
+# Generado: se rearma con python3 scripts/preview.py
+dist/
+
+# Capturas y pruebas de las skills de diseño
+.taste-skill/inspect/
+.taste-skill/v1/
+gate/
+
+__pycache__/
+.DS_Store

@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="es-AR"><head><meta charset="utf-8"><title>Bookea · Franja Exacta</title>
+<style>
+@font-face { font-family: "Bricolage Grotesque"; src: url("fuentes/BricolageGrotesque-Bold.ttf"); font-weight: 700; }
+@font-face { font-family: "Bricolage Grotesque"; src: url("fuentes/BricolageGrotesque-Regular.ttf"); font-weight: 400; }
+@font-face { font-family: "DM Mono"; src: url("fuentes/DMMono-Regular.ttf"); }
+@font-face { font-family: "Instrument Sans"; src: url("fuentes/InstrumentSans-Regular.ttf"); }
+* { box-sizing: border-box; margin: 0; }
+html, body { width: 1600px; height: 1000px; background: #0b0d12; color: #f5ecd7; }
+body { position: relative; font-family: "Instrument Sans", sans-serif; overflow: hidden; }
+.mono { font-family: "DM Mono", monospace; font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(245,236,215,0.6); }
+.placa { position: absolute; left: 64px; top: 120px; width: 760px; height: 760px; }
+.placa-rot { position: absolute; left: 64px; top: 72px; }
+.der { position: absolute; left: 896px; top: 64px; width: 640px; }
+.firma { display: flex; align-items: center; gap: 28px; height: 120px; }
+.firma svg { flex: none; }
+.palabra { font-family: "Bricolage Grotesque"; font-weight: 700; font-size: 104px; letter-spacing: -0.045em; line-height: 1; }
+.sub { margin-top: 28px; }
+.bloque { position: absolute; left: 896px; width: 640px; }
+.reds { top: 300px; display: flex; align-items: flex-end; gap: 30px; height: 190px; }
+.red { display: flex; flex-direction: column; align-items: center; gap: 12px; margin: 0; }
+.red svg { display: block; }
+.red figcaption { font-family: "DM Mono"; font-size: 12px; color: rgba(245,236,215,0.6); letter-spacing: 0.08em; }
+.paleta { top: 556px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+.sw { height: 96px; border-radius: 10px; }
+.sw-n { box-shadow: inset 0 0 0 1.5px rgba(245,236,215,0.22); }
+.sw-t { margin-top: 12px; font-size: 15px; }
+.sw-h { margin-top: 2px; font-family: "DM Mono"; font-size: 12px; letter-spacing: 0.08em; color: rgba(245,236,215,0.6); }
+.usos { top: 742px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.uso { height: 138px; border-radius: 10px; display: flex; align-items: center; justify-content: center; gap: 14px; }
+.uso .palabra { font-size: 50px; }
+.pie { position: absolute; left: 64px; right: 64px; bottom: 56px; display: flex; justify-content: space-between; }
+.rot { margin-bottom: 18px; }
+</style></head>
+<body>
+<p class="mono placa-rot">Lámina 01 · Construcción del isotipo</p>
+<div class="placa"><svg viewBox="0 0 1000 1000" width="760" height="760" aria-hidden="true">
+<rect width="1000" height="1000" fill="#171c26"/>
+<line x1="40" y1="180" x2="960" y2="180" stroke="#f5ecd7" stroke-opacity="0.16" stroke-width="1.6"/><line x1="40" y1="284" x2="960" y2="284" stroke="#f5ecd7" stroke-opacity="0.16" stroke-width="1.6"/><line x1="40" y1="426" x2="960" y2="426" stroke="#f5ecd7" stroke-opacity="0.16" stroke-width="1.6"/><line x1="40" y1="530" x2="960" y2="530" stroke="#f5ecd7" stroke-opacity="0.16" stroke-width="1.6"/><line x1="40" y1="716" x2="960" y2="716" stroke="#f5ecd7" stroke-opacity="0.16" stroke-width="1.6"/><line x1="40" y1="820" x2="960" y2="820" stroke="#f5ecd7" stroke-opacity="0.16" stroke-width="1.6"/><line x1="263" y1="40" x2="263" y2="960" stroke="#f5ecd7" stroke-opacity="0.16" stroke-width="1.6"/><line x1="399" y1="40" x2="399" y2="960" stroke="#f5ecd7" stroke-opacity="0.16" stroke-width="1.6"/><line x1="528" y1="40" x2="528" y2="960" stroke="#f5ecd7" stroke-opacity="0.16" stroke-width="1.6"/><line x1="553" y1="40" x2="553" y2="960" stroke="#f5ecd7" stroke-opacity="0.16" stroke-width="1.6"/><line x1="703" y1="40" x2="703" y2="960" stroke="#f5ecd7" stroke-opacity="0.16" stroke-width="1.6"/><line x1="750" y1="40" x2="750" y2="960" stroke="#f5ecd7" stroke-opacity="0.16" stroke-width="1.6"/><circle cx="528" cy="355" r="175" stroke="#f5ecd7" stroke-opacity="0.42" stroke-width="1.6" fill="none" stroke-dasharray="6 9"/><circle cx="553" cy="623" r="197" stroke="#f5ecd7" stroke-opacity="0.42" stroke-width="1.6" fill="none" stroke-dasharray="6 9"/><circle cx="528" cy="355" r="71" stroke="#f5ecd7" stroke-opacity="0.42" stroke-width="1.6" fill="none" stroke-dasharray="6 9"/><circle cx="553" cy="623" r="93" stroke="#f5ecd7" stroke-opacity="0.42" stroke-width="1.6" fill="none" stroke-dasharray="6 9"/><path d="M514,355 H542 M528,341 V369" stroke="#f5ecd7" stroke-opacity="0.8" stroke-width="2"/><path d="M539,623 H567 M553,609 V637" stroke="#f5ecd7" stroke-opacity="0.8" stroke-width="2"/><line x1="308" y1="430.0" x2="968" y2="546.3" stroke="#f5ecd7" stroke-opacity="0.42" stroke-width="1.6" fill="none" stroke-dasharray="2 7"/><line x1="798" y1="516.4" x2="948" y2="516.4" stroke="#f5ecd7" stroke-opacity="0.42" stroke-width="1.6" fill="none"/><path d="M918,516.4 A120,120 0 0 1 916.2,537.2" stroke="#f5ecd7" stroke-opacity="0.42" stroke-width="1.6" fill="none"/>
+<defs><mask id="mplaca" maskUnits="userSpaceOnUse" x="0" y="0" width="1000" height="1000">
+<path d="M391,180 H520 A175,175 0 0 1 520,530 H391 Z" fill="#fff"/><path d="M391,426 H545 A197,197 0 0 1 545,820 H391 Z" fill="#fff"/><path d="M391,284 H520 A71,71 0 0 1 520,426 H391 Z" fill="#000"/><path d="M391,530 H545 A93,93 0 0 1 545,716 H391 Z" fill="#000"/></mask></defs>
+<g transform="translate(8,0)"><g mask="url(#mplaca)"><polygon points="0,0 1000,0 1000,553.38 0,377.06" fill="#1fa08c"/><polygon points="0,377.06 1000,553.38 1000,1000 0,1000" fill="#e4572e"/></g>
+<rect x="255" y="180" width="136" height="640" fill="#f5ecd7"/></g>
+<path d="M263,132 V152 M399,132 V152 M263,142 H399" stroke="#f5ecd7" stroke-opacity="0.55" stroke-width="1.6"/><text x="331" y="118" text-anchor="middle" font-family="DM Mono" font-size="19" fill="#f5ecd7" fill-opacity="0.72" letter-spacing="0.5">136</text><path d="M190,180 H210 M190,820 H210 M200,180 V820" stroke="#f5ecd7" stroke-opacity="0.55" stroke-width="1.6"/><text x="176" y="506" text-anchor="end" font-family="DM Mono" font-size="19" fill="#f5ecd7" fill-opacity="0.72" letter-spacing="0.5">640</text><path d="M814,180 V284 M804,180 H824 M804,284 H824" stroke="#f5ecd7" stroke-opacity="0.55" stroke-width="1.6"/><text x="838" y="238" font-family="DM Mono" font-size="19" fill="#f5ecd7" fill-opacity="0.72" letter-spacing="0.5">104</text><text x="421" y="408" font-family="DM Mono" font-size="19" fill="#f5ecd7" fill-opacity="0.72" letter-spacing="0.5">r 71</text><text x="552" y="169" font-family="DM Mono" font-size="19" fill="#f5ecd7" fill-opacity="0.72" letter-spacing="0.5">r 175</text><text x="421" y="696" font-family="DM Mono" font-size="19" fill="#f5ecd7" fill-opacity="0.72" letter-spacing="0.5">r 93</text><text x="577" y="855" font-family="DM Mono" font-size="19" fill="#f5ecd7" fill-opacity="0.72" letter-spacing="0.5">r 197</text><text x="936" y="550.4" font-family="DM Mono" font-size="19" fill="#f5ecd7" fill-opacity="0.72" letter-spacing="0.5">10°</text>
+</svg></div>
+
+<div class="der">
+  <div class="firma"><svg viewBox="0 0 1000 1000" width="120" height="120" aria-hidden="true"><defs><mask id="mfirma" maskUnits="userSpaceOnUse" x="0" y="0" width="1000" height="1000">
+<path d="M391,180 H520 A175,175 0 0 1 520,530 H391 Z" fill="#fff"/><path d="M391,426 H545 A197,197 0 0 1 545,820 H391 Z" fill="#fff"/><path d="M391,284 H520 A71,71 0 0 1 520,426 H391 Z" fill="#000"/><path d="M391,530 H545 A93,93 0 0 1 545,716 H391 Z" fill="#000"/></mask></defs>
+<rect width="1000" height="1000" rx="200" fill="#11151c"/><g transform="translate(8,0)"><g mask="url(#mfirma)"><polygon points="0,0 1000,0 1000,553.38 0,377.06" fill="#1fa08c"/><polygon points="0,377.06 1000,553.38 1000,1000 0,1000" fill="#e4572e"/></g>
+<rect x="255" y="180" width="136" height="640" fill="#f5ecd7"/></g></svg><span class="palabra">Bookea</span></div>
+  <p class="mono sub">Franja Exacta · B de turno · asta crema, panzas cortadas a 10°</p>
+</div>
+
+<div class="bloque reds"><figure class="red"><svg viewBox="0 0 1000 1000" width="160" height="160" aria-hidden="true"><defs><mask id="mr160" maskUnits="userSpaceOnUse" x="0" y="0" width="1000" height="1000">
+<path d="M391,180 H520 A175,175 0 0 1 520,530 H391 Z" fill="#fff"/><path d="M391,426 H545 A197,197 0 0 1 545,820 H391 Z" fill="#fff"/><path d="M391,284 H520 A71,71 0 0 1 520,426 H391 Z" fill="#000"/><path d="M391,530 H545 A93,93 0 0 1 545,716 H391 Z" fill="#000"/></mask></defs>
+<rect width="1000" height="1000" rx="200" fill="#11151c"/><g transform="translate(8,0)"><g mask="url(#mr160)"><polygon points="0,0 1000,0 1000,553.38 0,377.06" fill="#1fa08c"/><polygon points="0,377.06 1000,553.38 1000,1000 0,1000" fill="#e4572e"/></g>
+<rect x="255" y="180" width="136" height="640" fill="#f5ecd7"/></g></svg><figcaption>160</figcaption></figure><figure class="red"><svg viewBox="0 0 1000 1000" width="96" height="96" aria-hidden="true"><defs><mask id="mr96" maskUnits="userSpaceOnUse" x="0" y="0" width="1000" height="1000">
+<path d="M391,180 H520 A175,175 0 0 1 520,530 H391 Z" fill="#fff"/><path d="M391,426 H545 A197,197 0 0 1 545,820 H391 Z" fill="#fff"/><path d="M391,284 H520 A71,71 0 0 1 520,426 H391 Z" fill="#000"/><path d="M391,530 H545 A93,93 0 0 1 545,716 H391 Z" fill="#000"/></mask></defs>
+<rect width="1000" height="1000" rx="200" fill="#11151c"/><g transform="translate(8,0)"><g mask="url(#mr96)"><polygon points="0,0 1000,0 1000,553.38 0,377.06" fill="#1fa08c"/><polygon points="0,377.06 1000,553.38 1000,1000 0,1000" fill="#e4572e"/></g>
+<rect x="255" y="180" width="136" height="640" fill="#f5ecd7"/></g></svg><figcaption>96</figcaption></figure><figure class="red"><svg viewBox="0 0 1000 1000" width="64" height="64" aria-hidden="true"><defs><mask id="mr64" maskUnits="userSpaceOnUse" x="0" y="0" width="1000" height="1000">
+<path d="M391,180 H520 A175,175 0 0 1 520,530 H391 Z" fill="#fff"/><path d="M391,426 H545 A197,197 0 0 1 545,820 H391 Z" fill="#fff"/><path d="M391,284 H520 A71,71 0 0 1 520,426 H391 Z" fill="#000"/><path d="M391,530 H545 A93,93 0 0 1 545,716 H391 Z" fill="#000"/></mask></defs>
+<rect width="1000" height="1000" rx="200" fill="#11151c"/><g transform="translate(8,0)"><g mask="url(#mr64)"><polygon points="0,0 1000,0 1000,553.38 0,377.06" fill="#1fa08c"/><polygon points="0,377.06 1000,553.38 1000,1000 0,1000" fill="#e4572e"/></g>
+<rect x="255" y="180" width="136" height="640" fill="#f5ecd7"/></g></svg><figcaption>64</figcaption></figure><figure class="red"><svg viewBox="0 0 1000 1000" width="40" height="40" aria-hidden="true"><defs><mask id="mr40" maskUnits="userSpaceOnUse" x="0" y="0" width="1000" height="1000">
+<path d="M391,180 H520 A175,175 0 0 1 520,530 H391 Z" fill="#fff"/><path d="M391,426 H545 A197,197 0 0 1 545,820 H391 Z" fill="#fff"/><path d="M391,284 H520 A71,71 0 0 1 520,426 H391 Z" fill="#000"/><path d="M391,530 H545 A93,93 0 0 1 545,716 H391 Z" fill="#000"/></mask></defs>
+<rect width="1000" height="1000" rx="200" fill="#11151c"/><g transform="translate(8,0)"><g mask="url(#mr40)"><polygon points="0,0 1000,0 1000,553.38 0,377.06" fill="#1fa08c"/><polygon points="0,377.06 1000,553.38 1000,1000 0,1000" fill="#e4572e"/></g>
+<rect x="255" y="180" width="136" height="640" fill="#f5ecd7"/></g></svg><figcaption>40</figcaption></figure><figure class="red"><svg viewBox="0 0 1000 1000" width="24" height="24" aria-hidden="true"><defs><mask id="mr24" maskUnits="userSpaceOnUse" x="0" y="0" width="1000" height="1000">
+<path d="M391,180 H520 A175,175 0 0 1 520,530 H391 Z" fill="#fff"/><path d="M391,426 H545 A197,197 0 0 1 545,820 H391 Z" fill="#fff"/><path d="M391,284 H520 A71,71 0 0 1 520,426 H391 Z" fill="#000"/><path d="M391,530 H545 A93,93 0 0 1 545,716 H391 Z" fill="#000"/></mask></defs>
+<rect width="1000" height="1000" rx="200" fill="#11151c"/><g transform="translate(8,0)"><g mask="url(#mr24)"><polygon points="0,0 1000,0 1000,553.38 0,377.06" fill="#1fa08c"/><polygon points="0,377.06 1000,553.38 1000,1000 0,1000" fill="#e4572e"/></g>
+<rect x="255" y="180" width="136" height="640" fill="#f5ecd7"/></g></svg><figcaption>24</figcaption></figure><figure class="red"><svg viewBox="0 0 1000 1000" width="16" height="16" aria-hidden="true"><defs><mask id="mr16" maskUnits="userSpaceOnUse" x="0" y="0" width="1000" height="1000">
+<path d="M391,180 H520 A175,175 0 0 1 520,530 H391 Z" fill="#fff"/><path d="M391,426 H545 A197,197 0 0 1 545,820 H391 Z" fill="#fff"/><path d="M391,284 H520 A71,71 0 0 1 520,426 H391 Z" fill="#000"/><path d="M391,530 H545 A93,93 0 0 1 545,716 H391 Z" fill="#000"/></mask></defs>
+<rect width="1000" height="1000" rx="200" fill="#11151c"/><g transform="translate(8,0)"><g mask="url(#mr16)"><polygon points="0,0 1000,0 1000,553.38 0,377.06" fill="#1fa08c"/><polygon points="0,377.06 1000,553.38 1000,1000 0,1000" fill="#e4572e"/></g>
+<rect x="255" y="180" width="136" height="640" fill="#f5ecd7"/></g></svg><figcaption>16</figcaption></figure></div>
+
+<div class="bloque paleta">
+  <div><div class="sw sw-n" style="background:#11151c"></div><p class="sw-t">Noche</p><p class="sw-h">#11151C</p></div>
+  <div><div class="sw" style="background:#e4572e"></div><p class="sw-t">Naranja</p><p class="sw-h">#E4572E</p></div>
+  <div><div class="sw" style="background:#1fa08c"></div><p class="sw-t">Verde agua</p><p class="sw-h">#1FA08C</p></div>
+  <div><div class="sw" style="background:#f5ecd7"></div><p class="sw-t">Crema</p><p class="sw-h">#F5ECD7</p></div>
+</div>
+
+<div class="bloque usos">
+  <div class="uso" style="background:#f5ecd7;color:#11151c"><svg viewBox="0 0 1000 1000" width="64" height="64" aria-hidden="true"><defs><mask id="mu1" maskUnits="userSpaceOnUse" x="0" y="0" width="1000" height="1000">
+<path d="M391,180 H520 A175,175 0 0 1 520,530 H391 Z" fill="#fff"/><path d="M391,426 H545 A197,197 0 0 1 545,820 H391 Z" fill="#fff"/><path d="M391,284 H520 A71,71 0 0 1 520,426 H391 Z" fill="#000"/><path d="M391,530 H545 A93,93 0 0 1 545,716 H391 Z" fill="#000"/></mask></defs>
+<g transform="translate(8,0)"><g mask="url(#mu1)"><polygon points="0,0 1000,0 1000,553.38 0,377.06" fill="#1fa08c"/><polygon points="0,377.06 1000,553.38 1000,1000 0,1000" fill="#e4572e"/></g>
+<rect x="255" y="180" width="136" height="640" fill="#11151c"/></g></svg><span class="palabra">Bookea</span></div>
+  <div class="uso" style="background:#e4572e;color:#11151c"><svg viewBox="0 0 1000 1000" width="64" height="64" aria-hidden="true"><defs><mask id="mu2" maskUnits="userSpaceOnUse" x="0" y="0" width="1000" height="1000">
+<path d="M391,180 H520 A175,175 0 0 1 520,530 H391 Z" fill="#fff"/><path d="M391,426 H545 A197,197 0 0 1 545,820 H391 Z" fill="#fff"/><path d="M391,284 H520 A71,71 0 0 1 520,426 H391 Z" fill="#000"/><path d="M391,530 H545 A93,93 0 0 1 545,716 H391 Z" fill="#000"/></mask></defs>
+<g transform="translate(8,0)"><g mask="url(#mu2)"><polygon points="0,0 1000,0 1000,553.38 0,377.06" fill="#11151c"/><polygon points="0,377.06 1000,553.38 1000,1000 0,1000" fill="#11151c"/></g>
+<rect x="255" y="180" width="136" height="640" fill="#11151c"/></g></svg><span class="palabra">Bookea</span></div>
+</div>
+
+<div class="pie mono"><span>Bookea · Mendoza · 2026</span><span>Asta 136 · trazo 104 · radios 175 / 197 · diagonal 10°</span></div>
+</body></html>
