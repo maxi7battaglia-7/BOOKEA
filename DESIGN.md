@@ -125,4 +125,13 @@ Filosofía **"Franja Exacta"** en `marca/filosofia.md`. Lámina de construcción
   - Con "reducir movimiento", el logo aparece quieto y se desvanece a los 0,6 s.
   - Sin JavaScript no se muestra.
   - Tiene un tope de 4 s por si la carga se demora.
+- **Entrada del primer pantallazo:** empieza mientras sube la persiana.
+  1. Los bloques del mosaico se destapan de izquierda a derecha.
+  2. Baja el menú.
+  3. El título sube palabra por palabra desde una ranura.
+  4. Entran el texto, el botón y la pista.
+  5. Se abre el escenario de la agenda.
+
+  En unos 2 s queda todo quieto.
+- **Al cargar o recargar, la página siempre arranca arriba de todo:** no recuerda el scroll y limpia el ancla de la URL. Los links del menú siguen llevando a cada sección.
 - **Excepción documentada:** el inspector de `design-taste-frontend` marca `late-title` (el título no se lee a 1,2 s) y `covered-text` (el "Bookea" de la pantalla mientras sube). Son efecto directo de la pantalla de carga, pedida por el dueño. Sin ella, la página da 0 fallas.

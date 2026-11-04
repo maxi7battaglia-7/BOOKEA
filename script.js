@@ -355,11 +355,26 @@
     items.forEach((el) => io.observe(el));
   } else items.forEach((el) => el.classList.add("is-in"));
 
+  // ---------- Siempre arriba de todo al cargar y al recargar ----------
+  const alInicio = () => window.scrollTo(0, 0);
+  alInicio();
+  window.addEventListener("load", alInicio, { once: true });
+  window.addEventListener("pageshow", (e) => { if (e.persisted) alInicio(); });
+  window.addEventListener("beforeunload", alInicio);
+
+  // ---------- Título: cada palabra en su ranura para la entrada ----------
+  const titulo = $(".hero__title");
+  if (titulo && !titulo.querySelector(".w")) {
+    titulo.setAttribute("aria-label", titulo.textContent.trim());
+    titulo.innerHTML = titulo.textContent.trim().split(/\s+/)
+      .map((w, i) => `<span class="w" aria-hidden="true"><span style="--i:${i}">${w}</span></span>`).join(" ");
+  }
+
   // ---------- Hero: persiana del escenario ----------
   const hero = $(".hero"), sh = $(".shutter");
   const arrancarHero = () => requestAnimationFrame(() => requestAnimationFrame(() => {
     hero && hero.classList.add("is-loaded");
-    setTimeout(() => sh && sh.classList.add("is-in"), 150);
+    setTimeout(() => sh && sh.classList.add("is-in"), 600);
   }));
 
   // ---------- Pantalla de carga: el logo se arma y después sube ----------
@@ -367,12 +382,13 @@
   const t0 = performance.now();
   const salir = () => {
     if (!splash || splash.classList.contains("is-out")) return;
+    alInicio(); // por si el navegador saltó a un ancla mientras cargaba
     splash.classList.add("is-out");
     document.documentElement.classList.add("is-ready");
     arrancarHero();
     setTimeout(() => splash.remove(), 1000);
   };
-  if (!splash) { document.documentElement.classList.add("is-ready"); arrancarHero(); }
+  if (!splash) { alInicio(); document.documentElement.classList.add("is-ready"); arrancarHero(); }
   else {
     // Se ve al menos lo que tarda en armarse el logo (más corto con "reducir movimiento")
     const listo = () => setTimeout(salir, Math.max(0, (reduce ? 600 : 1500) - (performance.now() - t0)));

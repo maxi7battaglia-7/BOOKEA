@@ -147,6 +147,8 @@ h1, h2, h3 { font-family: var(--f-display); font-weight: 500; text-wrap: balance
   font-size: var(--s-xl); line-height: 0.98; letter-spacing: -0.04em; max-width: 9.5em;
 }
 .hero__copy { grid-column: 1 / 5; grid-row: 2; padding-top: 36px; padding-bottom: 48px; display: grid; gap: 28px; align-content: start; justify-items: start; }
+.hero__title .w { display: inline-block; overflow: hidden; vertical-align: top; padding-bottom: 0.12em; margin-bottom: -0.12em; }
+.hero__title .w > span { display: inline-block; }
 .hero__lead { font-size: var(--s-b); max-width: 40ch; }
 .hero__hint { font-size: var(--s-s); color: var(--soft); max-width: 32ch; }
 
@@ -497,10 +499,30 @@ h1, h2, h3 { font-family: var(--f-display); font-weight: 500; text-wrap: balance
   .js .shutter.is-in { clip-path: polygon(var(--cx) 0, 100% 0, 100% 100%, 0 100%, 0 var(--cy)); }
   .js .shutter.is-in .stage__inner { transform: none; }
 
-  .js .hero__title, .js .hero__copy > * { opacity: 0.001; transform: translateY(24px); transition: opacity 800ms var(--ease-expo), transform 800ms var(--ease-expo); }
-  .js .hero__copy > :nth-child(2) { transition-delay: 90ms; }
-  .js .hero__copy > :nth-child(3) { transition-delay: 180ms; }
-  .js .is-loaded .hero__title, .js .is-loaded .hero__copy > * { opacity: 1; transform: none; }
+  /* ===== Entrada del primer pantallazo, mientras sube la persiana de la pantalla de carga ===== */
+  /* 1) el mosaico se destapa bloque por bloque, de izquierda a derecha */
+  .js .mosaico > * { clip-path: inset(0 0 100% 0); transition: clip-path 900ms var(--ease-expo); }
+  .js.is-ready .mosaico > * { clip-path: inset(0); }
+  .js .m-canchas { transition-delay: 80ms; }  .js .m-crema { transition-delay: 125ms; }
+  .js .m-futbol { transition-delay: 170ms; }   .js .m-naranja { transition-delay: 215ms; }
+  .js .m-peine { transition-delay: 260ms; }    .js .m-verde { transition-delay: 305ms; }
+  .js .m-noche { transition-delay: 350ms; }    .js .m-barbero { transition-delay: 395ms; }
+  .js .m-tenis { transition-delay: 440ms; }    .js .m-paletas { transition-delay: 485ms; }
+  /* 2) baja el menú */
+  .js .nav > * { opacity: 0.001; transform: translateY(-10px); transition: opacity 600ms var(--ease-out), transform 600ms var(--ease-out); }
+  .js.is-ready .nav > * { opacity: 1; transform: none; }
+  .js .nav > :nth-child(1) { transition-delay: 300ms; }
+  .js .nav > :nth-child(2) { transition-delay: 360ms; }
+  .js .nav > :nth-child(3) { transition-delay: 420ms; }
+  /* 3) el título sube palabra por palabra desde una ranura */
+  .js .hero__title .w > span { transform: translateY(108%); transition: transform 900ms var(--ease-expo); transition-delay: calc(380ms + var(--i, 0) * 60ms); }
+  .js .is-loaded .hero__title .w > span { transform: none; }
+  /* 4) texto, botón y pista */
+  .js .hero__copy > * { opacity: 0.001; transform: translateY(18px); transition: opacity 800ms var(--ease-expo), transform 800ms var(--ease-expo); transition-delay: 620ms; }
+  .js .hero__copy > :nth-child(2) { transition-delay: 690ms; }
+  .js .hero__copy > :nth-child(3) { transition-delay: 760ms; }
+  .js .hero__copy > :nth-child(4) { transition-delay: 830ms; }
+  .js .is-loaded .hero__copy > * { opacity: 1; transform: none; }
 
   .js .rise { opacity: 0.15; transform: translateY(24px); transition: opacity 800ms var(--ease-expo), transform 800ms var(--ease-expo); transition-delay: var(--d, 0ms); }
   .js .rise.is-in { opacity: 1; transform: none; }
