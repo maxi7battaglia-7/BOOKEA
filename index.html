@@ -172,62 +172,83 @@
 
     <!-- ===== Cómo funciona: lo que das y lo que vuelve ===== -->
     <section class="how frame" id="como-funciona" aria-labelledby="how-t">
-      <h2 id="how-t" class="h-sec">Así funciona</h2>
+      <div class="how__head">
+        <h2 id="how-t" class="h-sec">Así funciona</h2>
+        <p class="how__sub">Para tu complejo o tu barbería: tres pasos y empezás a recibir reservas con seña.</p>
+      </div>
       <ol class="how__list">
         <li class="ex">
-          <p class="ex__say">Primero, armás tu agenda.</p>
-          <div class="call" data-ui>
-            <span class="call__label">Tu negocio</span>
-            <p class="call__input">Pádel · 3 canchas · de 17 a 00:30 · turnos de 90 min</p>
+          <div class="ex__txt">
+            <span class="ex__n" aria-hidden="true">1</span>
+            <h3 class="ex__say">Armás tu agenda</h3>
+            <p class="ex__exp">Cargás tus canchas o tus barberos, los horarios y el precio de cada franja. La seña se calcula sola.</p>
           </div>
-          <div class="resp" data-ui>
-            <div class="chips">
-              <span class="chip">Cancha 1</span><span class="chip">Cancha 2</span><span class="chip">Cancha 3 · techada</span>
+          <div class="ex__demo">
+            <div class="call" data-ui>
+              <span class="call__label">Tu negocio</span>
+              <p class="call__input">Pádel · 3 canchas · de 17 a 00:30 · turnos de 90 min</p>
             </div>
-            <table class="mini-table">
-              <caption class="sr-only">Precios por franja</caption>
-              <tbody>
-                <tr><th scope="row">17:00 a 20:00</th><td>$ 28.000</td><td>seña $ 7.000</td></tr>
-                <tr><th scope="row">20:00 a 00:30</th><td>$ 34.000</td><td>seña $ 8.500</td></tr>
-              </tbody>
-            </table>
+            <div class="resp" data-ui>
+              <div class="chips">
+                <span class="chip">Cancha 1</span><span class="chip">Cancha 2</span><span class="chip">Cancha 3 · techada</span>
+              </div>
+              <table class="mini-table">
+                <caption class="sr-only">Precios por franja</caption>
+                <tbody>
+                  <tr><th scope="row">17:00 a 20:00</th><td>$ 28.000</td><td>seña $ 7.000</td></tr>
+                  <tr><th scope="row">20:00 a 00:30</th><td>$ 34.000</td><td>seña $ 8.500</td></tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </li>
         <li class="ex">
-          <p class="ex__say">Después, compartís tu link.</p>
-          <div class="call call--link" data-ui>
-            <label class="call__label" for="link">Tu link de reservas</label>
-            <div class="call__row">
-              <input id="link" class="call__input" value="bookea.ar/losalamos" readonly />
-              <button class="call__copy" type="button" data-copy="bookea.ar/losalamos">Copiar</button>
-            </div>
+          <div class="ex__txt">
+            <span class="ex__n" aria-hidden="true">2</span>
+            <h3 class="ex__say">Compartís tu link</h3>
+            <p class="ex__exp">Lo ponés en tu Instagram o lo mandás por WhatsApp cuando te preguntan si hay lugar. Tus clientes ven los horarios libres.</p>
           </div>
-          <div class="resp resp--chat" data-ui>
-            <p class="msg msg--in">¿Tenés cancha hoy a las 21?</p>
-            <p class="msg msg--out">¡Hola! Elegí tu horario y reservá acá: <u>bookea.ar/losalamos</u></p>
+          <div class="ex__demo">
+            <div class="call call--link" data-ui>
+              <label class="call__label" for="link">Tu link de reservas</label>
+              <div class="call__row">
+                <input id="link" class="call__input" value="bookea.ar/losalamos" readonly />
+                <button class="call__copy" type="button" data-copy="bookea.ar/losalamos">Copiar</button>
+              </div>
+            </div>
+            <div class="resp resp--chat" data-ui>
+              <p class="msg msg--in">¿Tenés cancha hoy a las 21?</p>
+              <p class="msg msg--out">¡Hola! Elegí tu horario y reservá acá: <u>bookea.ar/losalamos</u></p>
+            </div>
           </div>
         </li>
         <li class="ex ex--final">
-          <p class="ex__say">Y te reservan con seña.</p>
-          <div class="call" data-ui>
-            <span class="call__label">Martina eligió</span>
-            <p class="call__picked">Cancha 2 · Martes 21:30 · $ 34.000</p>
+          <div class="ex__txt">
+            <span class="ex__n" aria-hidden="true">3</span>
+            <h3 class="ex__say">Te reservan con seña</h3>
+            <p class="ex__exp">El cliente elige el horario y paga la seña con Mercado Pago. La plata te llega a vos, el turno queda en tu agenda y le avisamos por WhatsApp.</p>
           </div>
-          <div class="result" data-ui>
-            <div class="result__col">
-              <p class="result__k">Mercado Pago</p>
-              <p class="result__v">$ 8.500</p>
-              <p class="result__s"><span class="dot dot--ok"></span>Seña acreditada en tu cuenta</p>
+          <div class="ex__demo">
+            <div class="call" data-ui>
+              <span class="call__label">Martina eligió</span>
+              <p class="call__picked">Cancha 2 · Martes 21:30 · $ 34.000</p>
             </div>
-            <div class="result__col">
-              <p class="result__k">WhatsApp</p>
-              <p class="result__msg">Martina, te esperamos hoy 21:30 en Cancha 2.</p>
-              <p class="result__s">Recordatorio programado 18:30</p>
-            </div>
-            <div class="result__col">
-              <p class="result__k">Tu agenda</p>
-              <p class="result__slot">21:30 · Cancha 2<br /><b>Martina G.</b></p>
-              <p class="result__s">10 de 15 turnos</p>
+            <div class="result" data-ui>
+              <div class="result__col">
+                <p class="result__k">Mercado Pago</p>
+                <p class="result__v">$ 8.500</p>
+                <p class="result__s"><span class="dot dot--ok"></span>Seña acreditada en tu cuenta</p>
+              </div>
+              <div class="result__col">
+                <p class="result__k">WhatsApp</p>
+                <p class="result__msg">Martina, te esperamos hoy 21:30 en Cancha 2.</p>
+                <p class="result__s">Recordatorio programado 18:30</p>
+              </div>
+              <div class="result__col">
+                <p class="result__k">Tu agenda</p>
+                <p class="result__slot">21:30 · Cancha 2<br /><b>Martina G.</b></p>
+                <p class="result__s">10 de 15 turnos</p>
+              </div>
             </div>
           </div>
         </li>

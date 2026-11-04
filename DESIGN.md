@@ -189,3 +189,8 @@ El dueño pidió cambiarla por completo.
 - Se borró la sección #nosotros (foto del Valle de Uco, carta y foto de la acequia) y sus dos fotos.
 - "¿Quiénes somos?" del hero ahora lleva a Preguntas frecuentes y abre la primera respuesta, "¿Quiénes son?".
 - Funciones ya no tiene padding abajo: Precios trae su propio aire y así no queda un hueco doble.
+
+## Así funciona en tres bloques (pedido del dueño)
+- Cada paso es un bloque gris propio con un número en círculo (1 y 2 noche, 3 naranja), un título y una explicación corta a la izquierda, y la pantalla de ejemplo a la derecha.
+- Debajo de "Así funciona" va una línea que dice para quién es.
+- En tablet y celular, cada bloque apila la explicación arriba y la pantalla abajo.

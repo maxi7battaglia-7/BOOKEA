@@ -197,7 +197,7 @@
   // ---------- Entradas ----------
   const grupos = [
     [".intro", [".intro__title"]],
-    [".how", [".h-sec", ".ex"]],
+    [".how", [".h-sec", ".how__sub", ".ex"]],
     [".features", [".h-sec", ".cell"]],
     [".pricing", [".plan", ".plan-stage"]],
     [".join", [".join__title", ".join__next li", ".form"]],
