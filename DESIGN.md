@@ -191,6 +191,6 @@ El dueño pidió cambiarla por completo.
 - Funciones ya no tiene padding abajo: Precios trae su propio aire y así no queda un hueco doble.
 
 ## Así funciona en tres bloques (pedido del dueño)
-- Cada paso es un bloque gris propio con un número en círculo (1 y 2 noche, 3 naranja), un título y una explicación corta a la izquierda, y la pantalla de ejemplo a la derecha.
+- Cada paso es un bloque gris propio con un número en círculo (1 verde agua, 2 noche, 3 naranja), un título y una explicación corta a la izquierda, y la pantalla de ejemplo a la derecha.
 - Debajo de "Así funciona" va una línea que dice para quién es.
 - En tablet y celular, cada bloque apila la explicación arriba y la pantalla abajo.
