@@ -149,12 +149,14 @@
   // ---------- Preguntas: signo + / − ----------
   $$(".faq summary").forEach((s) => { const pm = document.createElement("span"); pm.className = "pm"; pm.setAttribute("aria-hidden", "true"); s.appendChild(pm); });
 
+  // "¿Quiénes somos?" lleva a Preguntas frecuentes con su respuesta abierta
+  $$("[data-abrir]").forEach((a) => a.addEventListener("click", () => { const d = document.getElementById(a.dataset.abrir); if (d) d.open = true; }));
+
   // ---------- Entradas ----------
   const grupos = [
     [".intro", [".intro__title"]],
     [".how", [".h-sec", ".ex"]],
     [".features", [".h-sec", ".cell"]],
-    [".place", [".place__title", ".letter__sheet", ".letter__pic"]],
     [".pricing", [".plan", ".plan-stage"]],
     [".join", [".join__title", ".join__next li", ".form"]],
     [".faq", [".faq__title", ".faq details"]],
@@ -166,7 +168,6 @@
     let i = 0;
     sels.forEach((sel) => $$(sel, root).forEach((el) => { el.classList.add("rise"); el.style.setProperty("--d", `${Math.min(i++, 6) * 75}ms`); items.push(el); }));
   });
-  const pic = $(".place__pic"); if (pic) items.push(pic);
   if ("IntersectionObserver" in window && !reduce) {
     const io = new IntersectionObserver((ents) => ents.forEach((en) => { if (en.isIntersecting) { en.target.classList.add("is-in"); io.unobserve(en.target); } }), { rootMargin: "0px 0px -8% 0px", threshold: 0.01 });
     items.forEach((el) => io.observe(el));

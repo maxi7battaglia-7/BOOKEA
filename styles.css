@@ -309,7 +309,7 @@ h1, h2, h3 { font-family: var(--f-display); font-stretch: var(--display-ancho); 
 .dot--ok { background: var(--teal); }
 
 /* ---------- Funciones ---------- */
-.features { padding-block: var(--section); }
+.features { padding-top: var(--section); } /* sin padding abajo: Precios ya trae su aire */
 .features .h-sec { margin-bottom: 56px; }
 .cells { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .cell {
@@ -362,26 +362,6 @@ h1, h2, h3 { font-family: var(--f-display); font-stretch: var(--display-ancho); 
 .ph__slots .is-off { color: var(--soft); text-decoration: line-through; background: var(--raised); }
 .ph__slots .is-pick { background: var(--teal); border-color: var(--teal); color: var(--ink); }
 .ph__note { margin-top: 12px; font-size: 13px; color: var(--soft); }
-
-/* ---------- Mendoza ---------- */
-.place { background: var(--ink); color: var(--cream); }
-.place__pic { position: relative; overflow: hidden; }
-.place__pic img { width: 100%; height: clamp(320px, 62vh, 640px); object-fit: cover; object-position: center 55%; }
-.place__pic figcaption {
-  position: absolute; left: max(var(--margin), env(safe-area-inset-left, 0px)); bottom: 16px;
-  font-size: var(--s-s); color: var(--ground); background: var(--ink); padding: 4px 10px; border-radius: 4px;
-}
-.place__inner { padding-block: clamp(88px, 10vw, 152px); display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: var(--gap); row-gap: 56px; }
-.place__title { grid-column: 1 / -1; font-size: var(--s-xl); line-height: 1; letter-spacing: -0.03em; max-width: 12em; }
-.letter { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: var(--gap); align-items: stretch; }
-.letter__sheet { background: var(--cream); color: var(--ink); padding: clamp(28px, 4.5vw, 64px); display: grid; gap: 18px; align-content: start; border-radius: var(--r); }
-.letter__sheet p { font-size: var(--s-b); line-height: 1.6; max-width: 54ch; }
-.letter__sheet mark { background: var(--orange); color: var(--ink); padding: 0 0.2em; }
-.letter__sheet .letter__sign { font-style: italic; font-size: var(--s-m); margin-top: 12px; }
-.letter__sheet .letter__role { font-size: var(--s-s); color: var(--soft); margin-top: -12px; }
-.letter__pic { position: relative; border-radius: var(--r); overflow: hidden; min-height: 420px; }
-.letter__pic img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.letter__pic figcaption { position: absolute; left: 12px; bottom: 12px; font-size: var(--s-s); background: var(--ink); color: var(--ground); padding: 4px 10px; border-radius: 4px; }
 
 /* ---------- Precios ---------- */
 .pricing {
@@ -533,10 +513,6 @@ h1, h2, h3 { font-family: var(--f-display); font-stretch: var(--display-ancho); 
   .m-foto:nth-child(3) img { animation-delay: 80ms; } .m-foto:nth-child(5) img { animation-delay: 160ms; }
   .m-foto:nth-child(7) img { animation-delay: 120ms; } .m-foto:nth-child(9) img { animation-delay: 200ms; } .m-foto:nth-child(10) img { animation-delay: 240ms; }
   @keyframes asentar { from { transform: scale(1.1); } to { transform: none; } }
-  .js .place__pic img { transform: scale(1.08); transition: transform 2400ms var(--ease-soft); }
-  .js .place__pic.is-in img { transform: scale(1); }
-  .js .letter__pic img { animation: drift 24s var(--ease-soft) infinite alternate; }
-  @keyframes drift { from { transform: scale(1.02) translateY(0); } to { transform: scale(1.1) translateY(-2%); } }
 }
 
 /* ---------- Pantalla de carga ---------- */
@@ -640,8 +616,6 @@ h1, h2, h3 { font-family: var(--f-display); font-stretch: var(--display-ancho); 
   .cell--rev .frag, .cell--rev .frag--price, .cell--rev .frag--wa { margin: 8px 0 -1px 24px; border-radius: var(--r) 0 0 0; border-right: 0; }
   .cell--rev .frag--phone { margin: 8px auto -1px; border-radius: 18px 18px 0 0; }
 
-  .letter { grid-template-columns: 1fr; }
-  .letter__pic { min-height: 360px; }
 
   .pricing { display: block; }
   .plans { margin-bottom: 32px; }

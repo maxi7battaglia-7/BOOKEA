@@ -184,3 +184,8 @@ El dueño pidió cambiarla por completo.
 - **Al pasar el cursor todo se pone verde agua (#1fa08c):** los links y el botón con texto noche (contraste AA), los vidrios con un teñido verde y las fotos viradas a verde (`mix-blend-mode: color`).
 - El color vivo queda para el contenido (hero naranja, buscador, etc.). La banda es neutra.
 - Al terminar la entrada, la clase `nav-lista` quita la demora escalonada para que el hover responda al instante.
+
+## Sin sección "Hecho en Mendoza" (pedido del dueño)
+- Se borró la sección #nosotros (foto del Valle de Uco, carta y foto de la acequia) y sus dos fotos.
+- "¿Quiénes somos?" del hero ahora lleva a Preguntas frecuentes y abre la primera respuesta, "¿Quiénes son?".
+- Funciones ya no tiene padding abajo: Precios trae su propio aire y así no queda un hueco doble.
