@@ -177,3 +177,10 @@ El dueño pidió cambiarla por completo.
 ## Refrescar siempre arriba (4/11/2026)
 - **Al cargar o refrescar, la página arranca arriba de todo, aunque la dirección tenga un ancla** (`#precios`). En la vista previa de claude.ai, el refresco abre la página de cero con el ancla del último link tocado, y antes eso la bajaba a esa sección.
 - **Única excepción:** "Sumá tu negocio" en `reservar.html` deja anotada la sección en `sessionStorage` y la landing va ahí.
+
+## Banda de vidrio (pedido del dueño)
+- El mosaico y el menú ya no llevan bloques de color: los cuatro bloques que eran naranja, noche, crema y verde (`.m-va`…`.m-vd`) son **vidrio esmerilado**, la foto de al lado desenfocada con un velo claro y un canto de luz.
+- La barra del menú es vidrio (`backdrop-filter`); los links y "Sumá tu negocio" son vidrio transparente.
+- **Al pasar el cursor todo se pone verde agua (#1fa08c):** los links y el botón con texto noche (contraste AA), los vidrios con un teñido verde y las fotos viradas a verde (`mix-blend-mode: color`).
+- El color vivo queda para el contenido (hero naranja, buscador, etc.). La banda es neutra.
+- Al terminar la entrada, la clase `nav-lista` quita la demora escalonada para que el hover responda al instante.

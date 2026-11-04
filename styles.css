@@ -94,7 +94,6 @@ h1, h2, h3 { font-family: var(--f-display); font-stretch: var(--display-ancho); 
 .btn--orange { background: var(--orange); color: var(--ink); }
 @media (hover: hover) and (pointer: fine) {
   .btn--ink:hover { background: var(--ink-2); }
-  .nav .btn--ink:hover { background: var(--orange-strong); }
   .btn--orange:hover { background: var(--orange-strong); }
 }
 
@@ -104,20 +103,40 @@ h1, h2, h3 { font-family: var(--f-display); font-stretch: var(--display-ancho); 
   position: absolute; inset: 0; overflow: hidden;
   display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); grid-template-rows: 1fr 1fr;
 }
-.mosaico > * { display: block; min-width: 0; min-height: 0; overflow: hidden; }
+.mosaico > * { position: relative; display: block; min-width: 0; min-height: 0; overflow: hidden; }
 .m-foto img { width: 100%; height: 100%; object-fit: cover; filter: grayscale(1) contrast(1.08); }
 .m-canchas { grid-column: 1 / 3; grid-row: 1; }
-.m-naranja { grid-column: 3; grid-row: 1 / 3; background: var(--orange); }
+.m-va { grid-column: 3; grid-row: 1 / 3; }
 .m-peine { grid-column: 4; grid-row: 1; }
-.m-noche { grid-column: 5; grid-row: 1; background: var(--ink); }
+.m-vb { grid-column: 5; grid-row: 1; }
 .m-tenis { grid-column: 6; grid-row: 1; }
-.m-crema { grid-column: 1; grid-row: 2; background: var(--cream); }
+.m-vc { grid-column: 1; grid-row: 2; }
 .m-futbol { grid-column: 2; grid-row: 2; }
-.m-verde { grid-column: 4; grid-row: 2; background: var(--teal); }
+.m-vd { grid-column: 4; grid-row: 2; }
 .m-barbero { grid-column: 5; grid-row: 2; }
 .m-paletas { grid-column: 6; grid-row: 2; }
 .m-tenis img { object-position: 30% 60%; }
 .m-paletas img { object-position: 50% 50%; }
+
+/* Vidrio: donde antes había bloques de color, la foto de al lado vista a través de un vidrio esmerilado.
+   Al pasar el cursor, cada bloque (vidrio o foto) se tiñe del verde agua de la marca. */
+.m-vidrio img {
+  position: absolute; inset: -32px; width: calc(100% + 64px); height: calc(100% + 64px);
+  object-fit: cover; filter: grayscale(1) blur(18px) brightness(1.15);
+}
+.mosaico > *::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  transition: background-color 280ms ease, box-shadow 280ms ease;
+}
+.m-vidrio::after {
+  background: rgba(245, 247, 250, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.34); /* taste-skill-ignore: canto del vidrio, pedido del dueño */
+}
+.m-foto::after { background: rgba(31, 160, 140, 0); mix-blend-mode: color; }
+@media (hover: hover) and (pointer: fine) {
+  .m-vidrio:hover::after { background: rgba(31, 160, 140, 0.62); box-shadow: inset 0 0 0 1px rgba(31, 160, 140, 0.9); } /* taste-skill-ignore: canto del vidrio */
+  .m-foto:hover::after { background: rgba(31, 160, 140, 1); }
+}
 
 /* ---------- Navegación ---------- */
 .nav {
@@ -126,17 +145,30 @@ h1, h2, h3 { font-family: var(--f-display); font-stretch: var(--display-ancho); 
   min-height: 72px; padding-top: env(safe-area-inset-top, 0px);
   background: rgba(17, 21, 28, 0.62); color: var(--ground); /* velo neutro para leer sobre las fotos */
 }
-.nav .btn--ink { background: var(--orange); color: var(--ink); }
+/* En la banda, la barra es de vidrio: deja ver el mosaico borroso y los botones son vidrio que se pone verde */
+.banda .nav {
+  background: rgba(17, 21, 28, 0.34);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2); backdrop-filter: blur(18px) saturate(1.2);
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.14); /* taste-skill-ignore: canto del vidrio */
+}
+.nav .btn--ink.nav__cta {
+  background: rgba(255, 255, 255, 0.12); color: var(--ground);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.3); /* taste-skill-ignore: canto del vidrio */
+  transition: transform var(--t-press) var(--ease-out), background-color var(--t-hover) ease, color var(--t-hover) ease, box-shadow var(--t-hover) ease;
+}
 .brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; }
 .brand__mark { width: 32px; height: 32px; }
 .brand__word { font-family: var(--f-display); font-stretch: var(--display-ancho); font-weight: 600; font-size: var(--s-m); letter-spacing: -0.02em; }
-.nav__links { display: flex; gap: 28px; margin-left: auto; }
+.nav__links { display: flex; gap: 6px; margin-left: auto; }
 .nav__links a {
-  font-size: var(--s-s); text-decoration: underline; text-decoration-color: transparent;
-  text-underline-offset: 0.3em; transition: text-decoration-color var(--t-hover) ease;
-  padding-block: 8px; /* área de toque de 24px o más */
+  font-size: var(--s-s); text-decoration: none; border-radius: var(--r);
+  padding: 10px 14px; /* área de toque de 24px o más */
+  transition: background-color var(--t-hover) ease, color var(--t-hover) ease;
 }
-@media (hover: hover) and (pointer: fine) { .nav__links a:hover { text-decoration-color: currentColor; } }
+@media (hover: hover) and (pointer: fine) {
+  .nav__links a:hover { background: var(--teal); color: var(--ink); }
+  .nav .btn--ink.nav__cta:hover { background: var(--teal); color: var(--ink); box-shadow: inset 0 0 0 1px var(--teal); } /* taste-skill-ignore: canto del vidrio */
+}
 
 /* ---------- Hero ---------- */
 .hero {
@@ -467,10 +499,10 @@ h1, h2, h3 { font-family: var(--f-display); font-stretch: var(--display-ancho); 
   /* 1) el mosaico se destapa bloque por bloque, de izquierda a derecha */
   .js .mosaico > * { clip-path: inset(0 0 100% 0); transition: clip-path 900ms var(--ease-expo); }
   .js.is-ready .mosaico > * { clip-path: inset(0); }
-  .js .m-canchas { transition-delay: 80ms; }  .js .m-crema { transition-delay: 125ms; }
-  .js .m-futbol { transition-delay: 170ms; }   .js .m-naranja { transition-delay: 215ms; }
-  .js .m-peine { transition-delay: 260ms; }    .js .m-verde { transition-delay: 305ms; }
-  .js .m-noche { transition-delay: 350ms; }    .js .m-barbero { transition-delay: 395ms; }
+  .js .m-canchas { transition-delay: 80ms; }  .js .m-vc { transition-delay: 125ms; }
+  .js .m-futbol { transition-delay: 170ms; }   .js .m-va { transition-delay: 215ms; }
+  .js .m-peine { transition-delay: 260ms; }    .js .m-vd { transition-delay: 305ms; }
+  .js .m-vb { transition-delay: 350ms; }    .js .m-barbero { transition-delay: 395ms; }
   .js .m-tenis { transition-delay: 440ms; }    .js .m-paletas { transition-delay: 485ms; }
   /* 2) baja el menú */
   .js .nav > * { opacity: 0.001; transform: translateY(-10px); transition: opacity 600ms var(--ease-out), transform 600ms var(--ease-out); }
@@ -478,6 +510,7 @@ h1, h2, h3 { font-family: var(--f-display); font-stretch: var(--display-ancho); 
   .js .nav > :nth-child(1) { transition-delay: 300ms; }
   .js .nav > :nth-child(2) { transition-delay: 360ms; }
   .js .nav > :nth-child(3) { transition-delay: 420ms; }
+  .js.nav-lista .nav > * { transition-delay: 0s; }
   /* 3) el título sube palabra por palabra desde una ranura */
   .js .hero__title .w > span { transform: translateY(108%); transition: transform 900ms var(--ease-expo); transition-delay: calc(380ms + var(--i, 0) * 60ms); }
   .js .is-loaded .hero__title .w > span { transform: none; }
@@ -567,11 +600,11 @@ h1, h2, h3 { font-family: var(--f-display); font-stretch: var(--display-ancho); 
   .banda { height: clamp(200px, 28svh, 260px); }
   .mosaico { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .m-canchas { grid-column: 1; grid-row: 1; }
-  .m-naranja { grid-column: 2; grid-row: 1 / 3; }
+  .m-va { grid-column: 2; grid-row: 1 / 3; }
   .m-peine { grid-column: 3; grid-row: 1; }
   .m-futbol { grid-column: 1; grid-row: 2; }
   .m-barbero { grid-column: 3; grid-row: 2; }
-  .m-noche, .m-tenis, .m-crema, .m-verde, .m-paletas { display: none; }
+  .m-vb, .m-tenis, .m-vc, .m-vd, .m-paletas { display: none; }
   .nav { gap: 16px; min-height: 64px; }
   .nav__links { display: none; }
   .nav__cta { margin-left: auto; padding: 10px 14px; }

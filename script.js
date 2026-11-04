@@ -197,6 +197,8 @@
   const arrancarHero = () => requestAnimationFrame(() => requestAnimationFrame(() => {
     hero && hero.classList.add("is-loaded");
     setTimeout(() => sh && sh.classList.add("is-in"), 600);
+    // Terminada la entrada, el menú responde al cursor sin la demora escalonada de la entrada
+    setTimeout(() => document.documentElement.classList.add("nav-lista"), 1200);
   }));
 
   // ---------- Pantalla de carga: el logo se arma y después sube ----------
