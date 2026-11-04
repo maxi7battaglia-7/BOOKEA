@@ -154,3 +154,14 @@ Pedido del dueño: "lo más importante es que el cliente pueda sacar el turno".
   - **Todo es de ejemplo:** 16 negocios con nombres inventados, disponibilidad simulada y el pago de la seña simulado. La página lo avisa.
 - **Para negocios:** lo de abajo de la landing (cómo funciona, funciones, Mendoza, precios, sumate y preguntas) sigue igual. Se sacó la sección del buscador de texto, que repetía el buscador nuevo. En el menú quedaron "Reservar turno" y "Para negocios".
 - **Llegada:** al recargar, la página arranca arriba. Si llegás con un link a una sección (por ejemplo, desde `reservar.html` a `#sumate`), te lleva ahí cuando termina la pantalla de carga.
+
+## Hero "Bienvenidos a Bookea" (4/11/2026)
+- **Título:** "Bienvenidos a Bookea", en lugar de "Turnos con seña, sin vueltas". Debajo va una frase corta para el cliente.
+- **Cuatro preguntas como links**, cada una con su respuesta en una línea y una flecha:
+  - ¿Quiénes somos? → la carta de Mendoza (`#nosotros`)
+  - ¿Qué hacemos? → cómo funciona
+  - ¿Para qué sirve? → funciones
+  - Laburá con nosotros → el formulario para sumar el negocio (`#sumate`)
+- **Composición:** título y preguntas ocupan la mitad izquierda; el buscador, la derecha, a 24px. Antes había un vacío grande en el medio.
+- **Tablet y celular** (hasta 900px): una columna con título, buscador y preguntas. Hasta 960px el menú muestra solo el logo y "Sumá tu negocio".
+- **Entrada:** las preguntas entran una tras otra, después del título.
