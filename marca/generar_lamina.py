@@ -56,7 +56,7 @@ ra = 120
 ex, ey = VX + DX + ra * math.cos(math.radians(10)), VY + ra * math.sin(math.radians(10))
 g.append(f'<path d="M{VX + DX + ra},{VY:.1f} A{ra},{ra} 0 0 1 {ex:.1f},{ey:.1f}" {fina}/>')
 
-txt = 'font-family="DM Mono" font-size="19" fill="#f5ecd7" fill-opacity="0.72" letter-spacing="0.5"'
+txt = 'font-family="Archivo" font-weight="500" font-size="19" fill="#f5ecd7" fill-opacity="0.72" letter-spacing="0.5"'
 cotas = [
     # ancho del asta, arriba
     f'<path d="M{255 + DX},132 V152 M{391 + DX},132 V152 M{255 + DX},142 H{391 + DX}" stroke="{C}" stroke-opacity="0.55" stroke-width="1.6"/>',
@@ -89,34 +89,31 @@ reducciones = "".join(
 html = f"""<!doctype html>
 <html lang="es-AR"><head><meta charset="utf-8"><title>Bookea · Franja Exacta</title>
 <style>
-@font-face {{ font-family: "Bricolage Grotesque"; src: url("fuentes/BricolageGrotesque-Bold.ttf"); font-weight: 700; }}
-@font-face {{ font-family: "Bricolage Grotesque"; src: url("fuentes/BricolageGrotesque-Regular.ttf"); font-weight: 400; }}
-@font-face {{ font-family: "DM Mono"; src: url("fuentes/DMMono-Regular.ttf"); }}
-@font-face {{ font-family: "Instrument Sans"; src: url("fuentes/InstrumentSans-Regular.ttf"); }}
+@font-face {{ font-family: "Archivo"; src: url("fuentes/Archivo-Variable.ttf"); font-weight: 100 900; font-stretch: 62% 125%; }}
 * {{ box-sizing: border-box; margin: 0; }}
 html, body {{ width: 1600px; height: 1000px; background: #0b0d12; color: {C}; }}
-body {{ position: relative; font-family: "Instrument Sans", sans-serif; overflow: hidden; }}
-.mono {{ font-family: "DM Mono", monospace; font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(245,236,215,0.6); }}
+body {{ position: relative; font-family: "Archivo", sans-serif; overflow: hidden; }}
+.mono {{ font-family: "Archivo"; font-weight: 500; font-stretch: 112%; font-variant-numeric: tabular-nums; font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(245,236,215,0.6); }}
 .placa {{ position: absolute; left: 64px; top: 120px; width: 760px; height: 760px; }}
 .placa-rot {{ position: absolute; left: 64px; top: 72px; }}
 .der {{ position: absolute; left: 896px; top: 64px; width: 640px; }}
 .firma {{ display: flex; align-items: center; gap: 28px; height: 120px; }}
 .firma svg {{ flex: none; }}
-.palabra {{ font-family: "Bricolage Grotesque"; font-weight: 700; font-size: 104px; letter-spacing: -0.045em; line-height: 1; }}
+.palabra {{ font-family: "Archivo"; font-weight: 700; font-stretch: 112%; font-size: 96px; letter-spacing: -0.03em; line-height: 1; }}
 .sub {{ margin-top: 28px; }}
 .bloque {{ position: absolute; left: 896px; width: 640px; }}
 .reds {{ top: 300px; display: flex; align-items: flex-end; gap: 30px; height: 190px; }}
 .red {{ display: flex; flex-direction: column; align-items: center; gap: 12px; margin: 0; }}
 .red svg {{ display: block; }}
-.red figcaption {{ font-family: "DM Mono"; font-size: 12px; color: rgba(245,236,215,0.6); letter-spacing: 0.08em; }}
+.red figcaption {{ font-family: "Archivo"; font-variant-numeric: tabular-nums; font-size: 12px; color: rgba(245,236,215,0.6); letter-spacing: 0.08em; }}
 .paleta {{ top: 556px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }}
 .sw {{ height: 96px; border-radius: 10px; }}
 .sw-n {{ box-shadow: inset 0 0 0 1.5px rgba(245,236,215,0.22); }}
 .sw-t {{ margin-top: 12px; font-size: 15px; }}
-.sw-h {{ margin-top: 2px; font-family: "DM Mono"; font-size: 12px; letter-spacing: 0.08em; color: rgba(245,236,215,0.6); }}
+.sw-h {{ margin-top: 2px; font-family: "Archivo"; font-variant-numeric: tabular-nums; font-size: 12px; letter-spacing: 0.08em; color: rgba(245,236,215,0.6); }}
 .usos {{ top: 742px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }}
 .uso {{ height: 138px; border-radius: 10px; display: flex; align-items: center; justify-content: center; gap: 14px; }}
-.uso .palabra {{ font-size: 50px; }}
+.uso .palabra {{ font-size: 46px; }}
 .pie {{ position: absolute; left: 64px; right: 64px; bottom: 56px; display: flex; justify-content: space-between; }}
 .rot {{ margin-bottom: 18px; }}
 </style></head>

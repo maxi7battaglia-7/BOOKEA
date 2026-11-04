@@ -334,6 +334,15 @@
     }
   });
 
+  // ---------- Links a una sección de la landing ("Sumá tu negocio") ----------
+  // La landing siempre abre arriba; solo baja a la sección si este link lo deja anotado.
+  document.addEventListener("click", (e) => {
+    const a = e.target.closest('a[href*="#"]');
+    if (!a) return;
+    const h = a.getAttribute("href");
+    try { sessionStorage.setItem("bookea:ir", h.slice(h.indexOf("#"))); } catch {}
+  });
+
   // ---------- Arranque ----------
   $("#res-t").setAttribute("tabindex", "-1");
   aplicarAlForm(); guardar(); pintar();

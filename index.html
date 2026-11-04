@@ -8,18 +8,19 @@
   <meta name="theme-color" content="#ffffff" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900;1,62..125,100..900&display=swap" rel="stylesheet" />
   <link rel="icon" href="marca/isotipo.svg" type="image/svg+xml" />
   <link rel="icon" href="marca/isotipo-32.png" sizes="32x32" type="image/png" />
   <link rel="apple-touch-icon" href="marca/isotipo-192.png" />
   <link rel="stylesheet" href="styles.css" />
   <script>
     document.documentElement.classList.add("js");
-    // Al recargar, siempre arriba de todo. Si llegaste con un link a una sección (#sumate),
-    // se guarda y se va ahí cuando termina la pantalla de carga.
+    // Al cargar o refrescar, siempre arriba de todo, diga lo que diga la dirección (#precios, etc.).
+    // Única excepción: si venís de reservar.html con "Sumá tu negocio", ese link deja anotada la sección.
     if ("scrollRestoration" in history) history.scrollRestoration = "manual";
-    var bkNav = performance.getEntriesByType ? performance.getEntriesByType("navigation")[0] : null;
-    window.__bkAncla = bkNav && bkNav.type === "reload" ? "" : location.hash;
+    var bkIr = "";
+    try { bkIr = sessionStorage.getItem("bookea:ir") || ""; sessionStorage.removeItem("bookea:ir"); } catch (e) {}
+    window.__bkAncla = /^#[a-z-]+$/.test(bkIr) ? bkIr : "";
     if (location.hash) { try { history.replaceState(null, "", location.pathname + location.search); } catch (e) {} }
   </script>
 </head>
