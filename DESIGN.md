@@ -116,3 +116,13 @@ Filosofía **"Franja Exacta"** en `marca/filosofia.md`. Lámina de construcción
   - PNG de 512, 192, 64 y 32 px.
 - **Logotipo:** isotipo + "Bookea" en Bricolage Grotesque Bold, la misma familia de la web.
 - **En la landing:** el isotipo va en el menú y como ícono de la pestaña (`marca/isotipo.svg` y `marca/isotipo-32.png`).
+
+## Pantalla de carga (4/11/2026)
+- **Animación:**
+  - Al abrir la página aparece el isotipo sobre fondo noche y se arma según su construcción. Primero crece el asta crema. Después baja el verde agua y sube el naranja hasta la diagonal de 10°. Al final aparece "Bookea".
+  - La pantalla se ve al menos 1,5 s y después sube como una persiana. Recién ahí arrancan el mosaico y el hero.
+- **Casos especiales:**
+  - Con "reducir movimiento", el logo aparece quieto y se desvanece a los 0,6 s.
+  - Sin JavaScript no se muestra.
+  - Tiene un tope de 4 s por si la carga se demora.
+- **Excepción documentada:** el inspector de `design-taste-frontend` marca `late-title` (el título no se lee a 1,2 s) y `covered-text` (el "Bookea" de la pantalla mientras sube). Son efecto directo de la pantalla de carga, pedida por el dueño. Sin ella, la página da 0 fallas.

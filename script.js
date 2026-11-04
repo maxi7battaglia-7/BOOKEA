@@ -357,8 +357,26 @@
 
   // ---------- Hero: persiana del escenario ----------
   const hero = $(".hero"), sh = $(".shutter");
-  requestAnimationFrame(() => requestAnimationFrame(() => {
+  const arrancarHero = () => requestAnimationFrame(() => requestAnimationFrame(() => {
     hero && hero.classList.add("is-loaded");
     setTimeout(() => sh && sh.classList.add("is-in"), 150);
   }));
+
+  // ---------- Pantalla de carga: el logo se arma y después sube ----------
+  const splash = $(".splash");
+  const t0 = performance.now();
+  const salir = () => {
+    if (!splash || splash.classList.contains("is-out")) return;
+    splash.classList.add("is-out");
+    document.documentElement.classList.add("is-ready");
+    arrancarHero();
+    setTimeout(() => splash.remove(), 1000);
+  };
+  if (!splash) { document.documentElement.classList.add("is-ready"); arrancarHero(); }
+  else {
+    // Se ve al menos lo que tarda en armarse el logo (más corto con "reducir movimiento")
+    const listo = () => setTimeout(salir, Math.max(0, (reduce ? 600 : 1500) - (performance.now() - t0)));
+    if (document.readyState === "complete") listo(); else window.addEventListener("load", listo, { once: true });
+    setTimeout(salir, 4000); // tope por si algo tarda en cargar
+  }
 })();
