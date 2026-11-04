@@ -15,8 +15,11 @@
   <link rel="stylesheet" href="styles.css" />
   <script>
     document.documentElement.classList.add("js");
-    // Al recargar, siempre arriba de todo: sin recordar el scroll ni saltar al ancla de la URL
+    // Al recargar, siempre arriba de todo. Si llegaste con un link a una sección (#sumate),
+    // se guarda y se va ahí cuando termina la pantalla de carga.
     if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+    var bkNav = performance.getEntriesByType ? performance.getEntriesByType("navigation")[0] : null;
+    window.__bkAncla = bkNav && bkNav.type === "reload" ? "" : location.hash;
     if (location.hash) { try { history.replaceState(null, "", location.pathname + location.search); } catch (e) {} }
   </script>
 </head>
@@ -82,8 +85,8 @@
       <span class="brand__word">Bookea</span>
     </a>
     <nav class="nav__links" aria-label="Principal">
-      <a href="#como-funciona">Cómo funciona</a>
-      <a href="#funciones">Funciones</a>
+      <a href="reservar.html">Reservar turno</a>
+      <a href="#como-funciona">Para negocios</a>
       <a href="#precios">Precios</a>
       <a href="#preguntas">Preguntas</a>
     </nav>
@@ -96,47 +99,62 @@
     <section class="hero frame" aria-labelledby="titulo">
       <h1 id="titulo" class="hero__title">Turnos con seña, sin vueltas.</h1>
       <div class="hero__copy">
-        <p class="hero__lead">Bookea es la agenda online para canchas y barberías de Mendoza. Tus clientes reservan desde un link, pagan la seña con Mercado Pago y reciben el recordatorio por WhatsApp.</p>
-        <a href="#sumate" class="btn btn--ink btn--lg">Sumá tu negocio gratis</a>
-        <p class="hero__hint">Tocá un horario libre de la agenda y mirá qué pasa.</p>
+        <p class="hero__lead">Buscá canchas de pádel, fútbol y tenis y barberías de Mendoza, mirá los horarios libres y reservá con una seña por Mercado Pago. Sin llamar ni esperar respuesta.</p>
+        <a href="#como-funciona" class="hero__biz">¿Tenés canchas o una barbería? Sumala a Bookea</a>
       </div>
 
       <div class="stage shutter">
         <div class="stage__inner">
-          <!-- Fragmento de producto: agenda del día -->
-          <div class="agenda" data-ui>
-            <div class="agenda__bar">
-              <div class="agenda__tabs" role="tablist" aria-label="Rubro">
-                <button type="button" role="tab" class="tab" data-rubro="padel" id="tab-padel" aria-controls="ag-grid" aria-selected="true">Pádel</button>
-                <button type="button" role="tab" class="tab" data-rubro="futbol" id="tab-futbol" aria-controls="ag-grid" aria-selected="false">Fútbol 5</button>
-                <button type="button" role="tab" class="tab" data-rubro="tenis" id="tab-tenis" aria-controls="ag-grid" aria-selected="false">Tenis</button>
-                <button type="button" role="tab" class="tab" data-rubro="barberia" id="tab-barberia" aria-controls="ag-grid" aria-selected="false">Barbería</button>
+          <!-- Buscador de turnos: lleva a reservar.html con la búsqueda -->
+          <form class="finder" id="finder" action="reservar.html" method="get" data-ui aria-labelledby="finder-t">
+            <h2 class="finder__title" id="finder-t">¿Qué querés reservar?</h2>
+            <fieldset class="finder__rubros">
+              <legend class="sr-only">Rubro</legend>
+              <label class="rb"><input type="radio" name="rubro" value="padel" checked /><span>Pádel</span></label>
+              <label class="rb"><input type="radio" name="rubro" value="futbol" /><span>Fútbol 5</span></label>
+              <label class="rb"><input type="radio" name="rubro" value="tenis" /><span>Tenis</span></label>
+              <label class="rb"><input type="radio" name="rubro" value="barberia" /><span>Barbería</span></label>
+            </fieldset>
+            <div class="finder__row">
+              <div class="ff">
+                <label for="fz">Dónde</label>
+                <select id="fz" name="zona">
+                  <option value="">Toda Mendoza</option>
+                  <optgroup label="Valle de Uco">
+                    <option value="tunuyan">Tunuyán</option>
+                    <option value="tupungato">Tupungato</option>
+                    <option value="san-carlos">San Carlos</option>
+                  </optgroup>
+                  <optgroup label="Sur">
+                    <option value="san-rafael">San Rafael</option>
+                  </optgroup>
+                  <optgroup label="Gran Mendoza">
+                    <option value="capital">Ciudad de Mendoza</option>
+                    <option value="godoy-cruz">Godoy Cruz</option>
+                    <option value="guaymallen">Guaymallén</option>
+                    <option value="las-heras">Las Heras</option>
+                    <option value="lujan">Luján de Cuyo</option>
+                    <option value="maipu">Maipú</option>
+                  </optgroup>
+                </select>
+              </div>
+              <div class="ff">
+                <label for="fd">Cuándo</label>
+                <select id="fd" name="dia"><option value="0">Hoy</option><option value="1">Mañana</option></select>
+              </div>
+              <div class="ff">
+                <label for="fh">Hora</label>
+                <select id="fh" name="franja">
+                  <option value="">Cualquier hora</option>
+                  <option value="manana">A la mañana</option>
+                  <option value="tarde">A la tarde</option>
+                  <option value="noche">A la noche</option>
+                </select>
               </div>
             </div>
-            <div class="agenda__head">
-              <div>
-                <p class="agenda__venue" id="ag-venue">Club Los Álamos</p>
-                <p class="agenda__date" id="ag-date">Martes 10 de noviembre · turnos de 90 min</p>
-              </div>
-              <div class="agenda__kpi">
-                <p class="agenda__kpi-v" id="ag-occ">10 de 15</p>
-                <p class="agenda__kpi-k" id="ag-money">$ 288.000 reservados</p>
-              </div>
-            </div>
-            <div class="agenda__grid" id="ag-grid" role="tabpanel" aria-labelledby="tab-padel"></div>
-            <p class="sr-only" id="ag-status" role="status" aria-atomic="true"></p>
-          </div>
-
-          <!-- Fragmento: confirmación por WhatsApp -->
-          <div class="wa" data-ui>
-            <p class="wa__from">WhatsApp · Bookea</p>
-            <div class="wa__bubble" id="wa-text" role="status" aria-atomic="true">
-              <p>¡Listo, Pato! Tu turno en <b>Club Los Álamos</b> quedó confirmado.</p>
-              <p>Martes 10/11 · 21:30 · Cancha 1</p>
-              <p>Seña de $ 8.500 recibida por Mercado Pago. Te recordamos 3 horas antes.</p>
-            </div>
-            <p class="wa__time" id="wa-time">21:04</p>
-          </div>
+            <button type="submit" class="btn btn--ink btn--lg btn--block finder__go">Buscar turnos</button>
+            <p class="finder__note">Ves los horarios libres de cada lugar y reservás en el momento.</p>
+          </form>
         </div>
       </div>
     </section>
@@ -208,26 +226,6 @@
           </div>
         </li>
       </ol>
-    </section>
-
-    <!-- ===== Buscador: escribí como tu cliente ===== -->
-    <section class="search" aria-labelledby="search-t">
-      <div class="frame search__inner">
-        <h2 id="search-t" class="search__title">Tu cliente escribe, Bookea encuentra el turno.</h2>
-        <div class="search__line" data-ui>
-          <label for="q" class="sr-only">Buscar un turno</label>
-          <input id="q" class="search__input" value="pádel el jueves a las 21" autocomplete="off" spellcheck="false" />
-        </div>
-        <div class="search__answer" data-ui role="status" aria-atomic="true">
-          <p class="answer__head" id="ans-head">Pádel · jueves 12/11 · cerca de las 21</p>
-          <ul class="answer__rows" id="ans-rows"></ul>
-        </div>
-        <div class="search__examples" aria-label="Ejemplos">
-          <button type="button" class="ex-btn" data-q="fútbol 5 hoy a las 22">fútbol 5 hoy a las 22</button>
-          <button type="button" class="ex-btn" data-q="corte y barba el sábado a las 11">corte y barba el sábado a las 11</button>
-          <button type="button" class="ex-btn" data-q="tenis mañana temprano">tenis mañana temprano</button>
-        </div>
-      </div>
     </section>
 
     <!-- ===== Funciones ===== -->
@@ -456,6 +454,7 @@
         <p class="tile__small">© <span id="year">2026</span> Bookea</p>
       </div>
       <nav class="tile tile--nav" aria-label="Pie">
+        <a href="reservar.html">Reservar turno</a>
         <a href="#como-funciona">Cómo funciona</a>
         <a href="#funciones">Funciones</a>
         <a href="#precios">Precios</a>

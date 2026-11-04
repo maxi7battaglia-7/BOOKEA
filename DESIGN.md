@@ -135,3 +135,22 @@ Filosofía **"Franja Exacta"** en `marca/filosofia.md`. Lámina de construcción
   En unos 2 s queda todo quieto.
 - **Al cargar o recargar, la página siempre arranca arriba de todo:** no recuerda el scroll y limpia el ancla de la URL. Los links del menú siguen llevando a cada sección.
 - **Excepción documentada:** el inspector de `design-taste-frontend` marca `late-title` (el título no se lee a 1,2 s) y `covered-text` (el "Bookea" de la pantalla mientras sube). Son efecto directo de la pantalla de carga, pedida por el dueño. Sin ella, la página da 0 fallas.
+
+## La landing le habla primero al cliente (4/11/2026)
+Pedido del dueño: "lo más importante es que el cliente pueda sacar el turno".
+
+- **Hero:** la demo de la agenda se reemplazó por un **buscador de turnos** sobre el escenario naranja.
+  - Campos: qué (pádel, fútbol 5, tenis o barbería), dónde (localidades de Mendoza agrupadas por zona), cuándo (hoy y los 6 días siguientes) y la franja horaria.
+  - En computadora va a la altura del título. En celular va justo después del título. El botón "Buscar turnos" entra en el primer pantallazo de 1440×900, 1280×800, 1024×768 y 390×844.
+- **"Buscar turnos" lleva a `reservar.html`**, la parte de la app con los turnos libres de cada lugar sumado a Bookea.
+  - Primero aparecen los lugares de la localidad elegida, después "También en (zona)" y después otras zonas.
+  - Cada lugar muestra su información, el precio y la seña, y los horarios libres con cuántas canchas o barberos quedan.
+  - Reserva en un panel de cuatro pasos:
+    1. cancha o barbero (y el servicio, en barberías)
+    2. nombre y WhatsApp, con errores junto a cada campo
+    3. seña
+    4. confirmación
+  - En celular el panel sube desde abajo.
+  - **Todo es de ejemplo:** 16 negocios con nombres inventados, disponibilidad simulada y el pago de la seña simulado. La página lo avisa.
+- **Para negocios:** lo de abajo de la landing (cómo funciona, funciones, Mendoza, precios, sumate y preguntas) sigue igual. Se sacó la sección del buscador de texto, que repetía el buscador nuevo. En el menú quedaron "Reservar turno" y "Para negocios".
+- **Llegada:** al recargar, la página arranca arriba. Si llegás con un link a una sección (por ejemplo, desde `reservar.html` a `#sumate`), te lleva ahí cuando termina la pantalla de carga.

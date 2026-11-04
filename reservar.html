@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="es-AR" class="js is-ready">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Bookea · Reservar</title>
+  <meta name="description" content="Turnos libres de canchas de pádel, fútbol y tenis y de barberías de Mendoza. Elegí horario y reservá con seña." />
+  <meta name="theme-color" content="#11151c" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap" rel="stylesheet" />
+  <link rel="icon" href="marca/isotipo.svg" type="image/svg+xml" />
+  <link rel="icon" href="marca/isotipo-32.png" sizes="32x32" type="image/png" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="app.css" />
+</head>
+<body class="app">
+  <a class="skip" href="#resultados">Saltar a los turnos</a>
+
+  <header class="nav nav--app frame">
+    <a href="index.html" class="brand" aria-label="Bookea, volver al inicio">
+      <svg class="brand__mark" viewBox="0 0 1000 1000" aria-hidden="true">
+        <defs>
+          <mask id="ap-panzas" maskUnits="userSpaceOnUse" x="0" y="0" width="1000" height="1000">
+            <path d="M391,180 H520 A175,175 0 0 1 520,530 H391 Z" fill="#fff"/><path d="M391,426 H545 A197,197 0 0 1 545,820 H391 Z" fill="#fff"/>
+            <path d="M391,284 H520 A71,71 0 0 1 520,426 H391 Z" fill="#000"/><path d="M391,530 H545 A93,93 0 0 1 545,716 H391 Z" fill="#000"/>
+          </mask>
+        </defs>
+        <rect width="1000" height="1000" rx="200" fill="#11151c"/>
+        <g transform="translate(8,0)">
+          <g mask="url(#ap-panzas)">
+            <polygon points="0,0 1000,0 1000,553.39 0,377.06" fill="#1fa08c"/>
+            <polygon points="0,377.06 1000,553.39 1000,1000 0,1000" fill="#e4572e"/>
+          </g>
+          <rect x="255" y="180" width="136" height="640" fill="#f5ecd7"/>
+        </g>
+      </svg>
+      <span class="brand__word">Bookea</span>
+    </a>
+    <a href="index.html#sumate" class="nav__biz">¿Tenés un complejo o una barbería?</a>
+  </header>
+
+  <main id="main">
+    <!-- Búsqueda: cada cambio actualiza los turnos -->
+    <section class="busq" aria-label="Buscar turnos">
+      <form class="busq__form frame" id="busq" data-ui>
+        <fieldset class="finder__rubros busq__rubros">
+          <legend class="sr-only">Rubro</legend>
+          <label class="rb"><input type="radio" name="rubro" value="padel" checked /><span>Pádel</span></label>
+          <label class="rb"><input type="radio" name="rubro" value="futbol" /><span>Fútbol 5</span></label>
+          <label class="rb"><input type="radio" name="rubro" value="tenis" /><span>Tenis</span></label>
+          <label class="rb"><input type="radio" name="rubro" value="barberia" /><span>Barbería</span></label>
+        </fieldset>
+        <div class="ff">
+          <label for="bz">Dónde</label>
+          <select id="bz" name="zona">
+            <option value="">Toda Mendoza</option>
+            <optgroup label="Valle de Uco">
+              <option value="tunuyan">Tunuyán</option>
+              <option value="tupungato">Tupungato</option>
+              <option value="san-carlos">San Carlos</option>
+            </optgroup>
+            <optgroup label="Sur">
+              <option value="san-rafael">San Rafael</option>
+            </optgroup>
+            <optgroup label="Gran Mendoza">
+              <option value="capital">Ciudad de Mendoza</option>
+              <option value="godoy-cruz">Godoy Cruz</option>
+              <option value="guaymallen">Guaymallén</option>
+              <option value="las-heras">Las Heras</option>
+              <option value="lujan">Luján de Cuyo</option>
+              <option value="maipu">Maipú</option>
+            </optgroup>
+          </select>
+        </div>
+        <div class="ff">
+          <label for="bd">Cuándo</label>
+          <select id="bd" name="dia"><option value="0">Hoy</option></select>
+        </div>
+        <div class="ff">
+          <label for="bh">Hora</label>
+          <select id="bh" name="franja">
+            <option value="">Cualquier hora</option>
+            <option value="manana">A la mañana</option>
+            <option value="tarde">A la tarde</option>
+            <option value="noche">A la noche</option>
+          </select>
+        </div>
+      </form>
+    </section>
+
+    <section class="res frame" id="resultados" aria-labelledby="res-t">
+      <p class="demo">Vista previa: los negocios, horarios y precios son de ejemplo y no se cobra nada.</p>
+      <div class="res__head">
+        <h1 id="res-t" class="res__title">Pádel en Mendoza</h1>
+        <p class="res__meta" id="res-meta" role="status" aria-live="polite"></p>
+      </div>
+      <div id="lista" class="lista"></div>
+    </section>
+  </main>
+
+  <footer class="app-foot frame">
+    <p>Bookea · Turnos con seña para canchas y barberías de Mendoza.</p>
+    <a href="index.html#sumate">Sumá tu negocio</a>
+  </footer>
+
+  <!-- Reserva: elegir, tus datos, seña y confirmación -->
+  <dialog class="reserva" id="reserva" aria-labelledby="rv-t">
+    <div class="reserva__in" id="rv"></div>
+  </dialog>
+
+  <script src="reservar.js"></script>
+</body>
+</html>
