@@ -230,7 +230,7 @@ h1, h2, h3 { font-family: var(--f-display); font-stretch: var(--display-ancho); 
 .ff select:focus { outline: none; border-color: var(--ink); box-shadow: 0 0 0 3px var(--teal-tint); } /* taste-skill-ignore: foco de campo */
 .finder__note { font-size: 13px; color: var(--soft); }
 .preguntas { display: grid; gap: 6px; max-width: 34em; }
-.preguntas a {
+.preguntas a, .preguntas__fija {
   display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 16px; align-items: center;
   padding: 12px 14px; margin-inline: -14px; border-radius: var(--r); text-decoration: none;
   transition: background-color var(--t-hover) ease;
@@ -239,6 +239,7 @@ h1, h2, h3 { font-family: var(--f-display); font-stretch: var(--display-ancho); 
   content: "→"; grid-column: 2; grid-row: 1 / span 2; font-size: var(--s-m); color: var(--orange-strong);
   transition: transform var(--t-ui) var(--ease-out);
 }
+.preguntas__fija { grid-template-columns: minmax(0, 1fr); } /* sin link: sin flecha */
 .pq { font-family: var(--f-display); font-stretch: var(--display-ancho); font-size: var(--s-m); font-weight: 600; letter-spacing: -0.01em; line-height: 1.25; }
 .pr { font-size: var(--s-s); color: var(--soft); line-height: 1.45; }
 @media (hover: hover) and (pointer: fine) {

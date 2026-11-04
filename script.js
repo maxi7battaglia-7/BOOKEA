@@ -191,8 +191,6 @@
     });
   });
 
-  // "¿Quiénes somos?" lleva a Preguntas frecuentes con su respuesta abierta
-  $$("[data-abrir]").forEach((a) => a.addEventListener("click", () => { const d = document.getElementById(a.dataset.abrir); if (d) abrir(d); }));
 
   // ---------- Entradas ----------
   const grupos = [
