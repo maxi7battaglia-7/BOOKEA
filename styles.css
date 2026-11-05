@@ -156,15 +156,36 @@ h1, h2, h3 { font-family: var(--f-display); font-stretch: var(--display-ancho); 
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.3); /* taste-skill-ignore: canto del vidrio */
   transition: transform var(--t-press) var(--ease-out), background-color var(--t-hover) ease, color var(--t-hover) ease, box-shadow var(--t-hover) ease;
 }
-/* Al pasar el cursor, la marca se apoya en un fondo verde agua, como los links del menú.
+/* Al pasar el cursor (o al tocarlo en el celular), un fondo verde agua barre desde el logo hacia la palabra,
+   la B se inclina con un rebote y la palabra pasa a noche. Al apretar, todo se achica un poco.
    El relleno y el margen negativo dejan el logo en el mismo lugar que antes. */
 .brand {
+  position: relative; isolation: isolate;
   display: inline-flex; align-items: center; gap: 10px; text-decoration: none;
   padding: 6px 12px 6px 6px; margin-left: -6px; border-radius: 10px;
-  transition: background-color var(--t-hover) ease, color var(--t-hover) ease;
 }
-@media (hover: hover) and (pointer: fine) { .brand:hover, .foot .brand:hover { background: var(--teal); color: var(--ink); } }
-.brand__mark { width: 32px; height: 32px; }
+.brand::before {
+  content: ""; position: absolute; inset: 0; z-index: -1; border-radius: 10px; background: var(--teal);
+  clip-path: inset(0 100% 0 0 round 10px);
+  transition: clip-path 380ms var(--ease-out);
+}
+.brand__mark { width: 32px; height: 32px; transition: transform 460ms cubic-bezier(0.34, 1.56, 0.64, 1); }
+.brand__word { transition: color 260ms ease; }
+.brand:active { scale: 0.96; }
+@media (hover: hover) and (pointer: fine) {
+  .brand:hover::before { clip-path: inset(0 0 0 0 round 10px); }
+  .brand:hover .brand__mark { transform: rotate(-8deg) scale(1.08); }
+  .brand:hover .brand__word { color: var(--ink); }
+}
+.brand:active::before { clip-path: inset(0 0 0 0 round 10px); transition-duration: 200ms; }
+.brand:active .brand__mark { transform: rotate(-8deg) scale(1.08); }
+.brand:active .brand__word { color: var(--ink); }
+.brand { transition: scale var(--t-press) var(--ease-out); }
+@media (prefers-reduced-motion: reduce) {
+  .brand::before { transition: none; }
+  .brand__mark { transition: none; }
+  .brand:hover .brand__mark, .brand:active .brand__mark { transform: none; }
+}
 .brand__word { font-family: var(--f-display); font-stretch: var(--display-ancho); font-weight: 600; font-size: var(--s-m); letter-spacing: -0.02em; }
 .nav__links { display: flex; gap: 6px; margin-left: auto; }
 .nav__links a {
@@ -190,7 +211,7 @@ h1, h2, h3 { font-family: var(--f-display); font-stretch: var(--display-ancho); 
 .hero__title .w { display: inline-block; overflow: hidden; vertical-align: top; padding-bottom: 0.12em; margin-bottom: -0.12em; }
 .hero__title .w > span { display: inline-block; }
 /* la B de Bookea es la B del isotipo, del alto de las mayúsculas y apoyada en la línea de base */
-.hero__title .marca-b { display: inline-block; height: 0.69em; width: calc(0.69em * 487 / 640); vertical-align: baseline; margin-right: 0.015em; }
+.hero__title .marca-b { display: inline-block; height: 0.69em; width: calc(0.69em * 487 / 640); vertical-align: baseline; margin-left: 0.04em; margin-right: 0.015em; }
 .hero__lead { font-size: var(--s-b); max-width: 44ch; }
 .hero__hint { font-size: var(--s-s); color: var(--soft); max-width: 32ch; }
 
@@ -493,7 +514,7 @@ h1, h2, h3 { font-family: var(--f-display); font-stretch: var(--display-ancho); 
   .js .m-vb { transition-delay: 350ms; }    .js .m-barbero { transition-delay: 395ms; }
   .js .m-tenis { transition-delay: 440ms; }    .js .m-paletas { transition-delay: 485ms; }
   /* 2) baja el menú */
-  .js .nav > * { opacity: 0.001; transform: translateY(-10px); transition: opacity 600ms var(--ease-out), transform 600ms var(--ease-out); }
+  .js .nav > * { opacity: 0.001; transform: translateY(-10px); transition: opacity 600ms var(--ease-out), transform 600ms var(--ease-out), scale var(--t-press) var(--ease-out); }
   .js.is-ready .nav > * { opacity: 1; transform: none; }
   .js .nav > :nth-child(1) { transition-delay: 300ms; }
   .js .nav > :nth-child(2) { transition-delay: 360ms; }
@@ -570,11 +591,13 @@ h1, h2, h3 { font-family: var(--f-display); font-stretch: var(--display-ancho); 
 }
 
 @media (max-width: 900px) {
-  /* una columna: título, buscador y después las preguntas */
+  /* una columna: título, la frase justo debajo, el buscador y después las preguntas */
   .hero { display: flex; flex-direction: column; }
   .hero__title { order: 1; }
-  .stage { order: 2; margin-top: 24px; align-self: stretch; }
-  .hero__copy { order: 3; padding-top: 28px; }
+  .hero__copy { display: contents; }
+  .hero__lead { order: 2; margin-top: 16px; }
+  .stage { order: 3; margin-top: 24px; align-self: stretch; }
+  .preguntas { order: 4; padding-top: 28px; padding-bottom: 48px; }
 }
 @media (max-width: 960px) {
   .nav__links { display: none; }
@@ -597,8 +620,9 @@ h1, h2, h3 { font-family: var(--f-display); font-stretch: var(--display-ancho); 
   .nav__cta { margin-left: auto; padding: 10px 14px; }
   .hero { display: flex; flex-direction: column; padding-top: 24px; }
   .hero__title { order: 1; }
-  .stage { order: 2; margin-top: 20px !important; }
-  .hero__copy { order: 3; padding-top: 24px; padding-bottom: 32px; gap: 16px; }
+  .hero__lead { order: 2; margin-top: 12px; }
+  .stage { order: 3; margin-top: 20px !important; }
+  .preguntas { order: 4; padding-top: 24px; padding-bottom: 32px; }
   .hero__copy .btn { width: 100%; }
   .stage {
     margin-top: 0; margin-left: calc(-1 * max(var(--margin), env(safe-area-inset-left, 0px)));
