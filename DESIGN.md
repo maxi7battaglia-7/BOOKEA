@@ -217,3 +217,7 @@ El dueño pidió cambiarla por completo.
 - Aplica solo a la barra de arriba: el logo, los links del menú y "Sumá tu negocio" (380 ms). Al sacar el cursor, se retira hacia la izquierda.
 - Los bloques del mosaico no barren: conservan su teñido verde con fundido, como pidió el dueño.
 - Con "reducir movimiento", el verde aparece sin barrido.
+
+## Frase "Cada turno vacío…" con foto (pedido del dueño)
+- Franja a todo el ancho con una cancha de pádel vacía de fondo (Commons, Diegodlh, CC BY 4.0), en blanco y negro con velo noche al 62 %.
+- La frase va centrada en crema, en computadora y en celular (en celular a 9vw, en 3 líneas).
