@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Bookea</title>
-  <meta name="description" content="Bookea: agenda online para canchas de pádel, fútbol y tenis y para barberías de Mendoza. Seña con Mercado Pago y recordatorio por WhatsApp." />
+  <meta name="description" content="Bookea: turnos online con seña para negocios que trabajan con reservas. Seña con Mercado Pago y recordatorio por WhatsApp." />
   <meta name="theme-color" content="#ffffff" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -101,9 +101,9 @@
       <div class="hero__copy">
         <p class="hero__lead">Reservá turno en segundos.</p>
         <ul class="preguntas">
-          <li><a href="#como-funciona"><span class="pq">¿Qué hacemos?</span><span class="pr">Juntamos los turnos libres de canchas y barberías en un solo lugar.</span></a></li>
+          <li><a href="#como-funciona"><span class="pq">¿Qué hacemos?</span><span class="pr">Juntamos los turnos libres de muchos negocios en un solo lugar.</span></a></li>
           <li><a href="#funciones"><span class="pq">¿Para qué sirve?</span><span class="pr">Para reservar sin llamar, y para que el negocio cobre la seña y no pierda turnos.</span></a></li>
-          <li><a href="#sumate"><span class="pq">Laburá con nosotros</span><span class="pr">¿Tenés canchas o una barbería? Sumala a Bookea.</span></a></li>
+          <li><a href="#sumate"><span class="pq">Laburá con nosotros</span><span class="pr">¿Tenés un negocio que trabaja con turnos? Sumalo a Bookea.</span></a></li>
         </ul>
       </div>
 
@@ -123,7 +123,7 @@
               <div class="ff">
                 <label for="fz">Dónde</label>
                 <select id="fz" name="zona">
-                  <option value="">Toda Mendoza</option>
+                  <option value="">Todas las zonas</option>
                   <optgroup label="Valle de Uco">
                     <option value="tunuyan">Tunuyán</option>
                     <option value="tupungato">Tupungato</option>
@@ -175,14 +175,14 @@
     <section class="how frame" id="como-funciona" aria-labelledby="how-t">
       <div class="how__head">
         <h2 id="how-t" class="h-sec">Así funciona</h2>
-        <p class="how__sub">Para tu complejo o tu barbería: tres pasos y empezás a recibir reservas con seña.</p>
+        <p class="how__sub">Para tu negocio: tres pasos y empezás a recibir reservas con seña.</p>
       </div>
       <ol class="how__list">
         <li class="ex">
           <div class="ex__txt">
             <span class="ex__n" aria-hidden="true">1</span>
             <h3 class="ex__say">Armás tu agenda</h3>
-            <p class="ex__exp">Cargás tus canchas o tus barberos, los horarios y el precio de cada franja. La seña se calcula sola.</p>
+            <p class="ex__exp">Cargás lo que se reserva (canchas, salas o profesionales), los horarios y el precio de cada franja. La seña se calcula sola.</p>
           </div>
           <div class="ex__demo">
             <div class="call" data-ui>
@@ -355,7 +355,7 @@
           <h2 id="join-t" class="join__title">Sumá tu negocio al proyecto.</h2>
           <ol class="join__next">
             <li><b>Te escribimos por WhatsApp</b> el mismo día para conocer tu negocio.</li>
-            <li><b>Vamos a verte</b> y cargamos juntos canchas o barberos, horarios y precios.</li>
+            <li><b>Lo armamos juntos:</b> te ayudamos a cargar lo que se reserva, los horarios y los precios.</li>
             <li><b>Compartís tu link</b> y empezás a recibir reservas con seña.</li>
           </ol>
         </div>
@@ -385,14 +385,14 @@
             </div>
             <div class="field">
               <label for="f-localidad">Localidad</label>
-              <input id="f-localidad" name="localidad" placeholder="Por ejemplo, Tunuyán" required aria-describedby="f-localidad-err" />
-            <p class="field__err" id="f-localidad-err" hidden>Escribí la localidad, por ejemplo Tunuyán.</p>
+              <input id="f-localidad" name="localidad" placeholder="Tu ciudad" required aria-describedby="f-localidad-err" />
+            <p class="field__err" id="f-localidad-err" hidden>Escribí la ciudad donde está tu negocio.</p>
             </div>
           </div>
           <div class="field">
             <label for="f-whatsapp">WhatsApp</label>
-            <input id="f-whatsapp" name="whatsapp" type="tel" inputmode="tel" autocomplete="tel" placeholder="261 555 1234" required aria-describedby="f-whatsapp-err" />
-            <p class="field__err" id="f-whatsapp-err" hidden>Escribí un WhatsApp con código de área, por ejemplo 261 555 1234.</p>
+            <input id="f-whatsapp" name="whatsapp" type="tel" inputmode="tel" autocomplete="tel" placeholder="Código de área y número" required aria-describedby="f-whatsapp-err" />
+            <p class="field__err" id="f-whatsapp-err" hidden>Escribí un WhatsApp con código de área.</p>
           </div>
           <button class="btn btn--ink btn--lg btn--block" type="submit">Quiero probarlo</button>
           <p class="form__msg" role="status" aria-live="polite"></p>
@@ -448,7 +448,7 @@
       </svg>
             <span class="brand__word">Bookea</span>
           </a>
-          <p class="foot__tag">Turnos con seña para canchas y barberías de Mendoza.</p>
+          <p class="foot__tag">Turnos online con seña para cualquier negocio que trabaje con reservas.</p>
         </div>
         <nav class="foot__col" aria-label="Bookea">
           <p class="foot__k">Bookea</p>
@@ -468,7 +468,7 @@
         </div>
       </div>
       <div class="foot__bottom">
-        <p>© <span id="year">2026</span> Bookea · Mendoza, Argentina</p>
+        <p>© <span id="year">2026</span> Bookea</p>
         <details class="foot__credits">
           <summary>Créditos de las fotos</summary>
           <p><a href="https://commons.wikimedia.org/wiki/File:Multiple_Paddle_tennis_players_engage_in_a_lively_match_on_blue_courts_surrounded_by_lush_greenery.jpg">“Multiple Paddle tennis players…”</a>, Nenad Stojković, CC BY 2.0; <a href="https://commons.wikimedia.org/wiki/File:Barber_cutting_hair_with_comb._Back_view_of_young_man_in_barber_shop.jpg">“Barber cutting hair with comb…”</a>, Nenad Stojkovic, CC BY 2.0; <a href="https://commons.wikimedia.org/w/index.php?curid=4217148">“Tennis racket and ball”</a>, nao2g, CC BY 3.0; <a href="https://commons.wikimedia.org/wiki/File:DFC_5331_A_late-night_match_at_Klet_Kaeo_a_player_in_red_sprints_toward_goal_as_defenders_close_in_under_the_floodlights.jpg">“DFC 5331 A late-night match at Klet Kaeo…”</a>, PattayaPatrol, CC BY-SA 4.0; <a href="https://commons.wikimedia.org/wiki/File:Young_men_with_trendy_haircut_at_barber_shop.jpg">“Young men with trendy haircut at barber shop”</a>, Nenad Stojkovic, CC BY 2.0; <a href="https://commons.wikimedia.org/wiki/File:Padel_rackets_and_balls.jpg">“Padel rackets and balls”</a>, Anton Gustafsson, CC BY 2.0; <a href="https://commons.wikimedia.org/wiki/File:Cancha_de_p%C3%A1del_en_el_centro_deportivo_%22El_Tuc%C3%A1n%22.jpg">“Cancha de pádel en el centro deportivo El Tucán”</a>, Diegodlh, CC BY 4.0. Todas vía Wikimedia Commons, en blanco y negro en el mosaico. Los negocios de la página de reservas son ejemplos.</p>

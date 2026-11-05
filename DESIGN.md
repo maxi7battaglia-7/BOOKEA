@@ -226,3 +226,8 @@ El dueño pidió cambiarla por completo.
 - Los tres pasos son cuadros lado a lado en crema (#f5ecd7), suave pero distinto del gris de Funciones. Dentro de cada cuadro: número, título y explicación, y el ejemplo de pantalla debajo.
 - El resultado del paso 3 se apila y se compacta. En tablet y celular los cuadros van uno debajo del otro.
 - La sección baja 80–128 px después de la foto (72 px en celular), porque arrancaba pegada.
+
+## Sin límite de rubro ni de lugar (pedido del dueño)
+- Los textos ya no dicen "canchas y barberías de Mendoza". Hablan de negocios que trabajan con turnos y reservas.
+- El buscador conserva sus rubros y zonas de ejemplo, pero la opción general dice "Todas las zonas".
+- Pie: "Turnos online con seña para cualquier negocio que trabaje con reservas." y "© Bookea", sin "Mendoza, Argentina".

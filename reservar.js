@@ -154,7 +154,7 @@
     const R = RUBROS[S.rubro];
     const delRubro = LUGARES.filter((l) => l.rubro === S.rubro);
     const ordenar = (arr) => arr.sort((a, b) => turnosDe(b).length - turnosDe(a).length);
-    $("#res-t").textContent = `${R.nombre} en ${S.zona ? ZONAS[S.zona] : "Mendoza"}`;
+    $("#res-t").textContent = S.zona ? `${R.nombre} en ${ZONAS[S.zona]}` : `Turnos de ${R.nombre.toLowerCase()}`;
 
     let html = "";
     let aca = [];
@@ -163,9 +163,9 @@
       const cerca = ordenar(delRubro.filter((l) => l.zona !== S.zona && REGION[l.zona] === REGION[S.zona]));
       const resto = ordenar(delRubro.filter((l) => REGION[l.zona] !== REGION[S.zona]));
       if (aca.length) html += aca.map(tarjeta).join("");
-      else html += `<div class="vacio"><h2>Todavía no hay ${R.nombre.toLowerCase() === "barbería" ? "barberías" : "lugares de " + R.nombre.toLowerCase()} en ${ZONAS[S.zona]} con Bookea.</h2><p>Si conocés uno, contale de Bookea: se suma gratis durante el piloto.</p></div>`;
+      else html += `<div class="vacio"><h2>Todavía no hay ${R.nombre.toLowerCase() === "barbería" ? "barberías" : "lugares de " + R.nombre.toLowerCase()} en ${ZONAS[S.zona]} con Bookea.</h2><p>Si conocés uno, contale de Bookea.</p></div>`;
       if (cerca.length) html += `<h2 class="grupo">También en ${NOMBRE_REGION[REGION[S.zona]]}</h2>` + cerca.map(tarjeta).join("");
-      if (resto.length) html += `<h2 class="grupo">En otras zonas de Mendoza</h2>` + resto.map(tarjeta).join("");
+      if (resto.length) html += `<h2 class="grupo">En otras zonas</h2>` + resto.map(tarjeta).join("");
     } else {
       aca = ordenar(delRubro);
       html = aca.map(tarjeta).join("");
