@@ -119,8 +119,7 @@ h1, h2, h3 { font-family: var(--f-display); font-stretch: var(--display-ancho); 
 .m-paletas img { object-position: 50% 50%; }
 
 /* Vidrio: donde antes había bloques de color, la foto de al lado vista a través de un vidrio esmerilado.
-   Al pasar el cursor, el verde agua de la marca barre cada bloque (vidrio o foto) de izquierda a derecha,
-   igual que en el logo y en los links del menú. */
+   Al pasar el cursor, cada bloque (vidrio o foto) se tiñe del verde agua de la marca. */
 .m-vidrio img {
   position: absolute; inset: -32px; width: calc(100% + 64px); height: calc(100% + 64px);
   object-fit: cover; filter: grayscale(1) blur(18px) brightness(1.15);
@@ -133,11 +132,10 @@ h1, h2, h3 { font-family: var(--f-display); font-stretch: var(--display-ancho); 
   background: rgba(245, 247, 250, 0.14);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.34); /* taste-skill-ignore: canto del vidrio, pedido del dueño */
 }
-.m-foto::after { background: var(--teal); mix-blend-mode: color; }
-.m-vidrio::before { content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none; background: rgba(31, 160, 140, 0.62); }
-.m-foto::after, .m-vidrio::before { clip-path: inset(0 100% 0 0); transition: clip-path 520ms var(--ease-out); }
+.m-foto::after { background: rgba(31, 160, 140, 0); mix-blend-mode: color; }
 @media (hover: hover) and (pointer: fine) {
-  .m-foto:hover::after, .m-vidrio:hover::before { clip-path: inset(0 0 0 0); }
+  .m-vidrio:hover::after { background: rgba(31, 160, 140, 0.62); box-shadow: inset 0 0 0 1px rgba(31, 160, 140, 0.9); } /* taste-skill-ignore: canto del vidrio */
+  .m-foto:hover::after { background: rgba(31, 160, 140, 1); }
 }
 
 /* ---------- Navegación ---------- */
@@ -184,7 +182,7 @@ h1, h2, h3 { font-family: var(--f-display); font-stretch: var(--display-ancho); 
 .brand:active .brand__word { color: var(--ink); }
 .brand { transition: scale var(--t-press) var(--ease-out); }
 @media (prefers-reduced-motion: reduce) {
-  .brand::before, .nav__links a::before, .nav .nav__cta::before, .m-foto::after, .m-vidrio::before { transition: none; }
+  .brand::before, .nav__links a::before, .nav .nav__cta::before { transition: none; }
   .brand__mark { transition: none; }
   .brand:hover .brand__mark, .brand:active .brand__mark { transform: none; }
 }

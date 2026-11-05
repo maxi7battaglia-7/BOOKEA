@@ -214,5 +214,6 @@ El dueño pidió cambiarla por completo.
 
 ## Barrido verde al pasar el cursor (pedido del dueño)
 - Todo lo de arriba usa la misma animación que el logo: el verde agua barre de izquierda a derecha con clip-path.
-- Aplica a los links del menú y a "Sumá tu negocio" (380 ms) y a los bloques del mosaico, vidrio y fotos (520 ms). Al sacar el cursor, se retira hacia la izquierda.
+- Aplica solo a la barra de arriba: el logo, los links del menú y "Sumá tu negocio" (380 ms). Al sacar el cursor, se retira hacia la izquierda.
+- Los bloques del mosaico no barren: conservan su teñido verde con fundido, como pidió el dueño.
 - Con "reducir movimiento", el verde aparece sin barrido.
