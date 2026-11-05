@@ -206,3 +206,8 @@ El dueño pidió cambiarla por completo.
 ## Funciones ordenadas (pedido del dueño)
 - Las seis tarjetas de "Lo que hace por vos" tienen el mismo armado: título y texto arriba, y el ejemplo de pantalla entero abajo, sin pegarse a los bordes. Se sacó la alternancia cell--rev.
 - Tienen el mismo alto por fila y llevan una línea de bajada junto al título de la sección.
+
+## Pie nuevo (pedido del dueño: "super desprolijo")
+- Se sacaron las fichas grises, el reloj de Mendoza, el "Bookea" gigante y el bloque naranja.
+- Ahora es una franja noche con los mismos márgenes que el resto: logo y frase a la izquierda; columnas Bookea, Negocios y Contacto (mail y "Copiar mail"); línea final con © y "Créditos de las fotos" plegados.
+- Al pasar el cursor, los links se ponen verde agua y el botón se rellena de verde, igual que el menú.

@@ -4,25 +4,7 @@
   const $$ = (s, el = document) => [...el.querySelectorAll(s)];
   const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  // ---------- Hora de Mendoza ----------
-  const horaMendoza = () => {
-    try {
-      return new Intl.DateTimeFormat("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "America/Argentina/Mendoza" }).format(new Date());
-    } catch { return "21:04"; }
-  };
-  const notaHora = (h) => {
-    if (h >= 13 && h < 17) return "Hora de la siesta. Las barberías abren a las 17.";
-    if (h >= 17 && h < 20) return "Arranca la tarde y se mueven las reservas.";
-    if (h >= 20 || h < 1) return "Las canchas de la noche ya se están llenando.";
-    if (h >= 1 && h < 7) return "Todos duermen. Las reservas, no.";
-    return "Las canchas de la mañana todavía tienen lugar.";
-  };
-  const tick = () => {
-    const t = horaMendoza();
-    const c = $("#clock"); if (c) c.textContent = t;
-    const n = $("#clock-note"); if (n) n.textContent = notaHora(parseInt(t, 10));
-  };
-  tick(); setInterval(tick, 30000);
+  // ---------- Año del pie ----------
   const y = $("#year"); if (y) y.textContent = new Date().getFullYear();
 
   // ---------- Buscador de turnos: arma la búsqueda y lleva a reservar.html ----------
@@ -157,7 +139,7 @@
     [".features", [".h-sec", ".features__sub", ".cell"]],
     [".join", [".join__title", ".join__next li", ".form"]],
     [".faq", [".faq__title", ".faq details"]],
-    [".foot", [".tile"]],
+    [".foot", [".foot__brand", ".foot__col"]],
   ];
   const items = [];
   grupos.forEach(([sec, sels]) => {
