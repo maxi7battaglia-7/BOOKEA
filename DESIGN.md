@@ -231,3 +231,17 @@ El dueño pidió cambiarla por completo.
 - Los textos ya no dicen "canchas y barberías de Mendoza". Hablan de negocios que trabajan con turnos y reservas.
 - El buscador conserva sus rubros y zonas de ejemplo, pero la opción general dice "Todas las zonas".
 - Pie: "Turnos online con seña para cualquier negocio que trabaje con reservas." y "© Bookea", sin "Mendoza, Argentina".
+
+## Panel del negocio (admin.html)
+- Pantalla de trabajo: fondo gris claro (--raised) y tarjetas blancas. Costado noche con el menú (Agenda, Finanzas, Clientes, Mi negocio, Cuenta). La sección activa va en verde agua, con el mismo barrido del sitio. En celular el costado pasa a barra de arriba con el menú deslizable.
+- Entrada: a la izquierda, noche con "Tu negocio, ordenado."; a la derecha, la tarjeta para ingresar o crear la cuenta. Abajo, la pista de la cuenta de prueba.
+- Agenda:
+  - Día: una columna por cancha o lugar y una fila por turno.
+  - Colores de estado, siempre con su texto: seña cobrada (verde agua claro con barra verde), pagado (blanco con barra noche), no vino (naranja claro con barra naranja), bloqueado (noche).
+  - Los huecos libres se marcan con borde fino y "+ Libre".
+  - Semana: grilla de ocupación de un solo tono verde (de claro a lleno) que lleva a ese día.
+- Finanzas:
+  - Cifras arriba.
+  - Columnas de un solo color (verde agua, validado con dataviz): máximo 24 px, con tooltip al pasar el cursor y con las flechas del teclado, y la tabla por día como alternativa.
+  - Barras horizontales por cancha y por franja, movimientos y planilla CSV.
+- No se muestran precios de Bookea en ningún lado.

@@ -13,3 +13,4 @@
 - A futuro habrá app y registro: no prometer en ningún texto "sin bajar una app" ni "sin crear cuenta".
 - Un solo plan para todos y sin precio visible en la página: no poner montos de Bookea, planes, "gratis" ni "sin comisión".
 - Bookea no se limita a canchas y barberías ni a Mendoza: los textos hablan de "negocios que trabajan con turnos". Los rubros y zonas del buscador y los negocios de ejemplo son solo la muestra actual.
+- Panel del negocio en `admin.html`/`admin.css`/`admin.js`; se publica como `admin.html` junto a la landing. Cuenta de prueba: losalamos / bookea2026. Datos en localStorage (`bookea:panel:v1`).

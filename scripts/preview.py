@@ -46,3 +46,13 @@ res = re.sub(r'\s*<link rel="icon"[^>]*>', "", res)  # el ícono lo pone claude.
 res = res.replace('href="index.html#', 'href="./#').replace('href="index.html"', 'href="./"')
 (dist / "reservar.html").write_text(res, encoding="utf-8")
 print("OK ->", dist / "reservar.html", f"({len(res)//1024} KB)")
+
+# ---------- Panel del negocio ----------
+adm = leer("admin.html")
+adm = adm.replace('<link rel="stylesheet" href="styles.css" />', f"<style>\n{leer('styles.css')}\n</style>")
+adm = adm.replace('<link rel="stylesheet" href="admin.css" />', f"<style>\n{leer('admin.css')}\n</style>")
+adm = adm.replace('<script src="admin.js"></script>', f"<script>\n{leer('admin.js')}\n</script>")
+adm = re.sub(r'\s*<link rel="icon"[^>]*>', "", adm)
+adm = adm.replace('href="index.html"', 'href="./"')
+(dist / "admin.html").write_text(adm, encoding="utf-8")
+print("OK ->", dist / "admin.html", f"({len(adm)//1024} KB)")
