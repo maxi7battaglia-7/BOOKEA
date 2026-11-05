@@ -307,19 +307,25 @@ h1, h2, h3 { font-family: var(--f-display); font-stretch: var(--display-ancho); 
 }
 
 /* ---------- Cómo funciona ---------- */
-.how { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: var(--gap); } /* el espacio hasta la sección siguiente lo pone esa sección */
+.how { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: var(--gap); padding-top: clamp(80px, 9vw, 128px); } /* aire después de la foto; el de abajo lo pone la sección siguiente */
 .h-sec { font-size: var(--s-l); letter-spacing: -0.02em; line-height: 1.1; }
 .how__head { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: var(--gap); align-items: end; margin-bottom: 40px; }
 .how__head .h-sec { grid-column: 1 / 6; }
 .how__sub { grid-column: 7 / -1; font-size: var(--s-b); color: var(--soft); max-width: 46ch; }
-/* Cada paso es un bloque propio: número y explicación a la izquierda, la pantalla de ejemplo a la derecha */
-.how__list { grid-column: 1 / -1; display: grid; gap: 12px; counter-reset: paso; }
+/* Los tres pasos son cuadros lado a lado, en crema suave: se distinguen de las tarjetas grises de Funciones.
+   Número, título y explicación arriba; la pantalla de ejemplo justo debajo. */
+.how__list { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .ex {
-  background: var(--raised); border-radius: var(--r); padding: clamp(24px, 3vw, 40px);
-  display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: var(--gap); row-gap: 24px; align-items: start;
+  background: var(--cream); border-radius: var(--r); padding: clamp(24px, 2.4vw, 32px);
+  display: flex; flex-direction: column; gap: 28px;
 }
-.ex__txt { grid-column: 1 / 5; display: grid; gap: 12px; justify-items: start; }
-.ex__demo { grid-column: 6 / -1; display: grid; gap: 12px; }
+.ex__txt { display: grid; gap: 12px; justify-items: start; }
+.ex__demo { display: grid; gap: 12px; }
+/* el resultado del paso 3, compacto para que los tres cuadros queden parejos */
+.ex--final .result__col { padding: 14px 16px; gap: 6px; }
+.ex--final .result__v { font-size: var(--s-m); }
+.ex .resp { margin-left: 24px; }
+.ex .resp--chat { background: #ebe3d0; }
 .ex__n {
   display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%;
   background: var(--ink); color: var(--ground); font-weight: 600; font-size: 18px; font-variant-numeric: tabular-nums;
@@ -359,7 +365,7 @@ h1, h2, h3 { font-family: var(--f-display); font-stretch: var(--display-ancho); 
 .ex--final .result {
   width: 100%;
   background: var(--ink); color: var(--ground); border-radius: var(--r);
-  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; overflow: hidden;
+  display: grid; grid-template-columns: 1fr; gap: 1px; overflow: hidden; /* apilado dentro del cuadro; en tablet, en tres columnas */
 }
 .result__col { padding: 20px; display: grid; gap: 8px; align-content: start; background: var(--ink); }
 .result__col + .result__col { background: var(--ink-2); }
@@ -597,8 +603,9 @@ h1, h2, h3 { font-family: var(--f-display); font-stretch: var(--display-ancho); 
   .cells { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .features__head .h-sec, .features__sub { grid-column: 1 / -1; }
   .features__sub { margin-top: 12px; }
-  .ex__txt, .ex__demo { grid-column: 1 / -1; }
+  .how__list { grid-template-columns: 1fr; }
   .ex__exp { max-width: 56ch; }
+  .ex--final .result { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .how__head .h-sec, .how__sub { grid-column: 1 / -1; }
   .how__sub { margin-top: 12px; }
   .join__next, .form { grid-column: 1 / -1; }
@@ -658,7 +665,8 @@ h1, h2, h3 { font-family: var(--f-display); font-stretch: var(--display-ancho); 
   .intro__in { padding-block: 72px; }
   .intro__title { font-size: 9vw; line-height: 1.08; max-width: 14ch; }
 
-  .resp { margin-left: 0; }
+  .resp, .ex .resp { margin-left: 0; }
+  .how { padding-top: 72px; }
   .ex { padding: 20px 16px; }
   .ex__n { width: 40px; height: 40px; font-size: 17px; }
   .ex--final .result { width: 100%; grid-template-columns: 1fr; }

@@ -191,7 +191,7 @@ El dueño pidió cambiarla por completo.
 - Funciones ya no tiene padding abajo: Precios trae su propio aire y así no queda un hueco doble.
 
 ## Así funciona en tres bloques (pedido del dueño)
-- Cada paso es un bloque gris propio con un número en círculo (1 verde agua, 2 noche, 3 naranja), un título y una explicación corta a la izquierda, y la pantalla de ejemplo a la derecha.
+- Cada paso es un bloque gris propio con un número en círculo (1 verde agua, 2 noche, 3 naranja), un título y una explicación corta, y la pantalla de ejemplo (ver "Así funciona en cuadros").
 - Debajo de "Así funciona" va una línea que dice para quién es.
 - En tablet y celular, cada bloque apila la explicación arriba y la pantalla abajo.
 
@@ -221,3 +221,8 @@ El dueño pidió cambiarla por completo.
 ## Frase "Cada turno vacío…" con foto (pedido del dueño)
 - Franja a todo el ancho con una cancha de pádel vacía de fondo (Commons, Diegodlh, CC BY 4.0), en blanco y negro con velo noche al 62 %.
 - La frase va centrada en crema, en computadora y en celular (en celular a 9vw, en 3 líneas).
+
+## Así funciona en cuadros (pedido del dueño)
+- Los tres pasos son cuadros lado a lado en crema (#f5ecd7), suave pero distinto del gris de Funciones. Dentro de cada cuadro: número, título y explicación, y el ejemplo de pantalla debajo.
+- El resultado del paso 3 se apila y se compacta. En tablet y celular los cuadros van uno debajo del otro.
+- La sección baja 80–128 px después de la foto (72 px en celular), porque arrancaba pegada.
