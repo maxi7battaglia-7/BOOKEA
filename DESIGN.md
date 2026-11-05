@@ -211,3 +211,8 @@ El dueño pidió cambiarla por completo.
 - Se sacaron las fichas grises, el reloj de Mendoza, el "Bookea" gigante y el bloque naranja.
 - Ahora es una franja noche con los mismos márgenes que el resto: logo y frase a la izquierda; columnas Bookea, Negocios y Contacto (mail y "Copiar mail"); línea final con © y "Créditos de las fotos" plegados.
 - Al pasar el cursor, los links se ponen verde agua y el botón se rellena de verde, igual que el menú.
+
+## Barrido verde al pasar el cursor (pedido del dueño)
+- Todo lo de arriba usa la misma animación que el logo: el verde agua barre de izquierda a derecha con clip-path.
+- Aplica a los links del menú y a "Sumá tu negocio" (380 ms) y a los bloques del mosaico, vidrio y fotos (520 ms). Al sacar el cursor, se retira hacia la izquierda.
+- Con "reducir movimiento", el verde aparece sin barrido.

@@ -119,7 +119,8 @@ h1, h2, h3 { font-family: var(--f-display); font-stretch: var(--display-ancho); 
 .m-paletas img { object-position: 50% 50%; }
 
 /* Vidrio: donde antes había bloques de color, la foto de al lado vista a través de un vidrio esmerilado.
-   Al pasar el cursor, cada bloque (vidrio o foto) se tiñe del verde agua de la marca. */
+   Al pasar el cursor, el verde agua de la marca barre cada bloque (vidrio o foto) de izquierda a derecha,
+   igual que en el logo y en los links del menú. */
 .m-vidrio img {
   position: absolute; inset: -32px; width: calc(100% + 64px); height: calc(100% + 64px);
   object-fit: cover; filter: grayscale(1) blur(18px) brightness(1.15);
@@ -132,10 +133,11 @@ h1, h2, h3 { font-family: var(--f-display); font-stretch: var(--display-ancho); 
   background: rgba(245, 247, 250, 0.14);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.34); /* taste-skill-ignore: canto del vidrio, pedido del dueño */
 }
-.m-foto::after { background: rgba(31, 160, 140, 0); mix-blend-mode: color; }
+.m-foto::after { background: var(--teal); mix-blend-mode: color; }
+.m-vidrio::before { content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none; background: rgba(31, 160, 140, 0.62); }
+.m-foto::after, .m-vidrio::before { clip-path: inset(0 100% 0 0); transition: clip-path 520ms var(--ease-out); }
 @media (hover: hover) and (pointer: fine) {
-  .m-vidrio:hover::after { background: rgba(31, 160, 140, 0.62); box-shadow: inset 0 0 0 1px rgba(31, 160, 140, 0.9); } /* taste-skill-ignore: canto del vidrio */
-  .m-foto:hover::after { background: rgba(31, 160, 140, 1); }
+  .m-foto:hover::after, .m-vidrio:hover::before { clip-path: inset(0 0 0 0); }
 }
 
 /* ---------- Navegación ---------- */
@@ -154,7 +156,7 @@ h1, h2, h3 { font-family: var(--f-display); font-stretch: var(--display-ancho); 
 .nav .btn--ink.nav__cta {
   background: rgba(255, 255, 255, 0.12); color: var(--ground);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.3); /* taste-skill-ignore: canto del vidrio */
-  transition: transform var(--t-press) var(--ease-out), background-color var(--t-hover) ease, color var(--t-hover) ease, box-shadow var(--t-hover) ease;
+  transition: opacity 600ms var(--ease-out), transform var(--t-press) var(--ease-out), color 260ms ease, box-shadow 260ms ease;
 }
 /* Al pasar el cursor (o al tocarlo en el celular), un fondo verde agua barre desde el logo hacia la palabra,
    la B se inclina con un rebote y la palabra pasa a noche. Al apretar, todo se achica un poco.
@@ -182,7 +184,7 @@ h1, h2, h3 { font-family: var(--f-display); font-stretch: var(--display-ancho); 
 .brand:active .brand__word { color: var(--ink); }
 .brand { transition: scale var(--t-press) var(--ease-out); }
 @media (prefers-reduced-motion: reduce) {
-  .brand::before { transition: none; }
+  .brand::before, .nav__links a::before, .nav .nav__cta::before, .m-foto::after, .m-vidrio::before { transition: none; }
   .brand__mark { transition: none; }
   .brand:hover .brand__mark, .brand:active .brand__mark { transform: none; }
 }
@@ -191,12 +193,22 @@ h1, h2, h3 { font-family: var(--f-display); font-stretch: var(--display-ancho); 
 .nav__links a {
   font-size: var(--s-s); text-decoration: none; border-radius: var(--r);
   padding: 10px 14px; /* área de toque de 24px o más */
-  transition: background-color var(--t-hover) ease, color var(--t-hover) ease;
+  transition: color 260ms ease;
+}
+/* Links y "Sumá tu negocio": el verde agua barre de izquierda a derecha, como en el logo */
+.nav__links a, .nav .nav__cta { position: relative; isolation: isolate; }
+.nav__links a::before, .nav .nav__cta::before {
+  content: ""; position: absolute; inset: 0; z-index: -1; border-radius: var(--r); background: var(--teal);
+  clip-path: inset(0 100% 0 0 round var(--r));
+  transition: clip-path 380ms var(--ease-out);
 }
 @media (hover: hover) and (pointer: fine) {
-  .nav__links a:hover { background: var(--teal); color: var(--ink); }
-  .nav .btn--ink.nav__cta:hover { background: var(--teal); color: var(--ink); box-shadow: inset 0 0 0 1px var(--teal); } /* taste-skill-ignore: canto del vidrio */
+  .nav__links a:hover, .nav .btn--ink.nav__cta:hover { color: var(--ink); }
+  .nav__links a:hover::before, .nav .nav__cta:hover::before { clip-path: inset(0 0 0 0 round var(--r)); }
+  .nav .btn--ink.nav__cta:hover { box-shadow: inset 0 0 0 1px var(--teal); } /* taste-skill-ignore: canto del vidrio */
 }
+.nav__links a:active, .nav .btn--ink.nav__cta:active { color: var(--ink); }
+.nav__links a:active::before, .nav .nav__cta:active::before { clip-path: inset(0 0 0 0 round var(--r)); transition-duration: 200ms; }
 
 /* ---------- Hero ---------- */
 .hero {
