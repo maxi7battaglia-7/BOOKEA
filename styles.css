@@ -328,27 +328,29 @@ h1, h2, h3 { font-family: var(--f-display); font-stretch: var(--display-ancho); 
 
 /* ---------- Funciones ---------- */
 .features { padding-block: var(--section); }
-.features .h-sec { margin-bottom: 56px; }
-.cells { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.features__head { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: var(--gap); align-items: end; margin-bottom: 40px; }
+.features__head .h-sec { grid-column: 1 / 6; }
+.features__sub { grid-column: 7 / -1; font-size: var(--s-b); color: var(--soft); max-width: 46ch; }
+/* Todas las tarjetas iguales: título y texto arriba, el ejemplo entero abajo, mismo alto por fila */
+.cells { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .cell {
-  background: var(--raised); border-radius: var(--r); height: 440px; overflow: hidden;
-  display: flex; flex-direction: column; justify-content: space-between;
+  background: var(--raised); border-radius: var(--r); padding: 28px;
+  display: flex; flex-direction: column; gap: 24px;
   transition: background-color var(--t-hover) ease;
 }
 @media (hover: hover) and (pointer: fine) { .cell:hover { background: var(--raised-2); } }
-.cell__text { padding: 24px; display: grid; gap: 8px; }
+.cell__text { display: grid; gap: 8px; }
 .cell__text h3 { font-size: var(--s-m); letter-spacing: -0.01em; line-height: 1.2; }
-.cell__text p { font-size: var(--s-b); max-width: 34ch; }
+.cell__text p { font-size: var(--s-b); max-width: 36ch; color: var(--soft); }
 .frag {
   background: var(--ground); border: 1px solid var(--ui-line); border-radius: var(--r) var(--r) 0 0; /* taste-skill-ignore: borde o sombra de una pieza de interfaz (data-ui) */
-  font-size: 14px; line-height: 1.4; padding: 16px; margin: 0 24px -1px;
+  font-size: 14px; line-height: 1.4; padding: 16px; margin-top: auto; border-radius: var(--r);
 }
-.cell--rev .frag { margin: -1px 24px 0; border-radius: 0 0 var(--r) var(--r); }
 .frag__k { font-size: 13px; color: var(--soft); margin-bottom: 8px; }
 .pay li { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; border-top: 1px solid var(--ui-line); font-variant-numeric: tabular-nums; } /* taste-skill-ignore: borde o sombra de una pieza de interfaz (data-ui) */
 .pay__total { font-weight: 600; }
 .pay__total b { color: var(--teal-deep); }
-.cell--rev .frag--wa { background: #efeae2; border-color: transparent; margin: -1px 0 0 48px; padding-top: 28px; border-radius: 0 0 0 var(--r); }
+.frag--wa { background: #efeae2; border-color: transparent; }
 .bub { background: var(--ground); border-radius: 2px 10px 10px 10px; padding: 10px 12px; }
 .bub-actions { display: flex; gap: 6px; margin-top: 6px; }
 .bub-actions span { flex: 1; text-align: center; background: var(--ground); border-radius: 8px; padding: 8px; color: var(--teal-deep); font-weight: 600; }
@@ -356,12 +358,11 @@ h1, h2, h3 { font-family: var(--f-display); font-stretch: var(--display-ancho); 
 .fixed__rule { color: var(--soft); font-size: 13px; margin-top: 2px; }
 .fixed__dates { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; padding-bottom: 8px; }
 .fixed__dates span { background: var(--cream); border-radius: 4px; padding: 6px 10px; font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; }
-.cell--rev .frag--price { margin: -1px 0 0 24px; border-right: 0; border-radius: 0 0 0 var(--r); padding-top: 24px; }
 .price-t { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
 .price-t th { text-align: left; font-weight: 400; padding: 10px 0 10px 8px; border-top: 1px solid var(--ui-line); } /* taste-skill-ignore: borde o sombra de una pieza de interfaz (data-ui) */
-.price-t td { text-align: right; padding: 10px 16px 10px 12px; border-top: 1px solid var(--ui-line); font-weight: 600; } /* taste-skill-ignore: borde o sombra de una pieza de interfaz (data-ui) */
+.price-t td { text-align: right; padding: 10px 8px 10px 12px; border-top: 1px solid var(--ui-line); font-weight: 600; } /* taste-skill-ignore: borde o sombra de una pieza de interfaz (data-ui) */
 .price-t tr.is-on th, .price-t tr.is-on td { background: var(--teal-tint); }
-.frag--rules { margin: 0 24px -1px 0; border-left: 0; border-radius: 0 var(--r) 0 0; display: grid; gap: 4px; padding-left: 24px; }
+.frag--rules { display: grid; gap: 4px; padding-block: 6px 0; }
 .rule { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--ui-line); } /* taste-skill-ignore: borde o sombra de una pieza de interfaz (data-ui) */
 .stepper { display: inline-flex; align-items: center; border: 1px solid var(--ui-line); border-radius: 4px; } /* taste-skill-ignore: borde o sombra de una pieza de interfaz (data-ui) */
 .stepper button { border: 0; background: transparent; width: 32px; height: 32px; font-size: 16px; }
@@ -372,7 +373,6 @@ h1, h2, h3 { font-family: var(--f-display); font-stretch: var(--display-ancho); 
 .switch[aria-checked="true"] { background: var(--teal); }
 .switch[aria-checked="true"] span { transform: translateX(18px); }
 .rule__note { font-size: 13px; color: var(--soft); padding: 8px 0 12px; }
-.cell--rev .frag--phone { margin: -1px auto 0; width: 260px; border-radius: 0 0 18px 18px; padding: 24px 16px 18px; }
 .ph__venue { font-weight: 600; font-size: 15px; }
 .ph__k { font-size: 13px; color: var(--soft); }
 .ph__slots { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 12px; }
@@ -545,6 +545,8 @@ h1, h2, h3 { font-family: var(--f-display); font-stretch: var(--display-ancho); 
 /* ---------- Tablet ---------- */
 @media (max-width: 1080px) {
   .cells { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .features__head .h-sec, .features__sub { grid-column: 1 / -1; }
+  .features__sub { margin-top: 12px; }
   .ex__txt, .ex__demo { grid-column: 1 / -1; }
   .ex__exp { max-width: 56ch; }
   .how__head .h-sec, .how__sub { grid-column: 1 / -1; }
@@ -608,11 +610,7 @@ h1, h2, h3 { font-family: var(--f-display); font-stretch: var(--display-ancho); 
   .ex--final .result { width: 100%; grid-template-columns: 1fr; }
 
   .cells { grid-template-columns: 1fr; gap: 6px; }
-  .cell { height: auto; }
-  .cell--rev { flex-direction: column-reverse; }
-  .cell .frag { margin-top: 8px; }
-  .cell--rev .frag, .cell--rev .frag--price, .cell--rev .frag--wa { margin: 8px 0 -1px 24px; border-radius: var(--r) 0 0 0; border-right: 0; }
-  .cell--rev .frag--phone { margin: 8px auto -1px; border-radius: 18px 18px 0 0; }
+  .cell { padding: 20px 16px; gap: 20px; }
 
 
 

@@ -154,7 +154,7 @@
   const grupos = [
     [".intro", [".intro__title"]],
     [".how", [".h-sec", ".how__sub", ".ex"]],
-    [".features", [".h-sec", ".cell"]],
+    [".features", [".h-sec", ".features__sub", ".cell"]],
     [".join", [".join__title", ".join__next li", ".form"]],
     [".faq", [".faq__title", ".faq details"]],
     [".foot", [".tile"]],

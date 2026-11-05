@@ -202,3 +202,7 @@ El dueño pidió cambiarla por completo.
 ## La B del título (pedido del dueño)
 - En "Bienvenidos a Bookea", la B de Bookea es la B del isotipo sin el fondo noche: panzas verde agua y naranja, y el palo en noche, porque el crema se pierde sobre blanco.
 - Mide 0,69em de alto (el alto de las mayúsculas de Archivo) y se apoya en la línea de base. Lectores de pantalla: el h1 lleva aria-label con el texto completo.
+
+## Funciones ordenadas (pedido del dueño)
+- Las seis tarjetas de "Lo que hace por vos" tienen el mismo armado: título y texto arriba, y el ejemplo de pantalla entero abajo, sin pegarse a los bordes. Se sacó la alternancia cell--rev.
+- Tienen el mismo alto por fila y llevan una línea de bajada junto al título de la sección.
