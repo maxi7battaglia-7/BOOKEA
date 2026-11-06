@@ -171,10 +171,9 @@
     YO = DB.cuentas.find((c) => c.usuario === usuario);
     if (!YO) { sesion.del(CLAVE_SES); return mostrarEntrada(); }
     NEG = DB.negocios[YO.negocio]; RES = DB.reservas[YO.negocio] || (DB.reservas[YO.negocio] = []);
-    sesion.set(CLAVE_SES, usuario);
     $("#entrada").hidden = true; $("#panel").hidden = false;
     pintarLado();
-    ir(vistaInicial || sesion.get(CLAVE_VISTA) || "agenda", { foco: false });
+    ir(vistaInicial || "agenda", { foco: false });
   };
   const salir = () => {
     sesion.del(CLAVE_SES); sesion.del(CLAVE_VISTA); YO = NEG = RES = null;
@@ -276,7 +275,7 @@
   let vistaActual = "agenda";
   const ir = (v, { foco = true } = {}) => {
     if (!VISTAS[v]) v = "agenda";
-    vistaActual = v; sesion.set(CLAVE_VISTA, v);
+    vistaActual = v;
     $$(".menu__i").forEach((b) => (b.dataset.vista === v ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current")));
     VISTAS[v]();
     if (foco) { window.scrollTo(0, 0); $("#vista").focus({ preventScroll: true }); }
@@ -969,9 +968,8 @@
   };
 
   // ---------- Arranque ----------
-  cargar().then(() => {
-    const u = sesion.get(CLAVE_SES);
-    if (u && DB.cuentas.some((c) => c.usuario === u)) entrar(u);
-    else mostrarEntrada();
-  });
+  // Cada vez que se carga o se refresca la página, se pide usuario y contraseña de nuevo:
+  // la sesión vive solo en memoria y no se guarda en el navegador.
+  sesion.del(CLAVE_SES); sesion.del(CLAVE_VISTA);
+  cargar().then(() => mostrarEntrada());
 })();
