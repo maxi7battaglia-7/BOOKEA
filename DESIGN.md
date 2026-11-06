@@ -269,6 +269,8 @@ textos que se entiendan en cada cuadro.
   y Cuenta. La entrada conserva 3 avisos a propósito: es la puerta entre el sitio y el panel, con la frase grande como la landing.
 - No se muestran precios de Bookea en ningún lado.
 
+- Barras de desplazamiento (cuando la grilla no entra a lo ancho): finitas, sin flechas, en verde agua pálido; se oscurecen un poco al pasar el cursor (pedido del dueño: la barra gris oscura del sistema no va).
+
 ## Panel: calendario desplegable
 - Al tocar la fecha se abre el mes. Cada día lleva una barrita verde con qué tan lleno está; los días pasados van en gris y los
   cerrados sin fondo. Se recorre con flechas y se cierra con Escape o tocando afuera.

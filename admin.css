@@ -656,3 +656,19 @@
   .menu__i::before, .pa .btn--ink::before, .aviso, .seg__p, .slot, .menu__i .ico { transition: none !important; }
   .slot.recien { animation: none; }
 }
+
+/* ---------- Barras de desplazamiento sutiles (pedido del dueño) ----------
+   Cuando la grilla no entra a lo ancho, la barra es finita, sin flechas, en el tinte del verde agua,
+   y se oscurece un poco al pasar el cursor. Nada de la barra gris oscura del sistema. */
+.dia, .sem-wrap, .tabla-wrap, .lado, .cal-pop {
+  scrollbar-width: thin;
+  scrollbar-color: var(--v200) transparent;
+}
+@media (hover: hover) and (pointer: fine) {
+  .dia:hover, .sem-wrap:hover, .tabla-wrap:hover { scrollbar-color: var(--v) transparent; }
+}
+/* navegadores que no entienden lo de arriba (Safari) */
+.dia::-webkit-scrollbar, .sem-wrap::-webkit-scrollbar, .tabla-wrap::-webkit-scrollbar { height: 6px; width: 6px; }
+.dia::-webkit-scrollbar-track, .sem-wrap::-webkit-scrollbar-track, .tabla-wrap::-webkit-scrollbar-track { background: transparent; }
+.dia::-webkit-scrollbar-thumb, .sem-wrap::-webkit-scrollbar-thumb, .tabla-wrap::-webkit-scrollbar-thumb { background: var(--v200); border-radius: 3px; }
+.dia::-webkit-scrollbar-button, .sem-wrap::-webkit-scrollbar-button, .tabla-wrap::-webkit-scrollbar-button { display: none; }
