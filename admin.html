@@ -17,6 +17,72 @@
 </head>
 <body class="pa">
   <a class="skip" href="#vista">Saltar al contenido</a>
+  <!-- Íconos de línea (24×24, trazo 1.6), dibujados para el panel -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <symbol id="i-agenda" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M8 3v4M16 3v4M3.5 10h17M8 14h2M14 14h2M8 17.5h2"/></symbol>
+    <symbol id="i-plata" viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/><path d="M6 9.5v5M18 9.5v5"/></symbol>
+    <symbol id="i-clientes" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M15.5 4.8a3.5 3.5 0 0 1 0 6.4M18 14.2A6.5 6.5 0 0 1 21.5 20"/></symbol>
+    <symbol id="i-negocio" viewBox="0 0 24 24"><path d="M4 10v10h16V10"/><path d="M2.5 10 5 4h14l2.5 6a3 3 0 0 1-6.3 0 3.2 3.2 0 0 1-6.4 0 3 3 0 0 1-6.3 0"/><path d="M10 20v-5h4v5"/></symbol>
+    <symbol id="i-cuenta" viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="4"/><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"/></symbol>
+    <symbol id="i-salir" viewBox="0 0 24 24"><path d="M9.5 20.5H6a2 2 0 0 1-2-2v-13a2 2 0 0 1 2-2h3.5M15.5 16.5 20 12l-4.5-4.5M20 12H9.5"/></symbol>
+    <symbol id="i-mas" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-izq" viewBox="0 0 24 24"><path d="m14.5 6-6 6 6 6"/></symbol>
+    <symbol id="i-der" viewBox="0 0 24 24"><path d="m9.5 6 6 6-6 6"/></symbol>
+    <symbol id="i-abajo" viewBox="0 0 24 24"><path d="m6 9.5 6 6 6-6"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5 10 17.5 19.5 7"/></symbol>
+    <symbol id="i-bajar" viewBox="0 0 24 24"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14"/></symbol>
+    <symbol id="i-copiar" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="12" height="12" rx="2"/><path d="M15.5 8.5V5.5a2 2 0 0 0-2-2h-8a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h3"/></symbol>
+    <symbol id="i-afuera" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v4.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6H10"/></symbol>
+    <symbol id="i-chat" viewBox="0 0 24 24"><path d="M20.5 11.5a8.5 8.5 0 0 1-12.4 7.6L3.5 20.5l1.4-4.4a8.5 8.5 0 1 1 15.6-4.6Z"/></symbol>
+    <symbol id="i-buscar" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+  </svg>
+
+
+  <!-- ===== Panel ===== -->
+  <div class="panel" id="panel" hidden>
+    <aside class="lado" aria-label="Panel">
+      <a href="index.html" class="brand" aria-label="Bookea, volver al sitio">
+        <svg class="brand__mark" viewBox="0 0 1000 1000" aria-hidden="true">
+          <defs>
+            <mask id="pa-panzas" maskUnits="userSpaceOnUse" x="0" y="0" width="1000" height="1000">
+              <path d="M391,180 H520 A175,175 0 0 1 520,530 H391 Z" fill="#fff"/><path d="M391,426 H545 A197,197 0 0 1 545,820 H391 Z" fill="#fff"/>
+              <path d="M391,284 H520 A71,71 0 0 1 520,426 H391 Z" fill="#000"/><path d="M391,530 H545 A93,93 0 0 1 545,716 H391 Z" fill="#000"/>
+            </mask>
+          </defs>
+          <rect width="1000" height="1000" rx="200" fill="#11151c"/>
+          <g transform="translate(8,0)">
+            <g mask="url(#pa-panzas)">
+              <polygon points="0,0 1000,0 1000,553.38 0,377.06" fill="#1fa08c"/>
+              <polygon points="0,377.06 1000,553.38 1000,1000 0,1000" fill="#e4572e"/>
+            </g>
+            <rect x="255" y="180" width="136" height="640" fill="#f5ecd7"/>
+          </g>
+        </svg>
+        <span class="brand__word">Bookea</span>
+      </a>
+      <div class="quien">
+        <span class="mono" id="lado-mono" aria-hidden="true"></span>
+        <div><p class="lado__neg" id="lado-neg"></p><p class="lado__det" id="lado-det"></p></div>
+      </div>
+      <nav class="menu" aria-label="Secciones">
+        <button type="button" class="menu__i" data-vista="agenda"><svg class="ico" aria-hidden="true"><use href="#i-agenda"/></svg><span>Agenda</span></button>
+        <button type="button" class="menu__i" data-vista="finanzas"><svg class="ico" aria-hidden="true"><use href="#i-plata"/></svg><span>Finanzas</span></button>
+        <button type="button" class="menu__i" data-vista="clientes"><svg class="ico" aria-hidden="true"><use href="#i-clientes"/></svg><span>Clientes</span></button>
+        <button type="button" class="menu__i" data-vista="negocio"><svg class="ico" aria-hidden="true"><use href="#i-negocio"/></svg><span><span class="menu__largo">Mi negocio</span><span class="menu__corto">Negocio</span></span></button>
+        <button type="button" class="menu__i" data-vista="cuenta"><svg class="ico" aria-hidden="true"><use href="#i-cuenta"/></svg><span>Cuenta</span></button>
+      </nav>
+      <div class="lado__pie">
+        <a class="lado__pag" href="reservar.html" target="_blank" rel="noopener">Ver tu página de reservas<svg class="ico" aria-hidden="true"><use href="#i-afuera"/></svg></a>
+        <div class="yo">
+          <span class="yo__av" id="lado-av" aria-hidden="true"></span>
+          <p class="lado__user" id="lado-user"></p>
+          <button type="button" class="lado__salir" id="salir"><svg class="ico" aria-hidden="true"><use href="#i-salir"/></svg>Salir</button>
+        </div>
+      </div>
+    </aside>
+    <main class="vista" id="vista" tabindex="-1"></main>
+  </div>
 
   <!-- ===== Entrada: ingresar o crear cuenta ===== -->
   <div class="entrada" id="entrada" hidden>
@@ -43,12 +109,18 @@
       <div class="entrada__frase">
         <h1>Tu negocio, ordenado.</h1>
         <p>La agenda, la plata y tus clientes en un solo lugar.</p>
+        <ul class="entrada__lista">
+          <li><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg>Todos tus turnos, día por día</li>
+          <li><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg>Lo que cobraste y lo que falta cobrar</li>
+          <li><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg>Quién vuelve y quién falta</li>
+        </ul>
       </div>
     </section>
 
     <section class="entrada__form">
       <form class="caja" id="f-ingresar" novalidate aria-labelledby="t-ingresar">
         <h2 id="t-ingresar">Ingresá a tu panel</h2>
+        <p class="caja__sub">Con el usuario y la contraseña de tu negocio.</p>
         <div class="field">
           <label for="i-usuario">Usuario</label>
           <input id="i-usuario" name="usuario" autocomplete="username" autocapitalize="none" spellcheck="false" required />
@@ -107,44 +179,6 @@
       </form>
       <p class="entrada__nota">Vista previa: las cuentas y los datos se guardan solo en este navegador.</p>
     </section>
-  </div>
-
-  <!-- ===== Panel ===== -->
-  <div class="panel" id="panel" hidden>
-    <aside class="lado" aria-label="Panel">
-      <a href="index.html" class="brand" aria-label="Bookea, volver al sitio">
-        <svg class="brand__mark" viewBox="0 0 1000 1000" aria-hidden="true">
-          <defs>
-            <mask id="pa-panzas" maskUnits="userSpaceOnUse" x="0" y="0" width="1000" height="1000">
-              <path d="M391,180 H520 A175,175 0 0 1 520,530 H391 Z" fill="#fff"/><path d="M391,426 H545 A197,197 0 0 1 545,820 H391 Z" fill="#fff"/>
-              <path d="M391,284 H520 A71,71 0 0 1 520,426 H391 Z" fill="#000"/><path d="M391,530 H545 A93,93 0 0 1 545,716 H391 Z" fill="#000"/>
-            </mask>
-          </defs>
-          <rect width="1000" height="1000" rx="200" fill="#11151c"/>
-          <g transform="translate(8,0)">
-            <g mask="url(#pa-panzas)">
-              <polygon points="0,0 1000,0 1000,553.38 0,377.06" fill="#1fa08c"/>
-              <polygon points="0,377.06 1000,553.38 1000,1000 0,1000" fill="#e4572e"/>
-            </g>
-            <rect x="255" y="180" width="136" height="640" fill="#f5ecd7"/>
-          </g>
-        </svg>
-        <span class="brand__word">Bookea</span>
-      </a>
-      <nav class="menu" aria-label="Secciones">
-        <button type="button" class="menu__i" data-vista="agenda">Agenda</button>
-        <button type="button" class="menu__i" data-vista="finanzas">Finanzas</button>
-        <button type="button" class="menu__i" data-vista="clientes">Clientes</button>
-        <button type="button" class="menu__i" data-vista="negocio">Mi negocio</button>
-        <button type="button" class="menu__i" data-vista="cuenta">Cuenta</button>
-      </nav>
-      <div class="lado__pie">
-        <p class="lado__neg" id="lado-neg"></p>
-        <p class="lado__user" id="lado-user"></p>
-        <button type="button" class="lado__salir" id="salir">Cerrar sesión</button>
-      </div>
-    </aside>
-    <main class="vista" id="vista" tabindex="-1"></main>
   </div>
 
   <datalist id="rubros">

@@ -11,6 +11,9 @@
   const compacto = new Intl.NumberFormat("es-AR", { notation: "compact", maximumFractionDigits: 1 });
   const pad2 = (n) => String(n).padStart(2, "0");
   const pct = (n) => Math.round(n * 100) + " %";
+  const ico = (n, cls = "") => `<svg class="ico${cls ? " " + cls : ""}" aria-hidden="true"><use href="#i-${n}"/></svg>`;
+  const tilde = () => `<svg class="tilde dibujar" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5 10 17.5 19.5 7"/></svg>`;
+  const iniciales = (t) => String(t || "").replace(/[^\p{L}\p{N} ]/gu, "").split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join("") || "B";
 
   const CLAVE = "bookea:panel:v1", CLAVE_SES = "bookea:panel:sesion", CLAVE_VISTA = "bookea:panel:vista";
   const local = {
@@ -114,7 +117,9 @@
         const sena = origen === "telefono" && r() < 0.5 ? 0 : senaDe(neg, precio);
         const pasado = f < hoy.fecha || (f === hoy.fecha && t + neg.duracion <= hoy.min);
         let estado = "confirmada", retenida = false;
-        if (pasado) {
+        if (pasado && f === hoy.fecha) {
+          r(); // hoy: el dueño todavía no marcó si pagaron o faltaron
+        } else if (pasado) {
           const x = r();
           estado = x < 0.86 ? "jugada" : x < 0.93 ? "ausente" : "cancelada";
           if (estado === "cancelada") retenida = r() < 0.4;
@@ -187,13 +192,16 @@
   };
   const pintarLado = () => {
     $("#lado-neg").textContent = NEG.nombre;
-    $("#lado-user").textContent = `${YO.nombre} · ${YO.usuario}`;
+    $("#lado-det").textContent = [NEG.rubro, NEG.ciudad].filter(Boolean).join(" · ") || "Completá los datos en Mi negocio";
+    $("#lado-mono").textContent = iniciales(NEG.nombre);
+    $("#lado-av").textContent = iniciales(YO.nombre).slice(0, 1);
+    $("#lado-user").innerHTML = `<b>${esc(YO.nombre)}</b>${esc(YO.usuario)}`;
   };
 
   // ---------- Aviso ----------
   let avisoT;
   const aviso = (txt) => {
-    const a = $("#aviso"); a.textContent = txt; a.classList.add("is-on");
+    const a = $("#aviso"); a.innerHTML = tilde() + `<span>${esc(txt)}</span>`; a.classList.add("is-on");
     clearTimeout(avisoT); avisoT = setTimeout(() => a.classList.remove("is-on"), 3200);
   };
 
@@ -292,7 +300,7 @@
   };
   const cerrarDlg = () => dlg.open && dlg.close();
   dlg.addEventListener("click", (e) => { if (e.target === dlg || e.target.closest("[data-cerrar]")) cerrarDlg(); });
-  const cabezaDlg = (k, t) => `<div class="dlg__top"><div><p class="dlg__k">${esc(k)}</p><h2 class="dlg__t" id="dlg-t">${esc(t)}</h2></div><button type="button" class="dlg__x" data-cerrar aria-label="Cerrar">×</button></div>`;
+  const cabezaDlg = (k, t) => `<div class="dlg__top"><div><p class="dlg__k">${esc(k)}</p><h2 class="dlg__t" id="dlg-t">${esc(t)}</h2></div><button type="button" class="dlg__x" data-cerrar aria-label="Cerrar">${ico("x")}</button></div>`;
 
   // ---------- Resúmenes ----------
   const capacidad = (desde, hasta) => {
@@ -304,9 +312,9 @@
     const lista = RES.filter((r) => r.fecha >= desde && r.fecha <= hasta);
     const turnos = lista.filter((r) => ocupa(r) && esTurno(r));
     const bloq = lista.filter((r) => r.estado === "bloqueo").length;
-    const cap = Math.max(1, capacidad(desde, hasta) - bloq);
+    const capR = Math.max(0, capacidad(desde, hasta) - bloq), cap = Math.max(1, capR);
     return {
-      lista, turnos: turnos.length, ocupacion: Math.min(1, turnos.length / cap),
+      lista, turnos: turnos.length, cap: capR, ocupacion: Math.min(1, turnos.length / cap),
       cobrado: lista.reduce((s, r) => s + ingreso(r), 0),
       senas: lista.filter((r) => r.sena && (r.estado !== "cancelada" || r.retenida)).reduce((s, r) => s + r.sena, 0),
       porCobrar: lista.filter((r) => r.estado === "confirmada").reduce((s, r) => s + (r.precio - r.sena), 0),
@@ -314,7 +322,22 @@
       ausentes: lista.filter((r) => r.estado === "ausente"),
     };
   };
-  const tile = (k, v, n = "") => `<div class="tile"><p class="tile__k">${k}</p><p class="tile__v">${v}</p>${n ? `<p class="tile__n">${n}</p>` : ""}</div>`;
+  // Cada cifra dice qué es (rótulo), cuánto (valor) y contra qué o por qué (una frase corta).
+  const kpi = (k, v, n = "", { lider = false, barra = null } = {}) =>
+    `<div class="kpi${lider ? " kpi--lider" : ""}"><p class="kpi__k">${k}</p><p class="kpi__v">${v}</p>${barra !== null ? `<span class="kpi__barra" aria-hidden="true"><i style="width:${Math.round(barra * 100)}%"></i></span>` : ""}${n ? `<p class="kpi__n">${n}</p>` : ""}</div>`;
+  const kpis = (celdas) => `<div class="kpis kpis--${celdas.length}" style="--k:${celdas.length}">${celdas.join("")}</div>`;
+  // Segmentados: la pastilla oscura se desliza de la opción anterior a la nueva
+  const SEG = {};
+  const animarSegs = () => $$(".seg[data-seg]").forEach((g) => {
+    const on = $('[aria-pressed="true"]', g); if (!on) return;
+    let p = $(".seg__p", g); if (!p) { p = document.createElement("span"); p.className = "seg__p"; p.setAttribute("aria-hidden", "true"); g.prepend(p); }
+    const nuevo = { x: on.offsetLeft, w: on.offsetWidth }, antes = SEG[g.dataset.seg] || nuevo;
+    p.style.transition = "none"; p.style.translate = `${antes.x}px 0`; p.style.width = `${antes.w}px`;
+    g.classList.add("is-listo"); void p.offsetWidth; p.style.transition = "";
+    p.style.translate = `${nuevo.x}px 0`; p.style.width = `${nuevo.w}px`;
+    SEG[g.dataset.seg] = nuevo;
+  });
+  let RECIEN = null; // el turno que se acaba de cambiar hace "pop" en la grilla
 
   // ---------- Agenda ----------
   const AG = { fecha: ahora().fecha, modo: "dia" };
@@ -326,53 +349,119 @@
   };
   const nombreRec = (id) => (NEG.recursos.find((r) => r.id === id) || { nombre: "Sin lugar" }).nombre;
 
+  // Un turno con seña o sin seña que ya terminó y todavía no se marcó si pagaron el resto o si faltaron.
+  const terminado = (r, hoy) => r.fecha < hoy.fecha || (r.fecha === hoy.fecha && r.hora + NEG.duracion <= hoy.min);
+  const pendientes = () => { const hoy = ahora(); return RES.filter((r) => r.estado === "confirmada" && terminado(r, hoy)).sort((a, b) => a.fecha.localeCompare(b.fecha) || a.hora - b.hora); };
+  const proximos = () => {
+    const hoy = ahora();
+    return RES.filter((r) => r.estado === "confirmada" && (r.fecha > hoy.fecha || (r.fecha === hoy.fecha && r.hora >= hoy.min)))
+      .sort((a, b) => a.fecha.localeCompare(b.fecha) || a.hora - b.hora).slice(0, 5);
+  };
+  const cuandoCorto = (f, hoy) => (f === hoy ? "Hoy" : f === sumar(hoy, 1) ? "Mañana" : f === sumar(hoy, -1) ? "Ayer" : `${DIAS_C[dow(f)]} ${corto(f)}`);
+  const plural = (n, uno, varios) => `${n} ${n === 1 ? uno : varios}`;
+
+  // La frase debajo del título: lo que más importa de ese día, armada con los datos.
+  const fraseAgenda = (f, hoy, R, esDia) => {
+    if (!esDia) return `Esta semana tenés <b>${plural(R.turnos, "turno", "turnos")}</b> y <b>${plural(Math.max(0, R.cap - R.turnos), "horario libre", "horarios libres")}</b>.`;
+    if (!slotsDe(NEG, f).length) return "Ese día el negocio está cerrado. Podés cambiar el horario en Mi negocio.";
+    const del = RES.filter((r) => r.fecha === f && ocupa(r) && esTurno(r)).sort((a, b) => a.hora - b.hora);
+    const tomadas = new Set(RES.filter((r) => r.fecha === f && ocupa(r)).map((r) => `${r.recurso}|${r.hora}`));
+    const libresDesde = (m) => slotsDe(NEG, f).filter((t) => t >= m).reduce((n, t) => n + NEG.recursos.filter((rec) => !tomadas.has(`${rec.id}|${t}`)).length, 0);
+    if (f === hoy.fecha) {
+      const prox = del.find((r) => r.hora >= hoy.min), libres = libresDesde(hoy.min);
+      const p1 = prox ? `El próximo turno es a las <b>${aHora(prox.hora)}</b>: ${esc(prox.cliente)} en ${esc(nombreRec(prox.recurso))}.` : "No quedan turnos por hoy.";
+      return `${p1} Te ${libres === 1 ? "queda" : "quedan"} <b>${plural(libres, "horario libre", "horarios libres")}</b> hoy.`;
+    }
+    if (f < hoy.fecha) return `Ese día hubo <b>${plural(del.length, "turno", "turnos")}</b> y cobraste <b>${plata(R.cobrado)}</b>.`;
+    return `Ese día tenés <b>${plural(del.length, "turno", "turnos")}</b> y <b>${plural(libresDesde(0), "horario libre", "horarios libres")}</b>.`;
+  };
+
+  // El riel: lo que hay que hacer (para cerrar) y lo que viene (próximos turnos)
+  const htmlRiel = () => {
+    const hoy = ahora(), pend = pendientes(), prox = proximos();
+    const filaPend = (r) => {
+      const resto = r.precio - r.sena;
+      return `<div class="lista__f lista__f--acc"><p class="lista__h">${aHora(r.hora)}<small>${cuandoCorto(r.fecha, hoy.fecha)}</small></p>
+        <div class="lista__q"><b>${esc(r.cliente)}</b><small>${esc(nombreRec(r.recurso))} · ${resto > 0 ? `falta cobrar ${plata(resto)}` : "ya estaba pago"}</small></div>
+        <div class="lista__acc"><button type="button" class="btn btn--ghost btn--sm" data-rapido="jugada" data-id="${r.id}" aria-label="${esc(`${r.cliente} pagó`)}">${ico("check")}Pagó</button><button type="button" class="btn btn--line btn--sm" data-rapido="ausente" data-id="${r.id}" aria-label="${esc(`${r.cliente} no vino`)}">No vino</button></div></div>`;
+    };
+    const filaProx = (r) => `<button type="button" class="lista__f lista__f--boton" data-res="${r.id}"><span class="lista__h">${aHora(r.hora)}<small>${cuandoCorto(r.fecha, hoy.fecha)}</small></span>
+        <span class="lista__q"><b>${esc(r.cliente)}</b><small>${esc(nombreRec(r.recurso))}</small></span>
+        <span class="punto ${r.sena ? "punto--v" : "punto--g"}">${r.sena ? "Con seña" : "Sin seña"}</span></button>`;
+    return `<aside class="riel" aria-label="Para hacer y lo que viene">
+        <section class="riel__sec" aria-labelledby="pc-t">
+          <h2 id="pc-t" tabindex="-1">Para cerrar ${pend.length ? `<span class="chip-n">${pend.length}</span>` : ""}</h2>
+          <p>${pend.length ? "Turnos que ya terminaron. Marcá si pagaron el resto o si no vinieron." : "Acá aparecen los turnos que ya terminaron, para marcar si pagaron."}</p>
+          <div class="lista">${pend.length ? pend.slice(0, 4).map(filaPend).join("") : `<p class="vacio-l">${ico("check")}Todo al día: no hay turnos sin marcar.</p>`}</div>
+          ${pend.length > 4 ? `<p>Y ${plural(pend.length - 4, "turno más", "turnos más")}: están en la agenda de cada día.</p>` : ""}
+        </section>
+        <section class="riel__sec riel__prox" aria-labelledby="px-t">
+          <h2 id="px-t">Próximos turnos</h2>
+          <div class="lista">${prox.length ? prox.map(filaProx).join("") : `<p class="vacio-l">No hay turnos reservados para los próximos días.</p>`}</div>
+        </section>
+      </aside>`;
+  };
+
   VISTAS.agenda = () => {
     if (cerrarCalFuera) { document.removeEventListener("pointerdown", cerrarCalFuera); cerrarCalFuera = null; }
     const hoy = ahora(), f = AG.fecha, esDia = AG.modo === "dia";
     const desde = esDia ? f : lunesDe(f), hasta = esDia ? f : sumar(lunesDe(f), 6);
     const R = resumen(desde, hasta);
     const titulo = esDia ? largo(f) + (f === hoy.fecha ? " · hoy" : "") : `Semana del ${corto(desde)} al ${corto(hasta)}`;
+    const cuando = esDia ? (f === hoy.fecha ? "hoy" : "ese día") : "esta semana";
+    const seniaRet = R.ausentes.reduce((s, r) => s + r.sena, 0);
     $("#vista").innerHTML = `
       <header class="vhead">
-        <div><h1>Agenda</h1><p>Tocá un turno para ver el detalle, o un hueco libre para cargar uno.</p></div>
-        <div class="vhead__acc">
-          <div class="seg" role="group" aria-label="Ver por">
-            <button type="button" data-modo="dia" aria-pressed="${esDia}">Día</button>
-            <button type="button" data-modo="semana" aria-pressed="${!esDia}">Semana</button>
-          </div>
-          <button type="button" class="btn btn--ink" data-nuevo>+ Cargar turno</button>
-        </div>
+        <div><h1>Agenda</h1><p class="vhead__frase">${fraseAgenda(f, hoy, R, esDia)}</p></div>
+        <div class="vhead__acc"><button type="button" class="btn btn--ink" data-nuevo>${ico("mas", "ico-mas")}Cargar turno</button></div>
       </header>
       <div class="barra-f">
-        <div class="nav-fecha">
-          <button type="button" data-mover="-1" aria-label="${esDia ? "Día anterior" : "Semana anterior"}">‹</button>
-          <button type="button" class="hoy" data-hoy>Hoy</button>
-          <button type="button" data-mover="1" aria-label="${esDia ? "Día siguiente" : "Semana siguiente"}">›</button>
+        <div class="barra-f__izq">
+          <div class="nav-fecha">
+            <button type="button" data-mover="-1" aria-label="${esDia ? "Día anterior" : "Semana anterior"}">${ico("izq")}</button>
+            <button type="button" class="hoy" data-hoy>Hoy</button>
+            <button type="button" data-mover="1" aria-label="${esDia ? "Día siguiente" : "Semana siguiente"}">${ico("der")}</button>
+          </div>
+          <div class="cal">
+            <button type="button" class="fecha-btn" id="cal-btn" aria-expanded="false" aria-controls="cal-pop">
+              ${ico("agenda")}<span class="fecha-t" aria-live="polite">${titulo}</span>${ico("abajo", "fecha-btn__f")}
+              <span class="sr-only">Abrir el calendario</span>
+            </button>
+            <div class="cal-pop" id="cal-pop" role="dialog" aria-label="Elegí un día" hidden></div>
+          </div>
         </div>
-        <div class="cal">
-          <button type="button" class="fecha-btn" id="cal-btn" aria-expanded="false" aria-controls="cal-pop">
-            <span class="fecha-t" aria-live="polite">${titulo}</span><span class="fecha-btn__f" aria-hidden="true">▾</span>
-            <span class="sr-only">Abrir el calendario</span>
-          </button>
-          <div class="cal-pop" id="cal-pop" role="dialog" aria-label="Elegí un día" hidden></div>
+        <div class="seg" data-seg="modo" role="group" aria-label="Ver por">
+          <button type="button" data-modo="dia" aria-pressed="${esDia}">Día</button>
+          <button type="button" data-modo="semana" aria-pressed="${!esDia}">Semana</button>
         </div>
       </div>
-      <div class="tiles">
-        ${tile("Turnos", R.turnos, `${pct(R.ocupacion)} ocupado`)}
-        ${tile("Cobrado", plata(R.cobrado), "Señas y turnos ya pagados")}
-        ${tile("Por cobrar en el lugar", plata(R.porCobrar), "Resto de los turnos con seña")}
-        ${tile("No vinieron", R.ausentes.length, R.ausentes.length ? `Te quedaste con ${plata(R.ausentes.reduce((s, r) => s + r.sena, 0))} de seña` : "Nadie faltó")}
-      </div>
-      <div class="card">${esDia ? htmlDia(f, hoy) : htmlSemana(f, hoy)}</div>`;
+      ${kpis([
+        kpi("Turnos reservados", R.cap ? `${R.turnos} <small>de ${R.cap}</small>` : "—", R.cap ? `Ocupaste el ${pct(R.ocupacion)} de los horarios` : "Cerrado", { barra: R.cap ? R.ocupacion : null }),
+        kpi("Ya cobrado", plata(R.cobrado), "Señas y turnos que ya te pagaron"),
+        kpi("Falta cobrar", plata(R.porCobrar), "El resto de cada turno, que se paga en el lugar"),
+        kpi("No vinieron", R.ausentes.length, R.ausentes.length ? `Te quedaste con ${plata(seniaRet)} de seña` : `Nadie faltó ${cuando}`),
+      ])}
+      <div class="ag">
+        <section class="card ag__main" aria-labelledby="ag-t"><h2 id="ag-t" class="sr-only">${esDia ? "Turnos por horario" : "Turnos de la semana"}</h2>${esDia ? htmlDia(f, hoy) : htmlSemana(f, hoy)}</section>
+        ${htmlRiel()}
+      </div>`;
     const v = $("#vista");
-    $$("[data-modo]", v).forEach((b) => b.addEventListener("click", () => { AG.modo = b.dataset.modo; VISTAS.agenda(); }));
+    $$("[data-modo]", v).forEach((b) => b.addEventListener("click", () => { if (AG.modo === b.dataset.modo) return; AG.modo = b.dataset.modo; VISTAS.agenda(); $(`[data-modo="${AG.modo}"]`).focus(); }));
     $$("[data-mover]", v).forEach((b) => b.addEventListener("click", () => { AG.fecha = sumar(AG.fecha, +b.dataset.mover * (AG.modo === "dia" ? 1 : 7)); VISTAS.agenda(); $(`[data-mover="${b.dataset.mover}"]`).focus(); }));
-    $("[data-hoy]", v).addEventListener("click", () => { AG.fecha = ahora().fecha; VISTAS.agenda(); });
+    $("[data-hoy]", v).addEventListener("click", () => { AG.fecha = ahora().fecha; VISTAS.agenda(); $("[data-hoy]").focus(); });
     engancharCalendario();
     $("[data-nuevo]", v).addEventListener("click", () => dlgNuevo({ fecha: AG.fecha }));
     $$("[data-res]", v).forEach((b) => b.addEventListener("click", () => dlgTurno(b.dataset.res)));
     $$("[data-libre]", v).forEach((b) => b.addEventListener("click", () => dlgNuevo({ fecha: f, recurso: b.dataset.rec, hora: +b.dataset.hora })));
     $$("[data-ir-dia]", v).forEach((b) => b.addEventListener("click", () => { AG.fecha = b.dataset.irDia; AG.modo = "dia"; VISTAS.agenda(); }));
+    $$("[data-rapido]", v).forEach((b) => b.addEventListener("click", () => {
+      const r = RES.find((x) => x.id === b.dataset.id); if (!r) return;
+      r.estado = b.dataset.rapido; RECIEN = r.id; tocar(); VISTAS.agenda();
+      aviso(`${r.cliente}: ${etiqueta(r).toLowerCase()}.`);
+      const sig = $("[data-rapido]"); (sig || $("#pc-t")).focus({ preventScroll: true });
+    }));
+    animarSegs();
+    RECIEN = null;
   };
 
 
@@ -452,20 +541,26 @@
       h += `<p class="dia__hora${ahoraAca ? " es-ahora" : ""}"><b>${aHora(t)}</b><small>a ${aHora(fin)}</small>${ahoraAca ? `<em>Ahora</em>` : ""}</p>`;
       for (const rec of NEG.recursos) {
         const r = del.find((x) => x.recurso === rec.id && x.hora === t);
-        const donde = `${esc(rec.nombre)} · ${rangoT}`;
-        if (r && r.estado === "bloqueo") h += `<button type="button" class="slot slot--bloqueo" data-res="${r.id}"><b>Bloqueado</b><small>${esc(r.nota || "Sin turnos")}</small><small class="slot__t">${donde}</small></button>`;
-        else if (r) h += `<button type="button" class="slot slot--${r.estado}${r.estado === "confirmada" && !r.sena ? " sin-sena" : ""}" data-res="${r.id}" aria-label="${esc(`${r.cliente}, ${rec.nombre} de ${rangoT}: ${etiqueta(r)}`)}"><b>${esc(r.cliente)}</b><small>${etiqueta(r)}${r.origen === "fijo" ? " · fijo" : r.origen === "telefono" ? " · teléfono" : ""}</small><small class="slot__t">${donde}</small></button>`;
-        else if (f < hoy.fecha || (f === hoy.fecha && t < hoy.min)) h += `<span class="slot slot--pasado" aria-label="${esc(`${rec.nombre} de ${rangoT}: libre, ya pasó`)}"><small>Ya pasó</small><small class="slot__t">${donde}</small></span>`;
-        else h += `<button type="button" class="slot slot--libre" data-libre data-rec="${rec.id}" data-hora="${t}" aria-label="Cargar turno en ${esc(rec.nombre)} de ${rangoT}"><b>+ Libre</b><small class="slot__t">${donde}</small></button>`;
+        const donde = `<span class="slot__c">${esc(rec.nombre)} · </span>${rangoT}`;
+        const pop = r && r.id === RECIEN ? " recien" : "";
+        if (r && r.estado === "bloqueo") h += `<button type="button" class="slot slot--bloqueo${pop}" data-res="${r.id}"><b>Bloqueado</b><small>${esc(r.nota || "Sin turnos")}</small><small class="slot__t">${donde}</small></button>`;
+        else if (r) {
+          const cerrar = r.estado === "confirmada" && terminado(r, hoy);
+          const est = cerrar ? "Terminó: marcá si pagó" : etiqueta(r);
+          const extra = r.origen === "fijo" ? " · fijo" : r.origen === "telefono" ? " · por teléfono" : "";
+          h += `<button type="button" class="slot slot--${r.estado}${r.estado === "confirmada" && !r.sena ? " sin-sena" : ""}${cerrar ? " slot--cerrar" : ""}${pop}" data-res="${r.id}" aria-label="${esc(`${r.cliente}, ${rec.nombre} de ${rangoT}: ${est}`)}"><b>${esc(r.cliente)}</b><small class="slot__e">${est}${cerrar ? "" : extra}</small><small class="slot__t">${donde}</small></button>`;
+        }
+        else if (f < hoy.fecha || (f === hoy.fecha && t < hoy.min)) h += `<span class="slot slot--pasado" aria-label="${esc(`${rec.nombre} de ${rangoT}: quedó libre, ya pasó`)}"><small>Quedó libre</small><small class="slot__t">${donde}</small></span>`;
+        else h += `<button type="button" class="slot slot--libre" data-libre data-rec="${rec.id}" data-hora="${t}" aria-label="Cargar turno en ${esc(rec.nombre)} de ${rangoT}"><b>${ico("mas")}Libre</b><small class="slot__t">${donde}</small></button>`;
       }
     }
     h += `</div><div class="leyenda" style="margin-top:16px">
-      <span><i style="background:var(--teal)"></i>Seña cobrada</span>
-      <span><i style="background:var(--caja-in);box-shadow:inset 0 0 0 1.5px var(--ink) !important"></i>Sin seña</span>
-      <span><i style="background:var(--ink)"></i>Pagado</span>
-      <span><i style="background:var(--orange)"></i>No vino</span>
-      <span><i style="background:var(--ink);border-radius:3px;width:14px;height:14px"></i>Bloqueado</span>
-      <span><i style="background:var(--caja-hondo)"></i>Libre</span></div>`;
+      <span><i style="background:var(--v100)"></i>Con seña</span>
+      <span><i style="background:#fff;box-shadow:inset 0 0 0 1px var(--control)"></i>Sin seña</span>
+      <span><i style="background:#eceeee"></i>Pagado</span>
+      <span><i style="background:var(--n100)"></i>No vino</span>
+      <span><i style="background:var(--tx)"></i>Bloqueado</span>
+      <span><i style="background:var(--v50);box-shadow:inset 0 0 0 1px var(--v100)"></i>Libre: tocalo para cargar un turno</span></div>`;
     return h;
   };
 
@@ -487,9 +582,9 @@
       h += `</tr>`;
     }
     h += `</tbody></table></div><div class="leyenda" style="margin-top:12px">
-      <span><i style="background:var(--caja-in)"></i>Todo libre</span><span><i style="background:#d6efe8"></i>Pocos ocupados</span>
-      <span><i style="background:#a9dccf"></i>Casi lleno</span><span><i style="background:var(--teal)"></i>Completo</span>
-      <span>Tocá un horario para ver ese día.</span></div>`;
+      <span><i style="background:var(--fondo);box-shadow:inset 0 0 0 1px var(--borde)"></i>Todo libre</span><span><i style="background:var(--v100)"></i>Menos de la mitad</span>
+      <span><i style="background:var(--v200)"></i>La mitad o más</span><span><i style="background:var(--v)"></i>Completo</span>
+      <span>Cada cuadro dice cuántos lugares están ocupados. Tocalo para ver ese día.</span></div>`;
     return h;
   };
 
@@ -538,11 +633,11 @@
         <div><dt>WhatsApp</dt><dd>${esc(r.wa || "—")}</dd></div>
         <div><dt>Turno</dt><dd>${NEG.duracion} min · ${plata(r.precio)}</dd></div>
         <div><dt>Seña</dt><dd>${r.sena ? plata(r.sena) : "Sin seña"}</dd></div>
-        ${r.estado === "confirmada" ? `<div><dt>Falta cobrar</dt><dd>${plata(resto)}</dd></div>` : ""}
+        ${r.estado === "confirmada" ? `<div class="falta"><dt>Falta cobrar</dt><dd>${plata(resto)}</dd></div>` : ""}
         <div><dt>Cómo reservó</dt><dd>${mayus(ORIGEN[r.origen] || "—")}</dd></div>
       </dl>
       <div class="field"><label for="d-nota">Nota</label><textarea id="d-nota" rows="2" placeholder="Por ejemplo, traen paletas prestadas">${esc(r.nota)}</textarea></div>
-      <div class="acciones">${acc}${wa ? `<a class="btn btn--ghost" href="${wa}" target="_blank" rel="noopener">Escribirle por WhatsApp</a>` : ""}</div>`);
+      <div class="acciones">${acc}${wa ? `<a class="btn btn--ghost" href="${wa}" target="_blank" rel="noopener">${ico("chat")}Escribirle por WhatsApp</a>` : ""}</div>`);
     $("#d-nota").addEventListener("change", (e) => { r.nota = e.target.value.trim(); tocar(); aviso("Nota guardada."); });
     bindAcc(r);
   };
@@ -556,7 +651,7 @@
       if (a === "jugada") r.estado = "jugada";
       if (a === "ausente") r.estado = "ausente";
       if (a === "deshacer") r.estado = "confirmada";
-      tocar(); cerrarDlg(); refrescar();
+      RECIEN = r.id; tocar(); cerrarDlg(); refrescar();
       aviso(a === "cancelar-si" ? "Turno cancelado. El horario quedó libre." : `${r.cliente}: ${etiqueta(r).toLowerCase()}.`);
       void previo;
     }));
@@ -568,7 +663,7 @@
     const hoy = ahora();
     abrirDlg(`${cabezaDlg(NEG.nombre, "Cargar turno")}
       <form class="nuevo" id="f-nuevo" novalidate>
-        <div class="seg" role="radiogroup" aria-label="Qué querés cargar">
+        <div class="seg" data-seg="tipo" role="radiogroup" aria-label="Qué querés cargar">
           <button type="button" role="radio" data-tipo="turno" aria-checked="true" aria-pressed="true">Turno</button>
           <button type="button" role="radio" data-tipo="bloqueo" aria-checked="false" aria-pressed="false">Bloquear horario</button>
         </div>
@@ -583,12 +678,12 @@
             <div class="field"><label for="n-wa">WhatsApp</label><input id="n-wa" type="tel" inputmode="tel" autocomplete="off" /></div>
           </div>
           <datalist id="n-clientes">${[...new Map(RES.filter((r) => r.cliente).map((r) => [r.cliente, r.wa])).entries()].map(([n]) => `<option value="${esc(n)}"></option>`).join("")}</datalist>
-          <p class="dlg__k" id="n-precio" style="margin-top:12px"></p>
+          <p class="nuevo__precio" id="n-precio"></p>
           <label class="chk"><input type="checkbox" id="n-sena" /> <span>Ya cobré la seña</span></label>
           <label class="chk"><input type="checkbox" id="n-fijo" /> <span>Turno fijo: repetir todas las semanas (8 semanas)</span></label>
         </div>
         <div class="field"><label for="n-nota" id="n-nota-l">Nota (opcional)</label><input id="n-nota" autocomplete="off" /></div>
-        <div class="acciones"><button type="submit" class="btn btn--ink btn--lg">Guardar</button><button type="button" class="btn btn--ghost btn--lg" data-cerrar>Cancelar</button></div>
+        <div class="acciones"><button type="submit" class="btn btn--ink btn--lg">${ico("check")}Guardar</button><button type="button" class="btn btn--ghost btn--lg" data-cerrar>Cancelar</button></div>
       </form>`);
     let tipo = "turno";
     const f = $("#f-nuevo"), selH = $("#n-hora"), selR = $("#n-rec"), inF = $("#n-fecha");
@@ -617,8 +712,10 @@
       $(".solo-turno", f).hidden = tipo !== "turno";
       $("#n-nota-l").textContent = tipo === "turno" ? "Nota (opcional)" : "Motivo (por ejemplo, torneo o mantenimiento)";
       $("#dlg-t").textContent = tipo === "turno" ? "Cargar turno" : "Bloquear horario";
+      animarSegs();
     }));
     pintarHoras();
+    SEG.tipo = null; animarSegs();
     f.addEventListener("submit", (e) => {
       e.preventDefault();
       const okH = marcar(selH, "n-hora-err", !selH.value);
@@ -638,7 +735,8 @@
         const fi = sumar(fecha, i * 7);
         const choca = RES.some((r) => r.fecha === fi && r.recurso === rec && r.hora === t && ocupa(r));
         if (choca || !slotsDe(NEG, fi).includes(t)) { salteados++; continue; }
-        RES.push({ id: nuevoId(), fecha: fi, ...base }); cargados++;
+        const id = nuevoId(); RES.push({ id, fecha: fi, ...base }); cargados++;
+        if (fi === fecha) RECIEN = id;
       }
       tocar(); cerrarDlg();
       AG.fecha = fecha; AG.modo = "dia"; if (vistaActual === "agenda") refrescar();
@@ -649,6 +747,7 @@
   // ---------- Finanzas ----------
   const FIN = { periodo: "mes", todos: false };
   const PERIODOS = { mes: "Este mes", mesAnt: "Mes pasado", d30: "Últimos 30 días", d7: "Últimos 7 días" };
+  const periodoBoton = (t) => t.replace("Últimos ", `<span class="largo">Últimos </span>`); // en el celular: "30 días"
   const rango = (p) => {
     const hoy = ahora().fecha, d = aD(hoy);
     if (p === "d7") return [sumar(hoy, -6), hoy];
@@ -675,41 +774,46 @@
     });
     const movs = R.lista.filter((r) => ingreso(r) > 0).sort((a, b) => b.fecha.localeCompare(a.fecha) || b.hora - a.hora);
     const verMovs = FIN.todos ? movs : movs.slice(0, 12);
+    const prevD = sumar(desde, -dias), prevH = sumar(desde, -1), futPlata = futuros.reduce((s, r) => s + r.precio - r.sena, 0);
+    const delta = P.cobrado
+      ? `<span class="${varCob >= 0 ? "sube" : "baja"}">${varCob >= 0 ? "▲ +" : "▼ −"}${Math.abs(Math.round(varCob * 100))} %</span> contra los ${dias} días anteriores (${corto(prevD)} al ${corto(prevH)})`
+      : `Del ${corto(desde)} al ${corto(hasta)}`;
     $("#vista").innerHTML = `
       <header class="vhead">
-        <div><h1>Finanzas</h1><p>Lo que entró por señas y turnos. Las señas van directo a tu Mercado Pago.</p></div>
+        <div><h1>Finanzas</h1><p class="vhead__frase">Lo que entró por señas y turnos del <b>${corto(desde)}</b> al <b>${corto(hasta)}</b>. Las señas van directo a tu Mercado Pago.</p></div>
         <div class="vhead__acc">
-          <div class="seg" role="group" aria-label="Período">${Object.entries(PERIODOS).map(([k, t]) => `<button type="button" data-per="${k}" aria-pressed="${FIN.periodo === k}">${t}</button>`).join("")}</div>
+          <div class="seg" data-seg="per" role="group" aria-label="Período">${Object.entries(PERIODOS).map(([k, t]) => `<button type="button" data-per="${k}" aria-pressed="${FIN.periodo === k}">${periodoBoton(t)}</button>`).join("")}</div>
         </div>
       </header>
-      <div class="tiles">
-        ${tile("Cobrado", plata(R.cobrado), P.cobrado ? `<span class="${varCob >= 0 ? "sube" : "baja"}">${varCob >= 0 ? "▲" : "▼"} ${Math.abs(Math.round(varCob * 100))} %</span> contra los ${dias} días anteriores` : `Del ${corto(desde)} al ${corto(hasta)}`)}
-        ${tile("Señas cobradas", plata(R.senas), "Incluidas en lo cobrado")}
-        ${tile("Turnos pagados", R.jugados, `${pct(R.ocupacion)} de ocupación`)}
-        ${tile("No vinieron", R.ausentes.length, R.ausentes.length ? `${plata(R.ausentes.reduce((s, r) => s + r.sena, 0))} de seña retenida` : "Nadie faltó")}
-        ${tile("Por cobrar en el lugar", plata(futuros.reduce((s, r) => s + r.precio - r.sena, 0)), `${futuros.length} turnos de hoy en adelante`)}
-      </div>
+      ${kpis([
+        kpi("Cobrado", plata(R.cobrado), delta, { lider: true }),
+        kpi("Señas cobradas", plata(R.senas), "Ya están sumadas en lo cobrado"),
+        kpi("Turnos pagados", R.jugados, `Ocupaste el ${pct(R.ocupacion)} de los horarios`),
+        kpi("No vinieron", R.ausentes.length, R.ausentes.length ? `Te quedaste con ${plata(R.ausentes.reduce((s, r) => s + r.sena, 0))} de seña` : "Nadie faltó en el período"),
+        kpi("Falta cobrar", plata(futPlata), `De ${plural(futuros.length, "turno", "turnos")} de hoy en adelante, en el lugar`),
+      ])}
       <section class="card" aria-labelledby="g-t">
-        <div class="card__head"><div><h2 id="g-t">Cobrado por día</h2><p class="card__sub">${PERIODOS[FIN.periodo]} · del ${corto(desde)} al ${corto(hasta)}</p></div></div>
+        <div class="card__head"><div><h2 id="g-t">Cobrado por día</h2><p class="card__sub">Cada barra es lo que entró ese día. Pasá el cursor o usá las flechas para ver el detalle.</p></div></div>
         <div class="chart" id="chart"></div>
-        <details class="tabla-dias" style="margin-top:12px"><summary class="link" style="display:inline-block;cursor:pointer">Ver los números por día</summary>
+        <details class="tabla-dias" style="margin-top:12px"><summary class="link" style="display:inline-block;cursor:pointer">Ver los números de cada día</summary>
           <div class="tabla-wrap"><table class="tabla" style="margin-top:8px"><thead><tr><th scope="col">Día</th><th scope="col" class="num">Turnos</th><th scope="col" class="num">Cobrado</th></tr></thead>
           <tbody>${porDia.map((d) => `<tr><td>${DIAS_C[dow(d.iso)]} ${corto(d.iso)}</td><td class="num">${d.n}</td><td class="num">${plata(d.v)}</td></tr>`).join("")}</tbody></table></div>
         </details>
       </section>
       <div class="grid2">
-        <section class="card" aria-labelledby="r-t"><div class="card__head"><div><h2 id="r-t">Por ${esc(unidad(NEG).toLowerCase())}</h2><p class="card__sub">Cuánto dejó cada una en el período</p></div></div>${hbar(porRec)}</section>
-        <section class="card" aria-labelledby="f-t"><div class="card__head"><div><h2 id="f-t">Por franja horaria</h2><p class="card__sub">Según tus precios por horario</p></div></div>${hbar(porFranja)}</section>
+        <section class="card" aria-labelledby="r-t"><div class="card__head"><div><h2 id="r-t">Por ${esc(unidad(NEG).toLowerCase())}</h2><p class="card__sub">Cuánto dejó cada una en el período</p></div></div>${hbar(porRec, R.cobrado)}</section>
+        <section class="card" aria-labelledby="f-t"><div class="card__head"><div><h2 id="f-t">Por franja horaria</h2><p class="card__sub">Según la hora en que empezó cada turno</p></div></div>${hbar(porFranja, R.cobrado)}</section>
       </div>
       <section class="card" aria-labelledby="m-t">
-        <div class="card__head"><div><h2 id="m-t">Movimientos</h2><p class="card__sub">${movs.length} en el período</p></div>
-          <button type="button" class="btn btn--line btn--sm" id="csv" ${movs.length ? "" : "disabled"}>Descargar planilla (CSV)</button></div>
+        <div class="card__head"><div><h2 id="m-t">Movimientos</h2><p class="card__sub">${plural(movs.length, "cobro", "cobros")} en el período, del más nuevo al más viejo</p></div>
+          <button type="button" class="btn btn--line btn--sm" id="csv" ${movs.length ? "" : "disabled"}>${ico("bajar")}Descargar planilla (CSV)</button></div>
         ${movs.length ? `<div class="tabla-wrap"><table class="tabla tabla--cards"><thead><tr><th scope="col">Cliente</th><th scope="col">Fecha</th><th scope="col">Concepto</th><th scope="col">${esc(unidad(NEG))}</th><th scope="col" class="num">Monto</th></tr></thead><tbody>
-          ${verMovs.map((r) => `<tr><td>${esc(r.cliente)}</td><td class="nowrap" data-k="">${corto(r.fecha)} ${aHora(r.hora)}</td><td data-k="">${CONCEPTO(r)}</td><td data-k="">${esc(nombreRec(r.recurso))}</td><td class="num"><b>${plata(ingreso(r))}</b></td></tr>`).join("")}
-        </tbody></table></div>${movs.length > 12 ? `<p style="margin-top:12px"><button type="button" class="link" id="mas">${FIN.todos ? "Ver menos" : `Ver los ${movs.length} movimientos`}</button></p>` : ""}`
-        : `<p class="vacio-p">Todavía no hay movimientos en este período.</p>`}
+          ${verMovs.map((r) => `<tr><td class="cli">${esc(r.cliente)}</td><td class="nowrap solo-pc">${DIAS_C[dow(r.fecha)]} ${corto(r.fecha)} · ${aHora(r.hora)}</td><td class="solo-pc">${CONCEPTO(r)}</td><td class="solo-pc gris">${esc(nombreRec(r.recurso))}</td><td class="num"><b>${plata(ingreso(r))}</b></td><td class="dato-2 solo-cel">${DIAS_C[dow(r.fecha)]} ${corto(r.fecha)} ${aHora(r.hora)} · ${CONCEPTO(r)} · ${esc(nombreRec(r.recurso))}</td></tr>`).join("")}
+        </tbody></table></div>${movs.length > 12 ? `<p style="margin-top:12px"><button type="button" class="link" id="mas">${FIN.todos ? "Ver menos" : `Ver los ${movs.length} cobros`}</button></p>` : ""}`
+        : `<p class="vacio-p">Todavía no entró plata en este período. Cuando te paguen una seña o un turno, aparece acá.</p>`}
       </section>`;
     $$("[data-per]").forEach((b) => b.addEventListener("click", () => { FIN.periodo = b.dataset.per; FIN.todos = false; VISTAS.finanzas(); $(`[data-per="${FIN.periodo}"]`).focus(); }));
+    animarSegs();
     const mas = $("#mas"); if (mas) mas.addEventListener("click", () => { FIN.todos = !FIN.todos; VISTAS.finanzas(); $("#mas").focus(); });
     const csv = $("#csv"); if (csv) csv.addEventListener("click", () => descargarCSV(movs, desde, hasta));
     const cont = $("#chart");
@@ -719,10 +823,10 @@
       new ResizeObserver(() => { if (cont.isConnected && Math.abs(cont.clientWidth - w) > 8) { w = cont.clientWidth; graficoBarras(cont, porDia); } }).observe(cont);
     }
   };
-  const hbar = (filas) => {
+  const hbar = (filas, total = 0) => {
     const max = Math.max(1, ...filas.map((f) => f.v));
     if (!filas.length) return `<p class="vacio-p">Sin datos.</p>`;
-    return `<div class="hbar">${filas.map((f) => `<div class="hbar__f"><span class="hbar__n">${esc(f.n)}</span><span class="hbar__p"><span class="hbar__b" style="width:calc(${(f.v / max) * 100}% - ${(f.v / max) * 96}px)"></span><span class="hbar__v">${plata(f.v)}</span></span></div>`).join("")}</div>`;
+    return `<div class="hbar">${filas.map((f) => `<div class="hbar__f"><span class="hbar__n">${esc(f.n)}</span><span class="hbar__p"><span class="hbar__b" style="width:calc(${(f.v / max) * 100}% - ${(f.v / max) * 110}px)"></span><span class="hbar__v">${plata(f.v)}${total ? `<span class="hbar__s">${pct(f.v / total)} del total</span>` : ""}</span></span></div>`).join("")}</div>`;
   };
   const techo = (max) => {
     if (max <= 0) return { tope: 1000, paso: 250 };
@@ -740,7 +844,7 @@
     const y = (v) => m.t + ih - (v / tope) * ih;
     const cadaCuanto = Math.max(1, Math.ceil(datos.length / Math.floor(iw / 46)));
     let s = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Cobrado por día. Usá las flechas para recorrer los días." tabindex="0">`;
-    for (let v = 0; v <= tope + 0.5; v += paso) s += `<line class="grilla" x1="${m.l}" x2="${W - m.r}" y1="${y(v)}" y2="${y(v)}"/><text class="eje" x="${m.l - 8}" y="${y(v) + 4}" text-anchor="end">${v === 0 ? "0" : "$ " + compacto.format(v)}</text>`;
+    for (let v = 0; v <= tope + 0.5; v += paso) s += `<line class="${v === 0 ? "base" : "grilla"}" x1="${m.l}" x2="${W - m.r}" y1="${y(v)}" y2="${y(v)}"/><text class="eje" x="${m.l - 8}" y="${y(v) + 4}" text-anchor="end">${v === 0 ? "0" : "$ " + compacto.format(v)}</text>`;
     datos.forEach((d, i) => {
       const x = m.l + i * banda + (banda - ancho) / 2, h = (d.v / tope) * ih, b = m.t + ih, rr = Math.min(4, h, ancho / 2);
       if (h > 0) s += `<path class="barra" data-i="${i}" d="M${x},${b} V${b - h + rr} Q${x},${b - h} ${x + rr},${b - h} H${x + ancho - rr} Q${x + ancho},${b - h} ${x + ancho},${b - h + rr} V${b} Z"/>`;
@@ -797,28 +901,27 @@
     });
     const todos = [...mapa.values()];
     const vuelven = todos.filter((c) => c.turnos >= 2).length;
+    const faltaron = todos.filter((c) => c.ausencias).length;
     $("#vista").innerHTML = `
-      <header class="vhead"><div><h1>Clientes</h1><p>Quiénes reservan, cuánto vuelven y quién falta.</p></div></header>
-      <div class="tiles">
-        ${tile("Clientes", todos.length, "Con al menos una reserva")}
-        ${tile("Vuelven", todos.length ? pct(vuelven / todos.length) : "—", `${vuelven} jugaron 2 veces o más`)}
-        ${tile("Con turno fijo", todos.filter((c) => c.fijo).length, "Reservan todas las semanas")}
-        ${tile("Faltaron alguna vez", todos.filter((c) => c.ausencias).length, "Sin avisar")}
-      </div>
+      <header class="vhead"><div><h1>Clientes</h1><p class="vhead__frase">Quiénes te reservan, cuánto vuelven y quién falta. Se arma solo con cada reserva.</p></div></header>
+      ${kpis([
+        kpi("Clientes", todos.length, "Reservaron al menos una vez"),
+        kpi("Vuelven", todos.length ? pct(vuelven / todos.length) : "—", todos.length ? `${plural(vuelven, "cliente jugó", "clientes jugaron")} 2 veces o más` : "Todavía no hay datos"),
+        kpi("Con turno fijo", todos.filter((c) => c.fijo).length, "Reservan todas las semanas"),
+        kpi("Faltaron alguna vez", faltaron, faltaron ? "No vinieron al menos a un turno" : "Nadie faltó nunca"),
+      ])}
       <section class="card" aria-labelledby="c-t">
-        <div class="card__head">
-          <h2 id="c-t">Lista</h2>
-          <div class="vhead__acc">
-            <label class="sr-only" for="c-q">Buscar cliente</label>
-            <input class="buscar" id="c-q" type="search" placeholder="Buscar por nombre o WhatsApp" value="${esc(CLI.q)}" autocomplete="off" />
-            <label class="sr-only" for="c-orden">Ordenar</label>
-            <select class="buscar" id="c-orden" style="width:auto">
-              <option value="turnos" ${CLI.orden === "turnos" ? "selected" : ""}>Más turnos</option>
-              <option value="gastado" ${CLI.orden === "gastado" ? "selected" : ""}>Más plata</option>
-              <option value="ultimo" ${CLI.orden === "ultimo" ? "selected" : ""}>Vinieron hace poco</option>
-              <option value="ausencias" ${CLI.orden === "ausencias" ? "selected" : ""}>Más ausencias</option>
-            </select>
-          </div>
+        <div class="card__head"><div><h2 id="c-t">Todos tus clientes</h2><p class="card__sub">Tocá WhatsApp para escribirle a cualquiera.</p></div></div>
+        <div class="herr">
+          <div class="buscar-w">${ico("buscar")}<label class="sr-only" for="c-q">Buscar cliente</label><input class="buscar" id="c-q" type="search" placeholder="Buscar por nombre o WhatsApp" value="${esc(CLI.q)}" autocomplete="off" /></div>
+          <label class="sr-only" for="c-orden">Ordenar</label>
+          <select class="buscar" id="c-orden">
+            <option value="turnos" ${CLI.orden === "turnos" ? "selected" : ""}>Los que más juegan</option>
+            <option value="gastado" ${CLI.orden === "gastado" ? "selected" : ""}>Los que más dejaron</option>
+            <option value="ultimo" ${CLI.orden === "ultimo" ? "selected" : ""}>Los que vinieron hace poco</option>
+            <option value="ausencias" ${CLI.orden === "ausencias" ? "selected" : ""}>Los que más faltan</option>
+          </select>
+          <p class="herr__cuenta" id="c-cuenta" aria-live="polite"></p>
         </div>
         <div id="c-lista"></div>
       </section>`;
@@ -826,8 +929,9 @@
       const q = CLI.q.trim().toLowerCase(), qd = q.replace(/\D/g, "");
       const l = todos.filter((c) => !q || c.nombre.toLowerCase().includes(q) || (qd && String(c.wa).replace(/\D/g, "").includes(qd)))
         .sort((a, b) => CLI.orden === "ultimo" ? b.ultimo.localeCompare(a.ultimo) : b[CLI.orden] - a[CLI.orden]);
-      $("#c-lista").innerHTML = l.length ? `<div class="tabla-wrap"><table class="tabla tabla--cards"><thead><tr><th scope="col">Cliente</th><th scope="col" class="num">Turnos</th><th scope="col" class="num">No vino</th><th scope="col">Último</th><th scope="col">Próximo</th><th scope="col" class="num">Dejó</th><th scope="col"><span class="sr-only">Contacto</span></th></tr></thead><tbody>
-        ${l.map((c) => { const wa = waLink(c, `Hola ${c.nombre.split(" ")[0]}, te escribimos de ${NEG.nombre}.`); return `<tr><td>${esc(c.nombre)}${c.fijo ? `<span class="chip-e">Fijo</span>` : ""}</td><td class="num" data-k="Turnos:">${c.turnos}</td><td class="num" data-k="No vino:">${c.ausencias}</td><td data-k="Último:">${c.ultimo ? corto(c.ultimo) : "—"}</td><td data-k="Próximo:">${c.proximo ? corto(c.proximo) : "—"}</td><td class="num" data-k="Dejó:">${plata(c.gastado)}</td><td>${wa ? `<a href="${wa}" target="_blank" rel="noopener">WhatsApp</a>` : ""}</td></tr>`; }).join("")}
+      $("#c-cuenta").textContent = q ? `${plural(l.length, "cliente", "clientes")} de ${todos.length}` : plural(todos.length, "cliente", "clientes");
+      $("#c-lista").innerHTML = l.length ? `<div class="tabla-wrap"><table class="tabla tabla--cards"><thead><tr><th scope="col">Cliente</th><th scope="col" class="num">Turnos jugados</th><th scope="col" class="num">Faltó</th><th scope="col">Último turno</th><th scope="col">Próximo turno</th><th scope="col" class="num">Dejó en total</th><th scope="col"><span class="sr-only">Contacto</span></th></tr></thead><tbody>
+        ${l.map((c) => { const wa = waLink(c, `Hola ${c.nombre.split(" ")[0]}, te escribimos de ${NEG.nombre}.`); return `<tr><td class="cli">${esc(c.nombre)}${c.fijo ? `<span class="chip-e">Fijo</span>` : ""}</td><td class="num solo-pc">${c.turnos}</td><td class="num solo-pc">${c.ausencias ? `<span class="chip-n">${c.ausencias}</span>` : `<span class="gris">0</span>`}</td><td class="solo-pc">${c.ultimo ? cuandoCorto(c.ultimo, hoy) : `<span class="gris">—</span>`}</td><td class="solo-pc">${c.proximo ? cuandoCorto(c.proximo, hoy) : `<span class="gris">—</span>`}</td><td class="num"><b>${plata(c.gastado)}</b></td><td class="nowrap">${wa ? `<a href="${wa}" target="_blank" rel="noopener">WhatsApp</a>` : ""}</td><td class="dato-2 solo-cel">${plural(c.turnos, "turno jugado", "turnos jugados")}${c.ausencias ? ` · faltó ${c.ausencias}` : ""}${c.proximo ? ` · próximo: ${cuandoCorto(c.proximo, hoy)}` : ""}</td></tr>`; }).join("")}
         </tbody></table></div>` : `<p class="vacio-p">${todos.length ? "No hay clientes con ese nombre o número." : "Todavía no hay clientes. Aparecen solos cuando te reservan."}</p>`;
     };
     pintar();
@@ -839,48 +943,51 @@
   const ORDEN_DIAS = [1, 2, 3, 4, 5, 6, 0];
   VISTAS.negocio = () => {
     const n = NEG, U = unidad(n);
-    const filaRec = (r) => `<div class="fila fila--rec" data-id="${r.id}"><input aria-label="Nombre" value="${esc(r.nombre)}" placeholder="${U} 1" /><input aria-label="Detalle" value="${esc(r.detalle)}" placeholder="Detalle (opcional)" /><button type="button" class="quitar" data-quitar aria-label="Quitar ${esc(r.nombre)}">×</button></div>`;
-    const filaFr = (f) => `<div class="fila fila--fr"><input type="time" aria-label="Desde" value="${f.desde}" /><input type="time" aria-label="Hasta" value="${f.hasta}" /><input class="fila__precio" type="number" inputmode="numeric" min="0" step="500" aria-label="Precio" value="${f.precio}" /><button type="button" class="quitar" data-quitar aria-label="Quitar franja">×</button></div>`;
+    const filaRec = (r) => `<div class="fila fila--rec" data-id="${r.id}"><input aria-label="Nombre" value="${esc(r.nombre)}" placeholder="${U} 1" /><input aria-label="Detalle" value="${esc(r.detalle)}" placeholder="Por ejemplo, techada" /><button type="button" class="quitar" data-quitar aria-label="Quitar ${esc(r.nombre)}">${ico("x")}</button></div>`;
+    const filaFr = (f) => `<div class="fila fila--fr"><input type="time" aria-label="Desde" value="${f.desde}" /><input type="time" aria-label="Hasta" value="${f.hasta}" /><input class="fila__precio" type="number" inputmode="numeric" min="0" step="500" aria-label="Precio" value="${f.precio}" /><button type="button" class="quitar" data-quitar aria-label="Quitar franja">${ico("x")}</button></div>`;
+    const sec = (id, t, d, cuerpo) => `<section class="ajuste" aria-labelledby="${id}"><div class="ajuste__r"><h2 id="${id}">${t}</h2><p>${d}</p></div><div class="ajuste__p">${cuerpo}</div></section>`;
     $("#vista").innerHTML = `
-      <header class="vhead"><div><h1>Mi negocio</h1><p>Lo que ven tus clientes cuando reservan y las reglas de tu agenda.</p></div>
-        <div class="vhead__acc"><a class="btn btn--line" href="reservar.html" target="_blank" rel="noopener">Ver la página de reservas</a></div></header>
+      <header class="vhead"><div><h1>Mi negocio</h1><p class="vhead__frase">Lo que ven tus clientes cuando reservan y las reglas de tu agenda.</p></div>
+        <div class="vhead__acc"><a class="btn btn--line" href="reservar.html" target="_blank" rel="noopener">${ico("afuera")}Ver la página de reservas</a></div></header>
       <form class="nform" id="f-neg" novalidate>
-        <section class="card" aria-labelledby="ng-1"><h2 id="ng-1">Datos</h2>
+        ${sec("ng-1", "Datos", "Así te encuentran tus clientes. El link es la dirección de tu página para reservar: pasalo por WhatsApp o ponelo en tu Instagram.", `
           <div class="campos">
             <div class="field"><label for="g-nombre">Nombre del negocio</label><input id="g-nombre" value="${esc(n.nombre)}" required aria-describedby="g-nombre-err" /><p class="field__err" id="g-nombre-err" hidden>El negocio necesita un nombre.</p></div>
             <div class="field"><label for="g-rubro">Rubro</label><input id="g-rubro" list="rubros" value="${esc(n.rubro)}" /></div>
             <div class="field"><label for="g-ciudad">Ciudad</label><input id="g-ciudad" value="${esc(n.ciudad)}" /></div>
             <div class="field"><label for="g-dir">Dirección</label><input id="g-dir" value="${esc(n.direccion)}" /></div>
             <div class="field"><label for="g-wa">WhatsApp del negocio</label><input id="g-wa" type="tel" inputmode="tel" value="${esc(n.whatsapp)}" /></div>
-            <div class="field"><label for="g-slug">Tu link de reservas</label><div class="slug"><span>bookea.ar/</span><input id="g-slug" value="${esc(n.slug)}" autocapitalize="none" spellcheck="false" aria-describedby="g-slug-err" /></div><p class="field__err" id="g-slug-err" hidden></p></div>
-          </div>
-        </section>
-        <section class="card" aria-labelledby="ng-2"><div><h2 id="ng-2">Qué se reserva</h2><p class="card__sub">Tus canchas, salas, sillones o profesionales. Cada uno tiene su columna en la agenda.</p></div>
+            <div class="field"><label for="g-slug">Tu link de reservas</label><div class="slug"><span>bookea.ar/</span><input id="g-slug" value="${esc(n.slug)}" autocapitalize="none" spellcheck="false" aria-describedby="g-slug-err" /><button type="button" class="btn btn--ghost btn--sm" id="g-copiar">${ico("copiar")}Copiar</button></div><p class="field__err" id="g-slug-err" hidden></p></div>
+          </div>`)}
+        ${sec("ng-2", "Qué se reserva", `Tus ${esc(U.toLowerCase())}s, salas, sillones o profesionales. Cada uno tiene su columna en la agenda.`, `
+          <div class="fila fila--rec cabeza-filas" aria-hidden="true"><span>Nombre</span><span>Detalle (opcional)</span><span></span></div>
           <div class="filas" id="g-recs">${n.recursos.map(filaRec).join("")}</div>
           <p class="field__err" id="g-recs-err" hidden></p>
-          <button type="button" class="btn btn--ghost btn--sm" id="g-rec-mas" style="justify-self:start">+ Agregar</button>
-        </section>
-        <section class="card" aria-labelledby="ng-3"><h2 id="ng-3">Horario</h2>
+          <button type="button" class="btn btn--ghost btn--sm agregar" id="g-rec-mas">${ico("mas")}Agregar</button>`)}
+        ${sec("ng-3", "Horario", "Los días y horas en que se puede reservar. Cada turno dura lo mismo.", `
           <div class="field" style="max-width:280px"><label for="g-dur">Cada turno dura</label><select id="g-dur">${[30, 45, 60, 90, 120].map((d) => `<option value="${d}" ${d === n.duracion ? "selected" : ""}>${d} minutos</option>`).join("")}</select></div>
           <div class="filas" id="g-hor">${ORDEN_DIAS.map((d) => { const h = n.horario[d]; return `<div class="fila fila--hr" data-dia="${d}"><span class="fila__dia">${mayus(DIAS[d])}</span><label class="chk"><input type="checkbox" ${h.cerrado ? "" : "checked"} data-abierto /> Abierto</label><input type="time" aria-label="${mayus(DIAS[d])}: abre" value="${h.abre}" ${h.cerrado ? "disabled" : ""} /><input type="time" aria-label="${mayus(DIAS[d])}: cierra" value="${h.cierra}" ${h.cerrado ? "disabled" : ""} /></div>`; }).join("")}</div>
-          <p class="field__help">Si cerrás después de medianoche, poné la hora igual (por ejemplo, 00:30).</p>
-        </section>
-        <section class="card" aria-labelledby="ng-4"><div><h2 id="ng-4">Precios por horario</h2><p class="card__sub">El precio del turno según la hora en que empieza.</p></div>
+          <p class="field__help">Si cerrás después de medianoche, poné la hora igual (por ejemplo, 00:30).</p>`)}
+        ${sec("ng-4", "Precios por horario", "El precio del turno depende de la hora en que empieza. Por ejemplo, más caro a la noche.", `
           <div class="fila fila--fr cabeza-filas" aria-hidden="true"><span>Desde</span><span>Hasta</span><span class="fila__precio">Precio</span><span></span></div>
           <div class="filas" id="g-frs">${n.franjas.map(filaFr).join("")}</div>
           <p class="field__err" id="g-frs-err" hidden></p>
-          <button type="button" class="btn btn--ghost btn--sm" id="g-fr-mas" style="justify-self:start">+ Agregar franja</button>
-        </section>
-        <section class="card" aria-labelledby="ng-5"><h2 id="ng-5">Seña y cancelaciones</h2>
+          <button type="button" class="btn btn--ghost btn--sm agregar" id="g-fr-mas">${ico("mas")}Agregar franja</button>`)}
+        ${sec("ng-5", "Seña y cancelaciones", "La seña asegura el turno. Vos elegís cuánto cobrar y hasta cuándo pueden cancelar.", `
           <div class="campos">
             <div class="field"><label for="g-sena">Seña (% del turno)</label><input id="g-sena" type="number" inputmode="numeric" min="0" max="100" value="${n.senaPct}" aria-describedby="g-sena-ayuda" /><p class="field__help" id="g-sena-ayuda"></p></div>
             <div class="field"><label for="g-canc">Pueden cancelar hasta (horas antes)</label><input id="g-canc" type="number" inputmode="numeric" min="0" max="72" value="${n.cancelarHoras}" /></div>
             <label class="chk ancho"><input type="checkbox" id="g-dev" ${n.devolverSena ? "checked" : ""} /> Si cancelan a tiempo, se les devuelve la seña</label>
-          </div>
-        </section>
-        <div class="guardar-barra"><p class="form__msg" id="g-msg" role="status" aria-live="polite"></p><button type="submit" class="btn btn--ink btn--lg">Guardar cambios</button></div>
+          </div>`)}
+        <div class="guardar-barra"><p class="form__msg" id="g-msg" role="status" aria-live="polite"></p><button type="submit" class="btn btn--ink btn--lg" id="g-guardar">Guardar cambios</button></div>
       </form>`;
     const f = $("#f-neg");
+    $("#g-copiar").addEventListener("click", async (e) => {
+      const b = e.currentTarget, link = `https://bookea.ar/${slugDe($("#g-slug").value)}`;
+      try { await navigator.clipboard.writeText(link); } catch { const i = $("#g-slug"); i.select(); try { document.execCommand("copy"); } catch {} }
+      b.innerHTML = tilde() + "Copiado"; aviso(`Link copiado: ${link}`);
+      setTimeout(() => { if (b.isConnected) b.innerHTML = ico("copiar") + "Copiar"; }, 2200);
+    });
     const ayudaSena = () => { const p = n.franjas[0] ? +n.franjas[0].precio : 0, pc = +$("#g-sena").value || 0; $("#g-sena-ayuda").textContent = p ? `Con un turno de ${plata(p)}, la seña es de ${plata(Math.round((p * pc) / 100 / 100) * 100)}.` : ""; };
     ayudaSena(); $("#g-sena").addEventListener("input", ayudaSena);
     f.addEventListener("click", (e) => {
@@ -918,6 +1025,8 @@
       tocar(); pintarLado();
       VISTAS.negocio();
       const m2 = $("#g-msg"); m2.className = "form__msg ok"; m2.textContent = "Cambios guardados.";
+      const g = $("#g-guardar"); g.classList.add("is-ok"); g.innerHTML = tilde() + "Guardado";
+      setTimeout(() => { if (g.isConnected) { g.classList.remove("is-ok"); g.textContent = "Guardar cambios"; } }, 2400);
       aviso("Cambios guardados.");
     });
   };
@@ -925,27 +1034,26 @@
   // ---------- Cuenta ----------
   VISTAS.cuenta = () => {
     $("#vista").innerHTML = `
-      <header class="vhead"><div><h1>Cuenta</h1><p>Tus datos para entrar al panel.</p></div></header>
-      <div class="grid2">
-        <form class="card nform" id="f-datos" novalidate aria-labelledby="cu-1">
-          <h2 id="cu-1">Tus datos</h2>
-          <div class="field"><label for="cu-nombre">Tu nombre</label><input id="cu-nombre" value="${esc(YO.nombre)}" autocomplete="name" aria-describedby="cu-nombre-err" /><p class="field__err" id="cu-nombre-err" hidden>Escribí tu nombre.</p></div>
-          <div class="field"><label for="cu-user">Usuario</label><input id="cu-user" value="${esc(YO.usuario)}" disabled aria-describedby="cu-user-ayuda" /><p class="field__help" id="cu-user-ayuda">El usuario no se puede cambiar.</p></div>
-          <div class="acciones"><button type="submit" class="btn btn--ink">Guardar</button></div>
-        </form>
-        <form class="card nform" id="f-clave" novalidate aria-labelledby="cu-2">
-          <h2 id="cu-2">Cambiar contraseña</h2>
-          <input type="text" autocomplete="username" value="${esc(YO.usuario)}" hidden />
-          <div class="field"><label for="cu-a">Contraseña actual</label><input id="cu-a" type="password" autocomplete="current-password" aria-describedby="cu-a-err" /><p class="field__err" id="cu-a-err" hidden>La contraseña actual no coincide.</p></div>
-          <div class="field"><label for="cu-n">Contraseña nueva</label><input id="cu-n" type="password" autocomplete="new-password" aria-describedby="cu-n-err" /><p class="field__err" id="cu-n-err" hidden>Usá al menos 8 caracteres.</p></div>
-          <div class="field"><label for="cu-r">Repetí la nueva</label><input id="cu-r" type="password" autocomplete="new-password" aria-describedby="cu-r-err" /><p class="field__err" id="cu-r-err" hidden>Las dos contraseñas no coinciden.</p></div>
-          <div class="acciones"><button type="submit" class="btn btn--ink">Cambiar contraseña</button></div>
-        </form>
-      </div>
-      <section class="card" aria-labelledby="cu-3"><h2 id="cu-3">Datos de prueba</h2>
-        <p class="card__sub" style="margin:4px 0 16px">En esta vista previa, las cuentas, el negocio y las reservas se guardan solo en este navegador. Si borrás todo, vuelve el negocio de ejemplo.</p>
-        <button type="button" class="btn btn--warn" id="cu-reset">Borrar todo y volver al ejemplo</button>
-      </section>`;
+      <header class="vhead"><div><h1>Cuenta</h1><p class="vhead__frase">Tus datos para entrar al panel. Cada administrador tiene su usuario y su contraseña.</p></div></header>
+      <div class="nform">
+        <section class="ajuste" aria-labelledby="cu-1"><div class="ajuste__r"><h2 id="cu-1">Tus datos</h2><p>Tu nombre aparece en el panel. El usuario es con el que entrás y no se puede cambiar.</p></div>
+          <form class="ajuste__p" id="f-datos" novalidate>
+            <div class="field"><label for="cu-nombre">Tu nombre</label><input id="cu-nombre" value="${esc(YO.nombre)}" autocomplete="name" aria-describedby="cu-nombre-err" /><p class="field__err" id="cu-nombre-err" hidden>Escribí tu nombre.</p></div>
+            <div class="field"><label for="cu-user">Usuario</label><input id="cu-user" value="${esc(YO.usuario)}" disabled aria-describedby="cu-user-ayuda" /><p class="field__help" id="cu-user-ayuda">El usuario no se puede cambiar.</p></div>
+            <div class="acciones"><button type="submit" class="btn btn--ink">Guardar</button></div>
+          </form></section>
+        <section class="ajuste" aria-labelledby="cu-2"><div class="ajuste__r"><h2 id="cu-2">Cambiar contraseña</h2><p>Usá al menos 8 caracteres. Cada vez que abrís o refrescás el panel te la pide de nuevo.</p></div>
+          <form class="ajuste__p" id="f-clave" novalidate>
+            <input type="text" autocomplete="username" value="${esc(YO.usuario)}" hidden />
+            <div class="field"><label for="cu-a">Contraseña actual</label><input id="cu-a" type="password" autocomplete="current-password" aria-describedby="cu-a-err" /><p class="field__err" id="cu-a-err" hidden>La contraseña actual no coincide.</p></div>
+            <div class="field"><label for="cu-n">Contraseña nueva</label><input id="cu-n" type="password" autocomplete="new-password" aria-describedby="cu-n-err" /><p class="field__err" id="cu-n-err" hidden>Usá al menos 8 caracteres.</p></div>
+            <div class="field"><label for="cu-r">Repetí la nueva</label><input id="cu-r" type="password" autocomplete="new-password" aria-describedby="cu-r-err" /><p class="field__err" id="cu-r-err" hidden>Las dos contraseñas no coinciden.</p></div>
+            <div class="acciones"><button type="submit" class="btn btn--ink">Cambiar contraseña</button></div>
+          </form></section>
+        <section class="ajuste" aria-labelledby="cu-3"><div class="ajuste__r"><h2 id="cu-3">Datos de prueba</h2><p>En esta vista previa, todo se guarda solo en este navegador.</p></div>
+          <div class="ajuste__p peligro"><p>Si borrás todo, vuelve el negocio de ejemplo y se pierden las cuentas que creaste.</p>
+          <button type="button" class="btn btn--warn" id="cu-reset">Borrar todo y volver al ejemplo</button></div></section>
+      </div>`;
     $("#f-datos").addEventListener("submit", (e) => {
       e.preventDefault();
       const nom = $("#cu-nombre").value.trim();

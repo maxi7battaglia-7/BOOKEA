@@ -8,3 +8,7 @@ gate/
 
 __pycache__/
 .DS_Store
+_insp-*.html
+.taste-skill/before/
+.taste-skill/after/
+.taste-skill/app/

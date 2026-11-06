@@ -232,23 +232,44 @@ El dueño pidió cambiarla por completo.
 - El buscador conserva sus rubros y zonas de ejemplo, pero la opción general dice "Todas las zonas".
 - Pie: "Turnos online con seña para cualquier negocio que trabaje con reservas." y "© Bookea", sin "Mendoza, Argentina".
 
-## Panel del negocio (admin.html)
-- Pantalla de trabajo: fondo gris claro (--raised) y tarjetas blancas. Costado noche con el menú (Agenda, Finanzas, Clientes, Mi negocio, Cuenta). La sección activa va en verde agua, con el mismo barrido del sitio. En celular el costado pasa a barra de arriba con el menú deslizable.
-- Entrada: a la izquierda, noche con "Tu negocio, ordenado."; a la derecha, la tarjeta para ingresar o crear la cuenta. Abajo, la pista de la cuenta de prueba.
-- Agenda:
-  - Día: una columna por cancha o lugar y una fila por turno.
-  - Colores de estado, siempre con su texto: seña cobrada (verde agua claro con barra verde), pagado (blanco con barra noche), no vino (naranja claro con barra naranja), bloqueado (noche).
-  - Los huecos libres se marcan con borde fino y "+ Libre".
-  - Semana: grilla de ocupación de un solo tono verde (de claro a lleno) que lleva a ese día.
-- Finanzas:
-  - Cifras arriba.
-  - Columnas de un solo color (verde agua, validado con dataviz): máximo 24 px, con tooltip al pasar el cursor y con las flechas del teclado, y la tabla por día como alternativa.
-  - Barras horizontales por cancha y por franja, movimientos y planilla CSV.
+## Panel del negocio (admin.html) — rediseño completo (6/11/2026, pedido del dueño)
+Hecho con tres skills: **design-taste-frontend** (capítulo de pantallas de app, estilo "accent-ladder", semilla 930136599,
+con la paleta y la letra de la marca; hoja en `.taste-skill/app/direction.json`), **anti-ui-slop** (paneles: tarea primero,
+estados, verificación) y **ui-ux-pro-max** (sus guías de UX: feedback al tocar, movimiento reducido, 1 o 2 animaciones clave
+por vista, vacíos con acción). La propuesta de estilo de ui-ux-pro-max (vidrio oscuro con Fira) se descartó: no es la marca.
+Pedido: "serio, profesional, pero con su toque divertido", todo relacionado con el sitio, animaciones en algunos botones y
+textos que se entiendan en cada cuadro.
+
+- **Color (la escalera del verde agua):** fondo #f4f7f6 (un paso hacia el verde agua), cajas blancas con borde #e1e8e6, sin sombra.
+  El verde agua lleno solo en marcas chicas (barras del gráfico, ícono del menú activo, puntos de estado, "Ahora", celda llena de
+  la semana). Sus tintes pálidos (#eef7f5, #dcf0eb, #b5e0d6) hacen el área: fila activa del menú, huecos libres, turnos con seña,
+  calor de la semana. Naranja solo para alertas (no vino, cancelar, baja). Noche: texto, botón principal y píldoras de cancha.
+  Crema: el palo de la B y la etiqueta "Fijo". **Nada de beige en líneas ni rayas de color al costado de los turnos.**
+- **Costado:** sobre el fondo, sin color. Logo con el barrido del sitio, la tarjeta del negocio (iniciales en verde agua,
+  rubro · ciudad), el menú con íconos de línea propios (16-22px) y el barrido verde pálido al pasar el cursor, abajo "Ver tu
+  página de reservas" y la cuenta con "Salir". En celular y tablet (≤900px): barra arriba (logo + negocio + Salir) y el mismo
+  menú como barra de 5 botones abajo (Agenda, Finanzas, Clientes, Negocio, Cuenta).
+- **Cada pantalla:** un h1 (30px) y una frase debajo armada con los datos (Agenda: "El próximo turno es a las 13:30: Lu P. en
+  Cancha 2. Te quedan 15 horarios libres hoy."). Las cifras van en **un solo contenedor dividido**, cada celda con rótulo,
+  valor y una frase que dice contra qué o por qué ("Ocupaste el 33 % de los horarios", "El resto de cada turno, que se paga
+  en el lugar"). En Finanzas "Cobrado" es la cifra más grande y su cambio dice contra qué días (naranja si baja, verde si sube).
+- **Agenda:** grilla por cancha y horario + riel a la derecha (336px) con **Para cerrar** (turnos que ya terminaron sin marcar,
+  con "Pagó" y "No vino" a un toque) y **Próximos turnos**. En pantallas angostas "Para cerrar" sube arriba de la grilla.
+  Estados: con seña = verde agua pálido; sin seña = blanco con borde gris; pagado = gris; no vino = naranja pálido;
+  bloqueado = noche; libre = verde agua más pálido con "+ Libre"; ya pasó = solo texto. Cada uno con su punto y su palabra.
+- **Ajustes (Mi negocio y Cuenta):** dos columnas, a la izquierda el título y para qué sirve, a la derecha el panel blanco.
+  "Copiar" al lado del link de reservas. Barra de guardar fija abajo.
+- **Movimiento (solo como respuesta, nunca entradas de pantalla):** barrido verde del sitio en el botón principal y el menú;
+  el "+" gira; la pastilla oscura de Día/Semana y de los períodos se desliza; las flechas de fecha empujan; el punto de "Ahora"
+  late; el turno recién cambiado hace "pop"; el aviso trae una tilde que se dibuja; "Guardado" y "Copiado" con tilde.
+  Todo se apaga con "reducir movimiento".
+- **Chequeo:** el inspector de la skill (`node <skill>/scripts/inspect.mjs _insp-<vista>.html --app`, con las copias que arma
+  `scripts/insp-copias.sh` y que entran solas con la cuenta demo) da 0 FAIL y 0 WARN en Agenda, Finanzas, Clientes, Mi negocio
+  y Cuenta. La entrada conserva 3 avisos a propósito: es la puerta entre el sitio y el panel, con la frase grande como la landing.
 - No se muestran precios de Bookea en ningún lado.
 
-## Panel: calendario, cajas y grilla más clara (pedido del dueño)
-- Calendario desplegable: al tocar la fecha se abre el mes. Cada día lleva una barrita verde con qué tan lleno está; los días pasados van en gris y los cerrados sin fondo. Se recorre con flechas y se cierra con Escape o tocando afuera.
-- Cajas: en todo el panel el fondo es blanco y cada caja va en **crema de la marca apenas tostado #f7f0df, sin borde**. **Nada de líneas de colores** (pedido del dueño: ni bordes beige ni rayas al costado de los turnos). En la agenda: turno tomado = tarjeta blanca + píldora de estado de la paleta (verde agua "Seña cobrada", hueca con borde noche "Sin seña", noche "Pagado", naranja "No vino"), hueco libre = crema más tostado #efe5cc, ya pasó = se funde con la caja, bloqueo = noche. Solo campos, tablas y grilla del gráfico llevan una línea gris fina #dfe1e5.
-- Grilla del día: cada cancha con su cabecera en noche, cada fila con "09:00 a 10:30" y cada cuadro repite cancha y horario.
+## Panel: calendario desplegable
+- Al tocar la fecha se abre el mes. Cada día lleva una barrita verde con qué tan lleno está; los días pasados van en gris y los
+  cerrados sin fondo. Se recorre con flechas y se cierra con Escape o tocando afuera.
 
 - Barra de arriba en tablet y celular (≤960px): se ocultan Reservar turno, Para negocios y Preguntas, pero **"Ingresar" siempre queda visible** al lado de "Sumá tu negocio" (es la única entrada al panel desde el celular). En celulares de menos de 375px el logo queda solo con la B.
