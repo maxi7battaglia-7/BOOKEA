@@ -93,7 +93,8 @@
   ];
   const negocioDemo = () => ({
     id: "n1", nombre: "Los Álamos Pádel", rubro: "Pádel", ciudad: "Tunuyán", direccion: "Av. San Martín 1450",
-    whatsapp: "2622 55 1234", slug: "losalamos",
+    whatsapp: "2622 55 1234", slug: "losalamos", foto: "", mapa: "",
+    descripcion: "Tres canchas de pádel: dos de blindex y una techada para los días de lluvia. Vestuarios con duchas, estacionamiento y buffet. Si no tenés paleta, te prestamos una.",
     recursos: [{ id: "r1", nombre: "Cancha 1", detalle: "Blindex" }, { id: "r2", nombre: "Cancha 2", detalle: "Blindex" }, { id: "r3", nombre: "Cancha 3", detalle: "Techada" }],
     duracion: 90,
     horario: [0, 1, 2, 3, 4, 5, 6].map((d) => ({ abre: d === 0 ? "10:30" : "09:00", cierra: "00:30", cerrado: false })),
@@ -193,7 +194,7 @@
   const pintarLado = () => {
     $("#lado-neg").textContent = NEG.nombre;
     $("#lado-det").textContent = [NEG.rubro, NEG.ciudad].filter(Boolean).join(" · ") || "Completá los datos en Mi negocio";
-    $("#lado-mono").textContent = iniciales(NEG.nombre);
+    $("#lado-mono").innerHTML = NEG.foto ? `<img src="${NEG.foto}" alt="" />` : esc(iniciales(NEG.nombre));
     $("#lado-av").textContent = iniciales(YO.nombre).slice(0, 1);
     $("#lado-user").innerHTML = `<b>${esc(YO.nombre)}</b>${esc(YO.usuario)}`;
   };
@@ -244,7 +245,7 @@
     const usados = new Set(Object.values(DB.negocios).map((n) => n.slug));
     while (usados.has(slug)) slug = slugDe(nombre) + k++;
     const neg = {
-      id, nombre, rubro, ciudad: "", direccion: "", whatsapp: "", slug, recursos: [], duracion: 60,
+      id, nombre, rubro, ciudad: "", direccion: "", whatsapp: "", slug, foto: "", descripcion: "", mapa: "", recursos: [], duracion: 60,
       horario: [0, 1, 2, 3, 4, 5, 6].map((d) => ({ abre: "09:00", cierra: "21:00", cerrado: d === 0 })),
       franjas: [{ desde: "09:00", hasta: "18:00", precio: 10000 }, { desde: "18:00", hasta: "21:00", precio: 12000 }],
       senaPct: 30, cancelarHoras: 12, devolverSena: true,
@@ -931,6 +932,26 @@
   };
 
   // ---------- Mi negocio ----------
+  // Link para llegar: el que pegó el dueño, o uno armado con el nombre, la dirección y la ciudad.
+  const MAPS_OK = /^https:\/\/((www\.)?google\.[a-z.]+\/maps|maps\.google\.[a-z.]+|maps\.app\.goo\.gl|goo\.gl\/maps)/i;
+  const linkMaps = ({ nombre = "", direccion = "", ciudad = "", mapa = "" }) => {
+    if (mapa) return mapa;
+    if (!direccion && !ciudad) return "";
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([nombre, direccion, ciudad].filter(Boolean).join(", "))}`;
+  };
+  // La foto se recorta en cuadrado y se achica a 320 px para que pese poco.
+  const achicarFoto = (archivo) => new Promise((ok, mal) => {
+    const url = URL.createObjectURL(archivo), img = new Image();
+    img.onload = () => {
+      const lado = Math.min(img.naturalWidth, img.naturalHeight), t = Math.min(320, lado);
+      const c = document.createElement("canvas"); c.width = c.height = t;
+      c.getContext("2d").drawImage(img, (img.naturalWidth - lado) / 2, (img.naturalHeight - lado) / 2, lado, lado, 0, 0, t, t);
+      URL.revokeObjectURL(url); ok(c.toDataURL("image/jpeg", 0.85));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); mal(new Error("no es una imagen")); };
+    img.src = url;
+  });
+
   const ORDEN_DIAS = [1, 2, 3, 4, 5, 6, 0];
   VISTAS.negocio = () => {
     const n = NEG, U = unidad(n);
@@ -941,15 +962,37 @@
       <header class="vhead"><div><h1>Mi negocio</h1><p class="vhead__frase">Lo que ven tus clientes cuando reservan y las reglas de tu agenda.</p></div>
         <div class="vhead__acc"><a class="btn btn--line" href="reservar.html" target="_blank" rel="noopener">${ico("afuera")}Ver la página de reservas</a></div></header>
       <form class="nform" id="f-neg" novalidate>
+        ${sec("ng-0", "Perfil", "Tu foto y unas líneas sobre el lugar. Es lo primero que ven tus clientes cuando entran a reservar.", `
+          <div class="perfil">
+            <div class="perfil__foto" id="g-foto-ver">${n.foto ? `<img src="${n.foto}" alt="Foto de perfil de ${esc(n.nombre)}" />` : `<span aria-hidden="true">${esc(iniciales(n.nombre))}</span>`}</div>
+            <div class="perfil__acc">
+              <p class="perfil__t">Foto de perfil</p>
+              <div class="perfil__bot">
+                <label class="btn btn--line btn--sm" for="g-foto">${ico("camara")}<span id="g-foto-l">${n.foto ? "Cambiar foto" : "Subir foto"}</span></label>
+                <input class="sr-only" type="file" id="g-foto" accept="image/*" aria-describedby="g-foto-ayuda g-foto-err" />
+                <button type="button" class="btn btn--warn btn--sm" id="g-foto-quitar" ${n.foto ? "" : "hidden"}>Quitar</button>
+              </div>
+              <p class="field__help" id="g-foto-ayuda">El logo o una foto del lugar. Se recorta en cuadrado.</p>
+              <p class="field__err" id="g-foto-err" hidden></p>
+            </div>
+          </div>
+          <div class="field"><label for="g-desc">Descripción del lugar</label><textarea id="g-desc" rows="4" maxlength="300" placeholder="Qué tiene tu lugar: canchas, servicios, si prestan equipo, cómo es el estacionamiento…" aria-describedby="g-desc-cuenta">${esc(n.descripcion || "")}</textarea><p class="field__help" id="g-desc-cuenta"></p></div>`)}
         ${sec("ng-1", "Datos", "Así te encuentran tus clientes. El link es la dirección de tu página para reservar: pasalo por WhatsApp o ponelo en tu Instagram.", `
           <div class="campos">
             <div class="field"><label for="g-nombre">Nombre del negocio</label><input id="g-nombre" value="${esc(n.nombre)}" required aria-describedby="g-nombre-err" /><p class="field__err" id="g-nombre-err" hidden>El negocio necesita un nombre.</p></div>
             <div class="field"><label for="g-rubro">Rubro</label><input id="g-rubro" list="rubros" value="${esc(n.rubro)}" /></div>
-            <div class="field"><label for="g-ciudad">Ciudad</label><input id="g-ciudad" value="${esc(n.ciudad)}" /></div>
-            <div class="field"><label for="g-dir">Dirección</label><input id="g-dir" value="${esc(n.direccion)}" /></div>
             <div class="field"><label for="g-wa">WhatsApp del negocio</label><input id="g-wa" type="tel" inputmode="tel" value="${esc(n.whatsapp)}" /></div>
             <div class="field"><label for="g-slug">Tu link de reservas</label><div class="slug"><span>bookea.ar/</span><input id="g-slug" value="${esc(n.slug)}" autocapitalize="none" spellcheck="false" aria-describedby="g-slug-err" /><button type="button" class="btn btn--ghost btn--sm" id="g-copiar">${ico("copiar")}Copiar</button></div><p class="field__err" id="g-slug-err" hidden></p></div>
           </div>`)}
+        ${sec("ng-6", "Ubicación", "Para que tus clientes puedan llegar. El botón los lleva directo a Google Maps.", `
+          <div class="campos">
+            <div class="field"><label for="g-dir">Dirección</label><input id="g-dir" value="${esc(n.direccion)}" autocomplete="street-address" placeholder="Calle y número" /></div>
+            <div class="field"><label for="g-ciudad">Ciudad</label><input id="g-ciudad" value="${esc(n.ciudad)}" autocomplete="address-level2" /></div>
+            <div class="field ancho"><label for="g-mapa">Link de Google Maps (opcional)</label><input id="g-mapa" type="url" inputmode="url" value="${esc(n.mapa || "")}" placeholder="https://maps.app.goo.gl/…" autocapitalize="none" spellcheck="false" aria-describedby="g-mapa-ayuda g-mapa-err" />
+              <p class="field__help" id="g-mapa-ayuda">Buscá tu negocio en Google Maps, tocá <b>Compartir</b> y pegá el link acá. Si lo dejás vacío, usamos la dirección y la ciudad.</p>
+              <p class="field__err" id="g-mapa-err" hidden>Pegá un link de Google Maps: empieza con https://maps.app.goo.gl o https://www.google.com/maps</p></div>
+          </div>
+          <div class="mapa" id="g-mapa-ver"></div>`)}
         ${sec("ng-2", "Qué se reserva", `Tus ${esc(U.toLowerCase())}s, salas, sillones o profesionales. Cada uno tiene su columna en la agenda.`, `
           <div class="fila fila--rec cabeza-filas" aria-hidden="true"><span>Nombre</span><span>Detalle (opcional)</span><span></span></div>
           <div class="filas" id="g-recs">${n.recursos.map(filaRec).join("")}</div>
@@ -979,6 +1022,36 @@
       b.innerHTML = tilde() + "Copiado"; aviso(`Link copiado: ${link}`);
       setTimeout(() => { if (b.isConnected) b.innerHTML = ico("copiar") + "Copiar"; }, 2200);
     });
+    // foto: se ve enseguida y se guarda con "Guardar cambios"
+    let foto = n.foto || "";
+    const pintarFoto = () => {
+      $("#g-foto-ver").innerHTML = foto ? `<img src="${foto}" alt="Foto de perfil de ${esc($("#g-nombre").value || n.nombre)}" />` : `<span aria-hidden="true">${esc(iniciales($("#g-nombre").value || n.nombre))}</span>`;
+      $("#g-foto-l").textContent = foto ? "Cambiar foto" : "Subir foto";
+      $("#g-foto-quitar").hidden = !foto;
+    };
+    $("#g-foto").addEventListener("change", async (e) => {
+      const a = e.target.files && e.target.files[0], err = $("#g-foto-err"); err.hidden = true;
+      if (!a) return;
+      if (!/^image\//.test(a.type)) { err.textContent = "Elegí una imagen (JPG o PNG)."; err.hidden = false; return; }
+      if (a.size > 15 * 1024 * 1024) { err.textContent = "La imagen pesa más de 15 MB. Probá con otra."; err.hidden = false; return; }
+      try { foto = await achicarFoto(a); pintarFoto(); $("#g-foto-ver").classList.remove("recien"); void $("#g-foto-ver").offsetWidth; $("#g-foto-ver").classList.add("recien"); $("#g-msg").className = "form__msg"; $("#g-msg").textContent = "Foto lista. Tocá Guardar cambios para que quede."; }
+      catch { err.textContent = "No pudimos abrir esa imagen. Probá con otra."; err.hidden = false; }
+      e.target.value = "";
+    });
+    $("#g-foto-quitar").addEventListener("click", () => { foto = ""; pintarFoto(); $("#g-foto").focus(); $("#g-msg").className = "form__msg"; $("#g-msg").textContent = "Foto quitada. Tocá Guardar cambios para que quede."; });
+    const cuentaDesc = () => { const l = $("#g-desc").value.length; $("#g-desc-cuenta").textContent = `${l} de 300 letras`; };
+    cuentaDesc(); $("#g-desc").addEventListener("input", cuentaDesc);
+    // ubicación: el botón de Google Maps se arma mientras escribís
+    const pintarMapa = () => {
+      const datos = { nombre: $("#g-nombre").value.trim(), direccion: $("#g-dir").value.trim(), ciudad: $("#g-ciudad").value.trim(), mapa: $("#g-mapa").value.trim() };
+      if (datos.mapa && !MAPS_OK.test(datos.mapa)) datos.mapa = "";
+      const url = linkMaps(datos), donde = [datos.direccion, datos.ciudad].filter(Boolean).join(", ");
+      $("#g-mapa-ver").innerHTML = url
+        ? `<span class="mapa__pin">${ico("pin")}</span><div class="mapa__t"><b>${esc(donde || "Ubicación de Google Maps")}</b><small>${$("#g-mapa").value.trim() && MAPS_OK.test($("#g-mapa").value.trim()) ? "Con el link que pegaste" : "Armado con la dirección y la ciudad"}</small></div><a class="btn btn--ghost btn--sm" href="${esc(url)}" target="_blank" rel="noopener" id="g-mapa-ir">${ico("afuera")}Abrir en Google Maps</a>`
+        : `<span class="mapa__pin">${ico("pin")}</span><div class="mapa__t"><b>Todavía sin ubicación</b><small>Completá la dirección para que tus clientes puedan llegar.</small></div>`;
+    };
+    pintarMapa(); ["#g-dir", "#g-ciudad", "#g-mapa", "#g-nombre"].forEach((id) => $(id).addEventListener("input", pintarMapa));
+    $("#g-mapa").addEventListener("blur", (e) => { const v = e.target.value.trim(); marcar(e.target, "g-mapa-err", !!v && !MAPS_OK.test(v)); });
     const ayudaSena = () => { const p = n.franjas[0] ? +n.franjas[0].precio : 0, pc = +$("#g-sena").value || 0; $("#g-sena-ayuda").textContent = p ? `Con un turno de ${plata(p)}, la seña es de ${plata(Math.round((p * pc) / 100 / 100) * 100)}.` : ""; };
     ayudaSena(); $("#g-sena").addEventListener("input", ayudaSena);
     f.addEventListener("click", (e) => {
@@ -999,6 +1072,7 @@
       const ok = [
         marcar($("#g-nombre"), "g-nombre-err", !nombre),
         marcar($("#g-slug"), "g-slug-err", Object.values(DB.negocios).some((o) => o.id !== n.id && o.slug === slug) ? "Ese link ya lo usa otro negocio." : false),
+        marcar($("#g-mapa"), "g-mapa-err", !!$("#g-mapa").value.trim() && !MAPS_OK.test($("#g-mapa").value.trim())),
       ];
       const eR = $("#g-recs-err"), eF = $("#g-frs-err");
       eR.hidden = eF.hidden = true;
@@ -1009,11 +1083,14 @@
       Object.assign(n, {
         nombre, rubro: $("#g-rubro").value.trim(), ciudad: $("#g-ciudad").value.trim(), direccion: $("#g-dir").value.trim(),
         whatsapp: $("#g-wa").value.trim(), slug, recursos: recs, franjas: frs, duracion: +$("#g-dur").value,
+        foto, descripcion: $("#g-desc").value.trim().slice(0, 300), mapa: $("#g-mapa").value.trim(),
         senaPct: Math.min(100, Math.max(0, Math.round(+$("#g-sena").value || 0))), cancelarHoras: Math.max(0, Math.round(+$("#g-canc").value || 0)),
         devolverSena: $("#g-dev").checked,
       });
       $$("#g-hor .fila").forEach((fila) => { const d = +fila.dataset.dia, [a, b] = $$('input[type="time"]', fila); n.horario[d] = { abre: a.value || "09:00", cierra: b.value || "21:00", cerrado: !$("[data-abierto]", fila).checked }; });
-      tocar(); pintarLado();
+      try { tocar(); } catch { /* el navegador se quedó sin lugar */ }
+      if (local.get(CLAVE) && !local.get(CLAVE).includes(foto.slice(-40))) { n.foto = ""; aviso("No entró la foto en este navegador. Probá con una más chica."); }
+      pintarLado();
       VISTAS.negocio();
       const m2 = $("#g-msg"); m2.className = "form__msg ok"; m2.textContent = "Cambios guardados.";
       const g = $("#g-guardar"); g.classList.add("is-ok"); g.innerHTML = tilde() + "Guardado";

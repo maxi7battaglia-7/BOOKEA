@@ -258,6 +258,10 @@ textos que se entiendan en cada cuadro.
   con "Pagó" y "No vino" a un toque) y **Próximos turnos**. En pantallas angostas "Para cerrar" sube arriba de la grilla.
   Estados: con seña = verde agua pálido; sin seña = blanco con borde gris; pagado = gris; no vino = naranja pálido;
   bloqueado = noche; libre = verde agua más pálido con "+ Libre"; ya pasó sin turno = "Finalizado", solo texto. Cada uno con su punto y su palabra.
+- **Mi negocio: Perfil y Ubicación** (pedido del dueño, 6/11). Perfil: foto (se recorta en cuadrado y se achica a 320 px,
+  se ve enseguida y queda con "Guardar cambios"; también aparece en el costado en lugar de las iniciales) y descripción del lugar
+  (hasta 300 letras, con contador). Ubicación: dirección, ciudad y un link de Google Maps opcional (solo acepta links de Maps).
+  Abajo, una tarjeta con el pin naranja y "Abrir en Google Maps": usa el link pegado o arma uno con nombre, dirección y ciudad.
 - **Ajustes (Mi negocio y Cuenta):** dos columnas, a la izquierda el título y para qué sirve, a la derecha el panel blanco.
   "Copiar" al lado del link de reservas. Barra de guardar fija abajo.
 - **Movimiento (solo como respuesta, nunca entradas de pantalla):** barrido verde del sitio en el botón principal y el menú;

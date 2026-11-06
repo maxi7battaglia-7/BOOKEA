@@ -672,3 +672,31 @@
 .dia::-webkit-scrollbar-track, .sem-wrap::-webkit-scrollbar-track, .tabla-wrap::-webkit-scrollbar-track { background: transparent; }
 .dia::-webkit-scrollbar-thumb, .sem-wrap::-webkit-scrollbar-thumb, .tabla-wrap::-webkit-scrollbar-thumb { background: var(--v200); border-radius: 3px; }
 .dia::-webkit-scrollbar-button, .sem-wrap::-webkit-scrollbar-button, .tabla-wrap::-webkit-scrollbar-button { display: none; }
+
+/* ---------- Perfil y ubicación del negocio ---------- */
+.mono { overflow: hidden; }
+.mono img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.perfil { display: flex; align-items: center; gap: 20px; }
+.perfil__foto {
+  flex: none; width: 96px; height: 96px; border-radius: 16px; overflow: hidden; display: grid; place-items: center;
+  background: var(--v100); color: var(--v-tinta); font-family: var(--f-display); font-stretch: var(--display-ancho); font-weight: 700; font-size: 30px;
+}
+.perfil__foto img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.perfil__foto.recien { animation: pop 560ms var(--ease-out); }
+.perfil__acc { display: grid; gap: 6px; min-width: 0; }
+.perfil__t { font-size: 14px; font-weight: 600; }
+.perfil__bot { display: flex; flex-wrap: wrap; gap: 8px; }
+.perfil__bot label { cursor: pointer; }
+.perfil__bot:focus-within label { outline: 3px solid var(--v); outline-offset: 2px; }
+.pa .field textarea { min-height: 104px; line-height: 1.5; }
+.mapa { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--v50); border-radius: var(--r-ctl); flex-wrap: wrap; }
+.mapa__pin { flex: none; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: var(--caja); color: var(--n); }
+.mapa__pin .ico { width: 20px; height: 20px; }
+.mapa__t { flex: 1; min-width: 160px; display: grid; }
+.mapa__t b { font-size: 15px; font-weight: 600; }
+.mapa__t small { font-size: 13px; color: var(--tx-2); }
+.mapa .btn { background: var(--caja); }
+@media (hover: hover) and (pointer: fine) { .mapa .btn:hover { background: var(--v100); } .mapa .btn:hover .ico { transform: translate(2px, -2px); } }
+.mapa .btn .ico { transition: transform 260ms var(--ease-out); }
+@media (max-width: 640px) { .perfil { align-items: flex-start; } .perfil__foto { width: 80px; height: 80px; border-radius: 14px; } .mapa .btn { width: 100%; } }
+@media (prefers-reduced-motion: reduce) { .perfil__foto.recien { animation: none; } }
