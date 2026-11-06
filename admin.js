@@ -454,17 +454,18 @@
         const r = del.find((x) => x.recurso === rec.id && x.hora === t);
         const donde = `${esc(rec.nombre)} · ${rangoT}`;
         if (r && r.estado === "bloqueo") h += `<button type="button" class="slot slot--bloqueo" data-res="${r.id}"><b>Bloqueado</b><small>${esc(r.nota || "Sin turnos")}</small><small class="slot__t">${donde}</small></button>`;
-        else if (r) h += `<button type="button" class="slot slot--${r.estado}" data-res="${r.id}" aria-label="${esc(`${r.cliente}, ${rec.nombre} de ${rangoT}: ${etiqueta(r)}`)}"><b>${esc(r.cliente)}</b><small>${etiqueta(r)}${r.origen === "fijo" ? " · fijo" : r.origen === "telefono" ? " · teléfono" : ""}</small><small class="slot__t">${donde}</small></button>`;
+        else if (r) h += `<button type="button" class="slot slot--${r.estado}${r.estado === "confirmada" && !r.sena ? " sin-sena" : ""}" data-res="${r.id}" aria-label="${esc(`${r.cliente}, ${rec.nombre} de ${rangoT}: ${etiqueta(r)}`)}"><b>${esc(r.cliente)}</b><small>${etiqueta(r)}${r.origen === "fijo" ? " · fijo" : r.origen === "telefono" ? " · teléfono" : ""}</small><small class="slot__t">${donde}</small></button>`;
         else if (f < hoy.fecha || (f === hoy.fecha && t < hoy.min)) h += `<span class="slot slot--pasado" aria-label="${esc(`${rec.nombre} de ${rangoT}: libre, ya pasó`)}"><small>Ya pasó</small><small class="slot__t">${donde}</small></span>`;
         else h += `<button type="button" class="slot slot--libre" data-libre data-rec="${rec.id}" data-hora="${t}" aria-label="Cargar turno en ${esc(rec.nombre)} de ${rangoT}"><b>+ Libre</b><small class="slot__t">${donde}</small></button>`;
       }
     }
     h += `</div><div class="leyenda" style="margin-top:16px">
-      <span><i style="background:#d9efe9;box-shadow:inset 3px 0 0 var(--teal)"></i>Seña cobrada</span>
-      <span><i style="background:#e7e6e2;box-shadow:inset 3px 0 0 var(--ink)"></i>Pagado</span>
-      <span><i style="background:#fbe3da;box-shadow:inset 3px 0 0 var(--orange)"></i>No vino</span>
-      <span><i style="background:var(--ink)"></i>Bloqueado</span>
-      <span><i style="background:var(--caja-in);box-shadow:inset 0 0 0 1px var(--caja-borde)"></i>Libre</span></div>`;
+      <span><i style="background:var(--teal)"></i>Seña cobrada</span>
+      <span><i style="background:var(--caja-in);box-shadow:inset 0 0 0 1.5px var(--ink) !important"></i>Sin seña</span>
+      <span><i style="background:var(--ink)"></i>Pagado</span>
+      <span><i style="background:var(--orange)"></i>No vino</span>
+      <span><i style="background:var(--ink);border-radius:3px;width:14px;height:14px"></i>Bloqueado</span>
+      <span><i style="background:var(--caja-hondo)"></i>Libre</span></div>`;
     return h;
   };
 

@@ -370,48 +370,60 @@
 }
 
 /* ---------- Cajas que resaltan del fondo (pedido del dueño) ----------
-   El fondo del panel es blanco. Cada caja (cifras, tarjetas, agenda, gráficos, formularios, botones
-   de fecha) va en el crema de la marca, apenas tostado, con un borde fino del mismo tono:
-   es otro color, no otro gris, así se nota que está "afuera" del fondo sin gritar.
-   Lo que va adentro de una caja (huecos libres, botones, campos, celdas) vuelve a blanco,
-   y los estados del turno usan colores propios (verde agua, gris, naranja, noche). */
+   El fondo del panel es blanco y cada caja va en el crema de la marca, apenas tostado.
+   Sin líneas de colores: las cajas no llevan borde y los turnos no llevan raya al costado.
+   Lo que dice el color lo dicen superficies y píldoras de la paleta, igual que en la página:
+   - turno tomado: tarjeta blanca + píldora de estado (verde agua = seña cobrada, noche = pagado, naranja = no vino)
+   - hueco libre: crema más tostado, "+ Libre" (al pasar el cursor, verde agua)
+   - ya pasó: se funde con la caja
+   Solo los campos, las tablas y la grilla del gráfico conservan una línea fina gris (hace falta para leerlos). */
 .pa {
-  --caja: #f7f0df; --caja-borde: #d5d8dd; --caja-linea: #e1e3e7; /* líneas en gris de la noche, no en beige */
-  --caja-hover: #f0e5cb; --caja-in: #ffffff;
+  --caja: #f7f0df; --caja-hondo: #efe5cc; --caja-hover: #ece0c3;
+  --linea: #dfe1e5; --caja-in: #ffffff;
   background: var(--ground);
 }
 .pa .card, .pa .tile, .pa .caja,
-.pa .fecha-btn, .pa .nav-fecha button {
-  background: var(--caja); border: 1px solid var(--caja-borde); /* taste-skill-ignore: borde que recorta la caja del fondo */
-}
+.pa .fecha-btn, .pa .nav-fecha button { background: var(--caja); border: 0; }
 .pa .entrada__form { background: var(--ground); }
-.pa .caja__demo { background: var(--caja-in); border: 1px solid var(--caja-borde); } /* taste-skill-ignore: borde que recorta la caja */
-.pa .seg { background: var(--caja); border: 1px solid var(--caja-borde); } /* taste-skill-ignore: borde que recorta la caja */
-.pa .seg button[aria-pressed="true"] { background: var(--caja-in); box-shadow: 0 1px 2px rgba(17, 21, 28, 0.08); } /* taste-skill-ignore: el botón elegido se levanta */
-.pa .btn--ghost, .pa .quitar, .pa .clave__ver { background: var(--caja-in); border: 1px solid var(--caja-borde); } /* taste-skill-ignore: borde que recorta la caja */
-.pa .card input, .pa .card select, .pa .card textarea, .pa .caja input { background: var(--caja-in); border-color: var(--caja-borde); }
+.pa .caja__demo { background: var(--caja-in); }
+.pa .seg { background: var(--caja); }
+.pa .seg button[aria-pressed="true"] { background: var(--ink); color: var(--ground); }
+.pa .btn--ghost, .pa .quitar, .pa .clave__ver { background: var(--caja); border: 0; }
+.pa .card .btn--ghost, .pa .card .quitar, .pa .card .clave__ver, .pa .caja .clave__ver { background: var(--caja-in); }
+.pa .card input, .pa .card select, .pa .card textarea, .pa .caja input { background: var(--caja-in); border-color: var(--linea); }
 .pa .guardar-barra { background: var(--ground); }
-/* Agenda: el hueco libre es blanco (se puede usar), lo que ya pasó se funde con la caja */
-.pa .slot--libre { background: var(--caja-in); box-shadow: inset 0 0 0 1px var(--caja-borde); } /* taste-skill-ignore: borde del hueco */
-.pa .slot--pasado { background: transparent; box-shadow: inset 0 0 0 1px var(--caja-linea); } /* taste-skill-ignore: borde del hueco */
-.pa .slot--confirmada { background: #d9efe9; }
-.pa .slot--jugada { background: #e7e6e2; }
-.pa .dia__hora { border-right-color: var(--caja-borde); }
+
+/* Agenda */
+.pa .dia__hora, .pa .dia__hora.es-ahora { border-right: 0; }
+.pa .slot { box-shadow: none; }
+.pa .slot--libre { background: var(--caja-hondo); }
+.pa .slot--pasado { background: transparent; }
+.pa .slot--confirmada, .pa .slot--jugada, .pa .slot--ausente { background: var(--caja-in); }
+.pa .slot--confirmada > small:not(.slot__t),
+.pa .slot--jugada > small:not(.slot__t),
+.pa .slot--ausente > small:not(.slot__t) {
+  justify-self: start; max-width: 100%; margin-top: 3px;
+  font-size: 11px; font-weight: 700; line-height: 1.5; padding: 1px 8px; border-radius: 999px;
+}
+.pa .slot--confirmada > small:not(.slot__t) { background: var(--teal); color: var(--ink); }
+.pa .slot--jugada > small:not(.slot__t) { background: var(--ink); color: var(--cream); }
+.pa .slot--ausente > small:not(.slot__t) { background: var(--orange); color: var(--ink); }
+.pa .slot--confirmada.sin-sena > small:not(.slot__t) { background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--ink); } /* taste-skill-ignore: píldora hueca = todavía sin seña */
+.pa .leyenda i { border-radius: 999px; width: 22px; height: 12px; }
+
 /* Semana */
-.pa .sem button { background: var(--caja-in); box-shadow: inset 0 0 0 1px var(--caja-linea); } /* taste-skill-ignore: borde de la celda */
-.pa .sem .o1 { background: #d9efe9; box-shadow: none; }
-.pa .sem .o2 { box-shadow: none; }
-.pa .sem .o3 { box-shadow: none; }
-.pa .sem .cerr { background: transparent; box-shadow: none; }
+.pa .sem button { background: var(--caja-in); box-shadow: none; }
+.pa .sem .o1 { background: #cdeae2; }
+.pa .sem .cerr { background: transparent; }
+
 /* Gráficos y tablas */
-.pa .chart .grilla { stroke: var(--caja-borde); }
-.pa .tabla th, .pa .tabla td { border-bottom-color: var(--caja-linea); }
+.pa .chart .grilla { stroke: var(--linea); }
+.pa .tabla th, .pa .tabla td { border-bottom-color: var(--linea); }
 .pa .hbar__b { min-width: 2px; }
 @media (hover: hover) and (pointer: fine) {
-  .pa .fecha-btn:hover, .pa .nav-fecha button:hover { background: var(--caja-hover); }
+  .pa .fecha-btn:hover, .pa .nav-fecha button:hover, .pa .seg button:not([aria-pressed="true"]):hover { background: var(--caja-hover); }
   .pa .btn--ghost:hover, .pa .quitar:hover { background: var(--caja-hover); }
-  .pa .slot--libre:hover { background: var(--teal-tint); box-shadow: inset 0 0 0 1px #a9dccf; } /* taste-skill-ignore: borde del hueco */
-  .pa .slot--confirmada:hover { background: #c9e8df; }
-  .pa .slot--jugada:hover { background: #dddbd5; }
-  .pa .tabla tbody tr:hover td { background: var(--caja-hover); }
+  .pa .slot--libre:hover { background: var(--teal-tint); }
+  .pa .slot--confirmada:hover, .pa .slot--jugada:hover, .pa .slot--ausente:hover { background: #fbf8f1; }
+  .pa .tabla tbody tr:hover td { background: var(--caja); }
 }
