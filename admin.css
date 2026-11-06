@@ -64,8 +64,27 @@
   .pa .btn--ghost:hover { background: var(--v100); }
   .pa .btn--warn:hover { background: var(--n100); }
 }
-.pa .btn--ink:active { color: var(--tx); }
-.pa .btn--ink:active::before { clip-path: inset(0 0 0 0); transition-duration: 160ms; }
+@media (hover: hover) and (pointer: fine) {
+  .pa .btn--ink:active { color: var(--tx); }
+  .pa .btn--ink:active::before { clip-path: inset(0 0 0 0); transition-duration: 160ms; }
+}
+/* Pantallas táctiles: sin barrido; al tocar se levanta un poco y cambia de color de una */
+@media (hover: none), (pointer: coarse) {
+  .pa .btn--ink::before, .menu__i::before { clip-path: none; opacity: 0; transition: opacity 90ms ease, background-color 90ms ease; }
+  .pa .btn--ink:active { color: var(--tx); transform: translateY(-2px); }
+  .pa .btn--ink:active::before { opacity: 1; }
+  .menu__i[aria-current="page"]::before { opacity: 1; }
+  .menu__i:active { transform: translateY(-2px); color: var(--v-tinta); }
+  .menu__i:active::before { opacity: 1; }
+  .pa .btn--line:active, .pa .btn--ghost:active { transform: translateY(-2px); background: var(--v100); }
+  .pa .btn--warn:active { transform: translateY(-2px); background: var(--n100); }
+  .slot:active, .nav-fecha button:active, .lado__salir:active { transform: translateY(-2px); }
+  .slot--libre:active { background: var(--v100); }
+  .nav-fecha button:active { background: var(--v100); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pa .btn:active, .menu__i:active, .slot:active, .nav-fecha button:active { transform: none; }
+}
 .pa .btn.is-ok { background: var(--v); color: var(--tx); }
 .pa .btn.is-ok::before { clip-path: inset(0 0 0 0); }
 .link {

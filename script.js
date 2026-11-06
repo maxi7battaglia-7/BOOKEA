@@ -207,3 +207,6 @@
     setTimeout(salir, 4000); // tope por si algo tarda en cargar
   }
 })();
+
+// En iPhone, Safari solo muestra el estado de "tocado" (:active) si la página escucha toques.
+document.addEventListener("touchstart", () => {}, { passive: true });

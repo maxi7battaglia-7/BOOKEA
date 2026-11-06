@@ -177,9 +177,11 @@ h1, h2, h3 { font-family: var(--f-display); font-stretch: var(--display-ancho); 
   .brand:hover .brand__mark { transform: rotate(-8deg) scale(1.08); }
   .brand:hover .brand__word { color: var(--ink); }
 }
-.brand:active::before { clip-path: inset(0 0 0 0 round 10px); transition-duration: 200ms; }
-.brand:active .brand__mark { transform: rotate(-8deg) scale(1.08); }
-.brand:active .brand__word { color: var(--ink); }
+@media (hover: hover) and (pointer: fine) {
+  .brand:active::before { clip-path: inset(0 0 0 0 round 10px); transition-duration: 200ms; }
+  .brand:active .brand__mark { transform: rotate(-8deg) scale(1.08); }
+  .brand:active .brand__word { color: var(--ink); }
+}
 .brand { transition: scale var(--t-press) var(--ease-out); }
 @media (prefers-reduced-motion: reduce) {
   .brand::before, .nav__links a::before, .nav .nav__cta::before { transition: none; }
@@ -205,8 +207,25 @@ h1, h2, h3 { font-family: var(--f-display); font-stretch: var(--display-ancho); 
   .nav__links a:hover::before, .nav .nav__cta:hover::before { clip-path: inset(0 0 0 0 round var(--r)); }
   .nav .btn--ink.nav__cta:hover { box-shadow: inset 0 0 0 1px var(--teal); } /* taste-skill-ignore: canto del vidrio */
 }
-.nav__links a:active, .nav .btn--ink.nav__cta:active { color: var(--ink); }
-.nav__links a:active::before, .nav .nav__cta:active::before { clip-path: inset(0 0 0 0 round var(--r)); transition-duration: 200ms; }
+@media (hover: hover) and (pointer: fine) {
+  .nav__links a:active, .nav .btn--ink.nav__cta:active { color: var(--ink); }
+  .nav__links a:active::before, .nav .nav__cta:active::before { clip-path: inset(0 0 0 0 round var(--r)); transition-duration: 200ms; }
+}
+/* Pantallas táctiles (pedido del dueño): el barrido no llegaba a completarse antes de cambiar de página.
+   Al tocar, el botón se levanta un poco y se pone verde agua de una, sin barrido. */
+@media (hover: none), (pointer: coarse) {
+  .brand::before, .nav__links a::before, .nav .nav__cta::before {
+    clip-path: none; opacity: 0; transition: opacity 90ms ease;
+  }
+  .js.nav-lista .nav > *, .nav__links a { transition: opacity 600ms var(--ease-out), translate 160ms var(--ease-out), color 90ms ease, box-shadow 90ms ease; }
+  .brand:active, .nav__links a:active, .nav .nav__cta:active { translate: 0 -2px; scale: 1; color: var(--ink); }
+  .brand:active::before, .nav__links a:active::before, .nav .nav__cta:active::before { opacity: 1; }
+  .brand:active .brand__word { color: var(--ink); }
+  .nav .btn--ink.nav__cta:active { box-shadow: inset 0 0 0 1px var(--teal); } /* taste-skill-ignore: canto del vidrio */
+}
+@media (prefers-reduced-motion: reduce) {
+  .brand:active, .nav__links a:active, .nav .nav__cta:active { translate: none; }
+}
 
 /* ---------- Hero ---------- */
 .hero {
