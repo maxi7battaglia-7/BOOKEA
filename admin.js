@@ -541,7 +541,7 @@
           const extra = r.origen === "fijo" ? " · fijo" : r.origen === "telefono" ? " · por teléfono" : "";
           h += `<button type="button" class="slot slot--${r.estado}${r.estado === "confirmada" && !r.sena ? " sin-sena" : ""}${cerrar ? " slot--cerrar" : ""}${pop}" data-res="${r.id}" aria-label="${esc(`${r.cliente}, ${rec.nombre} de ${rangoT}: ${est}`)}"><b>${esc(r.cliente)}</b><small class="slot__e">${est}${cerrar ? "" : extra}</small><small class="slot__t">${donde}</small></button>`;
         }
-        else if (f < hoy.fecha || (f === hoy.fecha && t < hoy.min)) h += `<span class="slot slot--pasado" aria-label="${esc(`${rec.nombre} de ${rangoT}: quedó libre, ya pasó`)}"><small>Quedó libre</small><small class="slot__t">${donde}</small></span>`;
+        else if (f < hoy.fecha || (f === hoy.fecha && t < hoy.min)) h += `<span class="slot slot--pasado" aria-label="${esc(`${rec.nombre} de ${rangoT}: finalizado`)}"><small>Finalizado</small><small class="slot__t">${donde}</small></span>`;
         else h += `<button type="button" class="slot slot--libre" data-libre data-rec="${rec.id}" data-hora="${t}" aria-label="Cargar turno en ${esc(rec.nombre)} de ${rangoT}"><b>${ico("mas")}Libre</b><small class="slot__t">${donde}</small></button>`;
       }
     }
