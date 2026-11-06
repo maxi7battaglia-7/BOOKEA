@@ -376,7 +376,7 @@
    Lo que va adentro de una caja (huecos libres, botones, campos, celdas) vuelve a blanco,
    y los estados del turno usan colores propios (verde agua, gris, naranja, noche). */
 .pa {
-  --caja: #f7f0df; --caja-borde: #e6d9b9; --caja-linea: #e7dcc2;
+  --caja: #f7f0df; --caja-borde: #d5d8dd; --caja-linea: #e1e3e7; /* líneas en gris de la noche, no en beige */
   --caja-hover: #f0e5cb; --caja-in: #ffffff;
   background: var(--ground);
 }

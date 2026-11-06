@@ -460,11 +460,11 @@
       }
     }
     h += `</div><div class="leyenda" style="margin-top:16px">
-      <span><i style="background:var(--teal-tint);box-shadow:inset 3px 0 0 var(--teal)"></i>Seña cobrada</span>
-      <span><i style="background:#dedad1;box-shadow:inset 3px 0 0 var(--ink)"></i>Pagado</span>
+      <span><i style="background:#d9efe9;box-shadow:inset 3px 0 0 var(--teal)"></i>Seña cobrada</span>
+      <span><i style="background:#e7e6e2;box-shadow:inset 3px 0 0 var(--ink)"></i>Pagado</span>
       <span><i style="background:#fbe3da;box-shadow:inset 3px 0 0 var(--orange)"></i>No vino</span>
       <span><i style="background:var(--ink)"></i>Bloqueado</span>
-      <span><i style="background:var(--caja-in)"></i>Libre</span></div>`;
+      <span><i style="background:var(--caja-in);box-shadow:inset 0 0 0 1px var(--caja-borde)"></i>Libre</span></div>`;
     return h;
   };
 
