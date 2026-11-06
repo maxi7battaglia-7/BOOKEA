@@ -218,7 +218,7 @@ El dueño pidió cambiarla por completo.
 - Los bloques del mosaico no barren: conservan su teñido verde con fundido, como pidió el dueño.
 - Con "reducir movimiento", el verde aparece sin barrido.
 
-- **En pantallas táctiles no hay barrido** (pedido del dueño, 6/11: en el celular el barrido no llegaba a completarse antes de cambiar de página). Al tocar, el botón se levanta 2px y se pone verde agua de una (90ms). Vale para la barra del sitio y para los botones y el menú del panel. El barrido queda solo para el mouse.
+- **En pantallas táctiles no hay barrido** (pedido del dueño, 6/11: en el celular el barrido no llegaba a completarse antes de cambiar de página). Al tocar, el botón se aprieta (escala 0,94-0,95) y se pone verde agua de una; al soltar se agranda un poco (1,06-1,07, con rebote; los turnos de la agenda 1,03) y se levanta 2px, y el color queda prendido 450ms antes de apagarse despacio (360ms). Lo manejan las clases `.is-apreta` / `.is-suelta` que ponen `script.js` y `admin.js` (solo con dedo, no con mouse; si el dedo arrastra para hacer scroll no queda marcado). Un link que lleva a otra página ("Ingresar") espera 260ms para que se vea el toque. Vale para la barra del sitio y para los botones y el menú del panel. El barrido queda solo para el mouse.
 
 ## Frase "Cada turno vacío…" con foto (pedido del dueño)
 - Franja a todo el ancho con una cancha de pádel vacía de fondo (Commons, Diegodlh, CC BY 4.0), en blanco y negro con velo noche al 62 %.

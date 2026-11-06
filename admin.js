@@ -1151,5 +1151,32 @@
   cargar().then(() => mostrarEntrada());
 })();
 
-// En iPhone, Safari solo muestra el estado de "tocado" (:active) si la página escucha toques.
-document.addEventListener("touchstart", () => {}, { passive: true });
+// Toque en pantallas táctiles: mientras el dedo apoya, el botón se aprieta (.is-apreta); al soltar,
+// se agranda un poco y el color queda un momento (.is-suelta) antes de apagarse despacio.
+// Si el dedo arrastra para hacer scroll, no queda marcado.
+(() => {
+  const tactil = window.matchMedia("(hover: none), (pointer: coarse)");
+  const SEL = ".pa .btn, .menu__i, .slot, .nav-fecha button, .lado__salir";
+  const QUEDA = 450; // ms que el color queda prendido después de soltar
+  let apretado = null;
+  document.addEventListener("pointerdown", (e) => {
+    if (e.pointerType === "mouse" || !tactil.matches) return;
+    const el = e.target.closest(SEL);
+    if (!el || el.disabled) return;
+    clearTimeout(el._toque);
+    el.classList.remove("is-suelta");
+    el.classList.add("is-apreta");
+    apretado = el;
+  }, { passive: true });
+  const soltar = (e) => {
+    const el = apretado;
+    if (!el) return;
+    apretado = null;
+    el.classList.remove("is-apreta");
+    if (e.type === "pointercancel") return;
+    el.classList.add("is-suelta");
+    el._toque = setTimeout(() => el.classList.remove("is-suelta"), QUEDA);
+  };
+  document.addEventListener("pointerup", soltar, { passive: true });
+  document.addEventListener("pointercancel", soltar, { passive: true });
+})();

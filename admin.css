@@ -68,22 +68,34 @@
   .pa .btn--ink:active { color: var(--tx); }
   .pa .btn--ink:active::before { clip-path: inset(0 0 0 0); transition-duration: 160ms; }
 }
-/* Pantallas táctiles: sin barrido; al tocar se levanta un poco y cambia de color de una */
+/* Pantallas táctiles (clases que pone admin.js): sin barrido. Al tocar se aprieta; al soltar se agranda
+   un poco, se levanta y el color queda un momento antes de apagarse despacio. */
 @media (hover: none), (pointer: coarse) {
-  .pa .btn--ink::before, .menu__i::before { clip-path: none; opacity: 0; transition: opacity 90ms ease, background-color 90ms ease; }
-  .pa .btn--ink:active { color: var(--tx); transform: translateY(-2px); }
-  .pa .btn--ink:active::before { opacity: 1; }
+  .pa .btn--ink::before, .menu__i::before { clip-path: none; opacity: 0; transition: opacity 360ms ease; }
+  .pa .btn:active, .nav-fecha button:active { transform: none; }
+  :is(.pa .btn, .menu__i, .slot, .nav-fecha button, .lado__salir) {
+    transition: scale 320ms cubic-bezier(0.34, 1.56, 0.64, 1), translate 320ms cubic-bezier(0.34, 1.56, 0.64, 1),
+      background-color 360ms ease, color 360ms ease, border-color 360ms ease;
+  }
+  :is(.pa .btn, .menu__i, .slot, .nav-fecha button, .lado__salir):is(.is-apreta, .is-suelta) { position: relative; z-index: 2; }
+  :is(.pa .btn, .menu__i, .slot, .nav-fecha button, .lado__salir).is-apreta { scale: 0.95; transition-duration: 90ms, 90ms, 60ms, 60ms, 60ms; }
+  :is(.pa .btn, .menu__i, .slot, .nav-fecha button, .lado__salir).is-apreta::before { transition-duration: 60ms; }
+  :is(.pa .btn, .menu__i, .slot, .nav-fecha button, .lado__salir).is-suelta { scale: 1.06; translate: 0 -2px; }
+  .pa .slot.is-apreta { scale: 0.97; }
+  .pa .slot.is-suelta { scale: 1.03; }
+
+  .pa .btn--ink:is(.is-apreta, .is-suelta) { color: var(--tx); }
+  .pa .btn--ink:is(.is-apreta, .is-suelta)::before { opacity: 1; }
   .menu__i[aria-current="page"]::before { opacity: 1; }
-  .menu__i:active { transform: translateY(-2px); color: var(--v-tinta); }
-  .menu__i:active::before { opacity: 1; }
-  .pa .btn--line:active, .pa .btn--ghost:active { transform: translateY(-2px); background: var(--v100); }
-  .pa .btn--warn:active { transform: translateY(-2px); background: var(--n100); }
-  .slot:active, .nav-fecha button:active, .lado__salir:active { transform: translateY(-2px); }
-  .slot--libre:active { background: var(--v100); }
-  .nav-fecha button:active { background: var(--v100); }
+  .menu__i:is(.is-apreta, .is-suelta) { color: var(--v-tinta); }
+  .menu__i:is(.is-apreta, .is-suelta)::before { opacity: 1; }
+  .pa :is(.btn--line, .btn--ghost):is(.is-apreta, .is-suelta) { background: var(--v100); }
+  .pa .btn--warn:is(.is-apreta, .is-suelta) { background: var(--n100); }
+  .slot--libre:is(.is-apreta, .is-suelta), .nav-fecha button:is(.is-apreta, .is-suelta) { background: var(--v100); }
+  .lado__salir:is(.is-apreta, .is-suelta) { background: var(--n50); color: var(--n-tinta); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .pa .btn:active, .menu__i:active, .slot:active, .nav-fecha button:active { transform: none; }
+  :is(.pa .btn, .menu__i, .slot, .nav-fecha button, .lado__salir):is(.is-apreta, .is-suelta) { scale: none; translate: none; }
 }
 .pa .btn.is-ok { background: var(--v); color: var(--tx); }
 .pa .btn.is-ok::before { clip-path: inset(0 0 0 0); }

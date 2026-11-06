@@ -40,6 +40,7 @@
 
   /* Movimiento */
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-rebote: cubic-bezier(0.34, 1.56, 0.64, 1);
   --ease-expo: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in-out: cubic-bezier(0.76, 0, 0.24, 1);
   --ease-soft: cubic-bezier(0.33, 1, 0.68, 1);
@@ -212,19 +213,25 @@ h1, h2, h3 { font-family: var(--f-display); font-stretch: var(--display-ancho); 
   .nav__links a:active::before, .nav .nav__cta:active::before { clip-path: inset(0 0 0 0 round var(--r)); transition-duration: 200ms; }
 }
 /* Pantallas táctiles (pedido del dueño): el barrido no llegaba a completarse antes de cambiar de página.
-   Al tocar, el botón se levanta un poco y se pone verde agua de una, sin barrido. */
+   Al tocar (clases que pone script.js): se aprieta, al soltar se agranda un poco y se levanta,
+   y el verde agua queda un momento antes de apagarse despacio. Sin barrido. */
 @media (hover: none), (pointer: coarse) {
   .brand::before, .nav__links a::before, .nav .nav__cta::before {
-    clip-path: none; opacity: 0; transition: opacity 90ms ease;
+    clip-path: none; opacity: 0; transition: opacity 360ms ease;
   }
-  .js.nav-lista .nav > *, .nav__links a { transition: opacity 600ms var(--ease-out), translate 160ms var(--ease-out), color 90ms ease, box-shadow 90ms ease; }
-  .brand:active, .nav__links a:active, .nav .nav__cta:active { translate: 0 -2px; scale: 1; color: var(--ink); }
-  .brand:active::before, .nav__links a:active::before, .nav .nav__cta:active::before { opacity: 1; }
-  .brand:active .brand__word { color: var(--ink); }
-  .nav .btn--ink.nav__cta:active { box-shadow: inset 0 0 0 1px var(--teal); } /* taste-skill-ignore: canto del vidrio */
+  .js.nav-lista .nav > *, .nav__links a {
+    transition: opacity 600ms var(--ease-out), translate 320ms var(--ease-rebote), scale 320ms var(--ease-rebote), color 360ms ease, box-shadow 360ms ease;
+  }
+  .brand:active { scale: 1; }
+  :is(.brand, .nav__links a, .nav .nav__cta):is(.is-apreta, .is-suelta) { color: var(--ink); }
+  :is(.brand, .nav__links a, .nav .nav__cta):is(.is-apreta, .is-suelta)::before { opacity: 1; transition-duration: 60ms; }
+  :is(.brand, .nav__links a, .nav .nav__cta).is-apreta { scale: 0.94; transition-duration: 600ms, 90ms, 90ms, 60ms, 60ms; }
+  :is(.brand, .nav__links a, .nav .nav__cta).is-suelta { scale: 1.07; translate: 0 -2px; }
+  .brand:is(.is-apreta, .is-suelta) .brand__word { color: var(--ink); }
+  .nav .btn--ink.nav__cta:is(.is-apreta, .is-suelta) { box-shadow: inset 0 0 0 1px var(--teal); } /* taste-skill-ignore: canto del vidrio */
 }
 @media (prefers-reduced-motion: reduce) {
-  .brand:active, .nav__links a:active, .nav .nav__cta:active { translate: none; }
+  :is(.brand, .nav__links a, .nav .nav__cta):is(.is-apreta, .is-suelta) { scale: none; translate: none; }
 }
 
 /* ---------- Hero ---------- */
