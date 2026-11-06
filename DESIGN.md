@@ -250,3 +250,5 @@ El dueño pidió cambiarla por completo.
 - Calendario desplegable: al tocar la fecha se abre el mes. Cada día lleva una barrita verde con qué tan lleno está; los días pasados van en gris y los cerrados sin fondo. Se recorre con flechas y se cierra con Escape o tocando afuera.
 - Cajas: en todo el panel el fondo es blanco y cada caja va en gris cálido #f1efea con borde #e1ded5. Lo de adentro usa #e5e2da (huecos libres, botones secundarios).
 - Grilla del día: cada cancha con su cabecera en noche, cada fila con "09:00 a 10:30" y cada cuadro repite cancha y horario.
+
+- Barra de arriba en tablet y celular (≤960px): se ocultan Reservar turno, Para negocios y Preguntas, pero **"Ingresar" siempre queda visible** al lado de "Sumá tu negocio" (es la única entrada al panel desde el celular). En celulares de menos de 375px el logo queda solo con la B.

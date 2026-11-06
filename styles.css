@@ -624,8 +624,10 @@ h1, h2, h3 { font-family: var(--f-display); font-stretch: var(--display-ancho); 
   .preguntas { order: 4; padding-top: 28px; padding-bottom: 48px; }
 }
 @media (max-width: 960px) {
-  .nav__links { display: none; }
-  .nav__cta { margin-left: auto; }
+  /* En tablet y celular queda solo "Ingresar" (para los negocios) al lado de "Sumá tu negocio" */
+  .nav__links { display: flex; }
+  .nav__links a:not(.nav__ingresar) { display: none; }
+  .nav__cta { margin-left: 0; }
 }
 
 /* ---------- Teléfono ---------- */
@@ -640,8 +642,9 @@ h1, h2, h3 { font-family: var(--f-display); font-stretch: var(--display-ancho); 
   .m-barbero { grid-column: 3; grid-row: 2; }
   .m-vb, .m-tenis, .m-vc, .m-vd, .m-paletas { display: none; }
   .nav { gap: 16px; min-height: 64px; }
-  .nav__links { display: none; }
-  .nav__cta { margin-left: auto; padding: 10px 14px; }
+  .nav__links { gap: 0; }
+  .nav__ingresar { min-height: 44px; display: inline-flex; align-items: center; }
+  .nav__cta { padding: 10px 14px; }
   .hero { display: flex; flex-direction: column; padding-top: 24px; }
   .hero__title { order: 1; }
   .hero__lead { order: 2; margin-top: 12px; }
@@ -693,6 +696,15 @@ h1, h2, h3 { font-family: var(--f-display); font-stretch: var(--display-ancho); 
 
 @media (max-width: 420px) {
   .finder__rubros { grid-template-columns: 1fr 1fr; }
+  /* barra de arriba: logo, "Ingresar" y "Sumá tu negocio" entran en una sola línea */
+  .nav { gap: 6px; }
+  .brand { padding-right: 8px; }
+  .nav__links a.nav__ingresar, .nav .nav__cta { font-size: 15px; padding-inline: 11px; white-space: nowrap; }
+}
+@media (max-width: 374px) {
+  /* en los celulares más angostos queda solo la B (el nombre ya está en el título) */
+  .brand__word { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .brand { padding-right: 6px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
