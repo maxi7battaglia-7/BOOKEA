@@ -372,7 +372,7 @@
       const p1 = prox ? `El próximo turno es a las <b>${aHora(prox.hora)}</b>: ${esc(prox.cliente)} en ${esc(nombreRec(prox.recurso))}.` : "No quedan turnos por hoy.";
       return `${p1} Te ${libres === 1 ? "queda" : "quedan"} <b>${plural(libres, "horario libre", "horarios libres")}</b> hoy.`;
     }
-    if (f < hoy.fecha) return `Ese día hubo <b>${plural(del.length, "turno", "turnos")}</b> y cobraste <b>${plata(R.cobrado)}</b>.`;
+    if (f < hoy.fecha) return `Ese día hubo <b>${plural(del.length, "turno", "turnos")}</b>.`;
     return `Ese día tenés <b>${plural(del.length, "turno", "turnos")}</b> y <b>${plural(libresDesde(0), "horario libre", "horarios libres")}</b>.`;
   };
 
@@ -380,9 +380,8 @@
   const htmlRiel = () => {
     const hoy = ahora(), pend = pendientes(), prox = proximos();
     const filaPend = (r) => {
-      const resto = r.precio - r.sena;
       return `<div class="lista__f lista__f--acc"><p class="lista__h">${aHora(r.hora)}<small>${cuandoCorto(r.fecha, hoy.fecha)}</small></p>
-        <div class="lista__q"><b>${esc(r.cliente)}</b><small>${esc(nombreRec(r.recurso))} · ${resto > 0 ? `falta cobrar ${plata(resto)}` : "ya estaba pago"}</small></div>
+        <div class="lista__q"><b>${esc(r.cliente)}</b><small>${esc(nombreRec(r.recurso))} · terminó a las ${aHora(r.hora + NEG.duracion)}</small></div>
         <div class="lista__acc"><button type="button" class="btn btn--ghost btn--sm" data-rapido="jugada" data-id="${r.id}" aria-label="${esc(`${r.cliente} pagó`)}">${ico("check")}Pagó</button><button type="button" class="btn btn--line btn--sm" data-rapido="ausente" data-id="${r.id}" aria-label="${esc(`${r.cliente} no vino`)}">No vino</button></div></div>`;
     };
     const filaProx = (r) => `<button type="button" class="lista__f lista__f--boton" data-res="${r.id}"><span class="lista__h">${aHora(r.hora)}<small>${cuandoCorto(r.fecha, hoy.fecha)}</small></span>
@@ -408,8 +407,6 @@
     const desde = esDia ? f : lunesDe(f), hasta = esDia ? f : sumar(lunesDe(f), 6);
     const R = resumen(desde, hasta);
     const titulo = esDia ? largo(f) + (f === hoy.fecha ? " · hoy" : "") : `Semana del ${corto(desde)} al ${corto(hasta)}`;
-    const cuando = esDia ? (f === hoy.fecha ? "hoy" : "ese día") : "esta semana";
-    const seniaRet = R.ausentes.reduce((s, r) => s + r.sena, 0);
     $("#vista").innerHTML = `
       <header class="vhead">
         <div><h1>Agenda</h1><p class="vhead__frase">${fraseAgenda(f, hoy, R, esDia)}</p></div>
@@ -435,12 +432,6 @@
           <button type="button" data-modo="semana" aria-pressed="${!esDia}">Semana</button>
         </div>
       </div>
-      ${kpis([
-        kpi("Turnos reservados", R.cap ? `${R.turnos} <small>de ${R.cap}</small>` : "—", R.cap ? `Ocupaste el ${pct(R.ocupacion)} de los horarios` : "Cerrado", { barra: R.cap ? R.ocupacion : null }),
-        kpi("Ya cobrado", plata(R.cobrado), "Señas y turnos que ya te pagaron"),
-        kpi("Falta cobrar", plata(R.porCobrar), "El resto de cada turno, que se paga en el lugar"),
-        kpi("No vinieron", R.ausentes.length, R.ausentes.length ? `Te quedaste con ${plata(seniaRet)} de seña` : `Nadie faltó ${cuando}`),
-      ])}
       <div class="ag">
         <section class="card ag__main" aria-labelledby="ag-t"><h2 id="ag-t" class="sr-only">${esDia ? "Turnos por horario" : "Turnos de la semana"}</h2>${esDia ? htmlDia(f, hoy) : htmlSemana(f, hoy)}</section>
         ${htmlRiel()}

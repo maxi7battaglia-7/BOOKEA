@@ -253,7 +253,8 @@ textos que se entiendan en cada cuadro.
   Cancha 2. Te quedan 15 horarios libres hoy."). Las cifras van en **un solo contenedor dividido**, cada celda con rótulo,
   valor y una frase que dice contra qué o por qué ("Ocupaste el 33 % de los horarios", "El resto de cada turno, que se paga
   en el lugar"). En Finanzas "Cobrado" es la cifra más grande y su cambio dice contra qué días (naranja si baja, verde si sube).
-- **Agenda:** grilla por cancha y horario + riel a la derecha (336px) con **Para cerrar** (turnos que ya terminaron sin marcar,
+- **Agenda: solo la agenda** (pedido del dueño, 6/11): sin cifras, sin estadísticas y sin plata; eso vive en Finanzas.
+  Grilla por cancha y horario + riel a la derecha (336px) con **Para cerrar** (turnos que ya terminaron sin marcar,
   con "Pagó" y "No vino" a un toque) y **Próximos turnos**. En pantallas angostas "Para cerrar" sube arriba de la grilla.
   Estados: con seña = verde agua pálido; sin seña = blanco con borde gris; pagado = gris; no vino = naranja pálido;
   bloqueado = noche; libre = verde agua más pálido con "+ Libre"; ya pasó = solo texto. Cada uno con su punto y su palabra.
