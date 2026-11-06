@@ -245,3 +245,8 @@ El dueño pidió cambiarla por completo.
   - Columnas de un solo color (verde agua, validado con dataviz): máximo 24 px, con tooltip al pasar el cursor y con las flechas del teclado, y la tabla por día como alternativa.
   - Barras horizontales por cancha y por franja, movimientos y planilla CSV.
 - No se muestran precios de Bookea en ningún lado.
+
+## Panel: calendario, cajas y grilla más clara (pedido del dueño)
+- Calendario desplegable: al tocar la fecha se abre el mes. Cada día lleva una barrita verde con qué tan lleno está; los días pasados van en gris y los cerrados sin fondo. Se recorre con flechas y se cierra con Escape o tocando afuera.
+- Cajas: en todo el panel el fondo es blanco y cada caja va en gris cálido #f1efea con borde #e1ded5. Lo de adentro usa #e5e2da (huecos libres, botones secundarios).
+- Grilla del día: cada cancha con su cabecera en noche, cada fila con "09:00 a 10:30" y cada cuadro repite cancha y horario.

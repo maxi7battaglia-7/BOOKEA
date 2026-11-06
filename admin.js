@@ -319,6 +319,7 @@
 
   // ---------- Agenda ----------
   const AG = { fecha: ahora().fecha, modo: "dia" };
+  let cerrarCalFuera = null; // escucha "tocar afuera" del calendario abierto
   const horasDelDia = (f) => {
     const s = new Set(slotsDe(NEG, f));
     RES.forEach((r) => { if (r.fecha === f && ocupa(r)) s.add(r.hora); }); // turnos viejos que quedaron fuera de la grilla
@@ -327,6 +328,7 @@
   const nombreRec = (id) => (NEG.recursos.find((r) => r.id === id) || { nombre: "Sin lugar" }).nombre;
 
   VISTAS.agenda = () => {
+    if (cerrarCalFuera) { document.removeEventListener("pointerdown", cerrarCalFuera); cerrarCalFuera = null; }
     const hoy = ahora(), f = AG.fecha, esDia = AG.modo === "dia";
     const desde = esDia ? f : lunesDe(f), hasta = esDia ? f : sumar(lunesDe(f), 6);
     const R = resumen(desde, hasta);
@@ -348,7 +350,13 @@
           <button type="button" class="hoy" data-hoy>Hoy</button>
           <button type="button" data-mover="1" aria-label="${esDia ? "Día siguiente" : "Semana siguiente"}">›</button>
         </div>
-        <h2 class="fecha-t" aria-live="polite">${titulo}</h2>
+        <div class="cal">
+          <button type="button" class="fecha-btn" id="cal-btn" aria-expanded="false" aria-controls="cal-pop">
+            <span class="fecha-t" aria-live="polite">${titulo}</span><span class="fecha-btn__f" aria-hidden="true">▾</span>
+            <span class="sr-only">Abrir el calendario</span>
+          </button>
+          <div class="cal-pop" id="cal-pop" role="dialog" aria-label="Elegí un día" hidden></div>
+        </div>
       </div>
       <div class="tiles">
         ${tile("Turnos", R.turnos, `${pct(R.ocupacion)} ocupado`)}
@@ -361,10 +369,76 @@
     $$("[data-modo]", v).forEach((b) => b.addEventListener("click", () => { AG.modo = b.dataset.modo; VISTAS.agenda(); }));
     $$("[data-mover]", v).forEach((b) => b.addEventListener("click", () => { AG.fecha = sumar(AG.fecha, +b.dataset.mover * (AG.modo === "dia" ? 1 : 7)); VISTAS.agenda(); $(`[data-mover="${b.dataset.mover}"]`).focus(); }));
     $("[data-hoy]", v).addEventListener("click", () => { AG.fecha = ahora().fecha; VISTAS.agenda(); });
+    engancharCalendario();
     $("[data-nuevo]", v).addEventListener("click", () => dlgNuevo({ fecha: AG.fecha }));
     $$("[data-res]", v).forEach((b) => b.addEventListener("click", () => dlgTurno(b.dataset.res)));
     $$("[data-libre]", v).forEach((b) => b.addEventListener("click", () => dlgNuevo({ fecha: f, recurso: b.dataset.rec, hora: +b.dataset.hora })));
     $$("[data-ir-dia]", v).forEach((b) => b.addEventListener("click", () => { AG.fecha = b.dataset.irDia; AG.modo = "dia"; VISTAS.agenda(); }));
+  };
+
+
+  // ---------- Calendario desplegable: un mes, cada día con una barrita de qué tan lleno está ----------
+  const CAL = { mes: "" };
+  const llenoDe = (f) => {
+    const cap = slotsDe(NEG, f).length * NEG.recursos.length;
+    if (!cap) return -1;
+    return Math.min(1, RES.filter((r) => r.fecha === f && ocupa(r)).length / cap);
+  };
+  const pintarCalendario = () => {
+    const pop = $("#cal-pop"), hoy = ahora().fecha, mes = CAL.mes;
+    const d1 = mes + "-01", d = aD(d1), anio = d.getUTCFullYear(), m = d.getUTCMonth();
+    const enMes = new Date(Date.UTC(anio, m + 1, 0)).getUTCDate();
+    const vacios = (dow(d1) + 6) % 7;
+    let h = `<div class="cal__top">
+        <button type="button" class="cal__nav" data-cal-mes="-1" aria-label="Mes anterior">‹</button>
+        <p class="cal__mes" aria-live="polite">${mayus(MESES[m])} ${anio}</p>
+        <button type="button" class="cal__nav" data-cal-mes="1" aria-label="Mes siguiente">›</button>
+      </div>
+      <div class="cal__grid" role="grid">${["Lu", "Ma", "Mi", "Ju", "Vi", "Sá", "Do"].map((x) => `<span class="cal__dsem" aria-hidden="true">${x}</span>`).join("")}`;
+    for (let i = 0; i < vacios; i++) h += `<span></span>`;
+    for (let n = 1; n <= enMes; n++) {
+      const f = `${mes}-${pad2(n)}`, ll = llenoDe(f);
+      const cls = ["cal__d", f === hoy ? "es-hoy" : "", f === AG.fecha ? "es-sel" : "", f < hoy ? "es-pasado" : "", ll < 0 ? "es-cerrado" : ""].filter(Boolean).join(" ");
+      const txt = ll < 0 ? "cerrado" : `${pct(ll)} ocupado`;
+      h += `<button type="button" class="${cls}" data-cal-dia="${f}" aria-label="${esc(`${largo(f)}, ${txt}`)}"${f === AG.fecha ? ' aria-current="date"' : ""}>
+        <span>${n}</span><i aria-hidden="true"><i style="width:${ll < 0 ? 0 : Math.round(ll * 100)}%"></i></i></button>`;
+    }
+    h += `</div><p class="cal__ley">La barrita muestra qué tan lleno está cada día.</p>
+      <button type="button" class="link cal__hoy" data-cal-dia="${hoy}">Ir a hoy</button>`;
+    pop.innerHTML = h;
+    $$("[data-cal-mes]", pop).forEach((b) => b.addEventListener("click", () => {
+      const nd = aD(CAL.mes + "-01"); nd.setUTCMonth(nd.getUTCMonth() + +b.dataset.calMes);
+      CAL.mes = aISO(nd).slice(0, 7); pintarCalendario(); $(`[data-cal-mes="${b.dataset.calMes}"]`, pop).focus();
+    }));
+    $$("[data-cal-dia]", pop).forEach((b) => b.addEventListener("click", () => {
+      AG.fecha = b.dataset.calDia; VISTAS.agenda(); $("#cal-btn").focus();
+    }));
+  };
+  const engancharCalendario = () => {
+    const btn = $("#cal-btn"), pop = $("#cal-pop");
+    const cerrar = (devolver) => {
+      pop.hidden = true; btn.setAttribute("aria-expanded", "false");
+      if (cerrarCalFuera) { document.removeEventListener("pointerdown", cerrarCalFuera); cerrarCalFuera = null; }
+      if (devolver) btn.focus();
+    };
+    btn.addEventListener("click", () => {
+      if (!pop.hidden) return cerrar(false);
+      CAL.mes = AG.fecha.slice(0, 7); pintarCalendario();
+      pop.hidden = false; btn.setAttribute("aria-expanded", "true");
+      ($(".es-sel", pop) || $(".cal__d", pop)).focus();
+      cerrarCalFuera = (e) => { if (!e.target.closest(".cal")) cerrar(false); };
+      document.addEventListener("pointerdown", cerrarCalFuera);
+    });
+    pop.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") { e.preventDefault(); return cerrar(true); }
+      const paso = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: 7, ArrowUp: -7 }[e.key];
+      const act = e.target.closest(".cal__d");
+      if (!paso || !act) return;
+      e.preventDefault();
+      const dest = sumar(act.dataset.calDia, paso);
+      if (dest.slice(0, 7) !== CAL.mes) { CAL.mes = dest.slice(0, 7); pintarCalendario(); }
+      const b = $(`[data-cal-dia="${dest}"].cal__d`, pop); b && b.focus();
+    });
   };
 
   const htmlDia = (f, hoy) => {
@@ -372,24 +446,26 @@
     if (!horas.length) return `<p class="vacio-p">Este día el negocio está cerrado. Podés cambiar el horario en Mi negocio.</p>`;
     const del = RES.filter((r) => r.fecha === f && ocupa(r));
     let h = `<div class="dia" style="--n:${NEG.recursos.length}" role="grid" aria-label="Turnos del ${esc(largo(f))}">`;
-    h += `<span></span>` + NEG.recursos.map((r) => `<p class="dia__h">${esc(r.nombre)}${r.detalle ? `<small>${esc(r.detalle)}</small>` : ""}</p>`).join("");
+    h += `<span class="dia__esq">Horario</span>` + NEG.recursos.map((r) => `<div class="dia__h"><span class="dia__rec">${esc(r.nombre)}</span>${r.detalle ? `<small>${esc(r.detalle)}</small>` : ""}</div>`).join("");
     for (const t of horas) {
-      const ahoraAca = f === hoy.fecha && hoy.min >= t && hoy.min < t + NEG.duracion;
-      h += `<p class="dia__hora${ahoraAca ? " es-ahora" : ""}">${aHora(t)}${ahoraAca ? " · ahora" : ""}</p>`;
+      const fin = t + NEG.duracion, rangoT = `${aHora(t)} a ${aHora(fin)}`;
+      const ahoraAca = f === hoy.fecha && hoy.min >= t && hoy.min < fin;
+      h += `<p class="dia__hora${ahoraAca ? " es-ahora" : ""}"><b>${aHora(t)}</b><small>a ${aHora(fin)}</small>${ahoraAca ? `<em>Ahora</em>` : ""}</p>`;
       for (const rec of NEG.recursos) {
         const r = del.find((x) => x.recurso === rec.id && x.hora === t);
-        if (r && r.estado === "bloqueo") h += `<button type="button" class="slot slot--bloqueo" data-res="${r.id}"><b>Bloqueado</b><small>${esc(r.nota || "Sin turnos")}</small></button>`;
-        else if (r) h += `<button type="button" class="slot slot--${r.estado}" data-res="${r.id}" aria-label="${esc(`${r.cliente}, ${rec.nombre} a las ${aHora(t)}: ${etiqueta(r)}`)}"><b>${esc(r.cliente)}</b><small>${etiqueta(r)}${r.origen === "fijo" ? " · fijo" : r.origen === "telefono" ? " · teléfono" : ""}</small></button>`;
-        else if (f < hoy.fecha || (f === hoy.fecha && t < hoy.min)) h += `<span class="slot slot--pasado" aria-label="Libre, ya pasó">—</span>`;
-        else h += `<button type="button" class="slot slot--libre" data-libre data-rec="${rec.id}" data-hora="${t}" aria-label="Cargar turno en ${esc(rec.nombre)} a las ${aHora(t)}">+ Libre</button>`;
+        const donde = `${esc(rec.nombre)} · ${rangoT}`;
+        if (r && r.estado === "bloqueo") h += `<button type="button" class="slot slot--bloqueo" data-res="${r.id}"><b>Bloqueado</b><small>${esc(r.nota || "Sin turnos")}</small><small class="slot__t">${donde}</small></button>`;
+        else if (r) h += `<button type="button" class="slot slot--${r.estado}" data-res="${r.id}" aria-label="${esc(`${r.cliente}, ${rec.nombre} de ${rangoT}: ${etiqueta(r)}`)}"><b>${esc(r.cliente)}</b><small>${etiqueta(r)}${r.origen === "fijo" ? " · fijo" : r.origen === "telefono" ? " · teléfono" : ""}</small><small class="slot__t">${donde}</small></button>`;
+        else if (f < hoy.fecha || (f === hoy.fecha && t < hoy.min)) h += `<span class="slot slot--pasado" aria-label="${esc(`${rec.nombre} de ${rangoT}: libre, ya pasó`)}"><small>Ya pasó</small><small class="slot__t">${donde}</small></span>`;
+        else h += `<button type="button" class="slot slot--libre" data-libre data-rec="${rec.id}" data-hora="${t}" aria-label="Cargar turno en ${esc(rec.nombre)} de ${rangoT}"><b>+ Libre</b><small class="slot__t">${donde}</small></button>`;
       }
     }
     h += `</div><div class="leyenda" style="margin-top:16px">
       <span><i style="background:var(--teal-tint);box-shadow:inset 3px 0 0 var(--teal)"></i>Seña cobrada</span>
-      <span><i style="background:var(--raised);box-shadow:inset 3px 0 0 var(--ink)"></i>Pagado</span>
+      <span><i style="background:#dedad1;box-shadow:inset 3px 0 0 var(--ink)"></i>Pagado</span>
       <span><i style="background:#fbe3da;box-shadow:inset 3px 0 0 var(--orange)"></i>No vino</span>
       <span><i style="background:var(--ink)"></i>Bloqueado</span>
-      <span><i style="box-shadow:inset 0 0 0 1px #d9d6ce"></i>Libre</span></div>`;
+      <span><i style="background:var(--caja-in)"></i>Libre</span></div>`;
     return h;
   };
 
@@ -411,7 +487,7 @@
       h += `</tr>`;
     }
     h += `</tbody></table></div><div class="leyenda" style="margin-top:12px">
-      <span><i style="background:var(--raised)"></i>Todo libre</span><span><i style="background:#e3f4f0"></i>Pocos ocupados</span>
+      <span><i style="background:var(--caja-in)"></i>Todo libre</span><span><i style="background:#d6efe8"></i>Pocos ocupados</span>
       <span><i style="background:#a9dccf"></i>Casi lleno</span><span><i style="background:var(--teal)"></i>Completo</span>
       <span>Tocá un horario para ver ese día.</span></div>`;
     return h;
