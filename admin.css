@@ -370,31 +370,48 @@
 }
 
 /* ---------- Cajas que resaltan del fondo (pedido del dueño) ----------
-   En todo el panel: el fondo es blanco y cada caja (cifras, tarjetas, botones de fecha, la entrada)
-   va en un gris cálido un poco más oscuro, con un borde fino que la recorta.
-   Lo que va adentro de una caja (huecos libres, filas, campos) usa otro paso de gris o blanco. */
-.pa { --caja: #f1efea; --caja-borde: #e1ded5; --caja-in: #e5e2da; background: var(--ground); }
+   El fondo del panel es blanco. Cada caja (cifras, tarjetas, agenda, gráficos, formularios, botones
+   de fecha) va en el crema de la marca, apenas tostado, con un borde fino del mismo tono:
+   es otro color, no otro gris, así se nota que está "afuera" del fondo sin gritar.
+   Lo que va adentro de una caja (huecos libres, botones, campos, celdas) vuelve a blanco,
+   y los estados del turno usan colores propios (verde agua, gris, naranja, noche). */
+.pa {
+  --caja: #f7f0df; --caja-borde: #e6d9b9; --caja-linea: #e7dcc2;
+  --caja-hover: #f0e5cb; --caja-in: #ffffff;
+  background: var(--ground);
+}
 .pa .card, .pa .tile, .pa .caja,
 .pa .fecha-btn, .pa .nav-fecha button {
   background: var(--caja); border: 1px solid var(--caja-borde); /* taste-skill-ignore: borde que recorta la caja del fondo */
 }
 .pa .entrada__form { background: var(--ground); }
-.pa .caja__demo { background: var(--cream); }
-.pa .seg { background: var(--caja-in); }
-.pa .btn--ghost, .pa .quitar, .pa .clave__ver { background: var(--caja-in); }
+.pa .caja__demo { background: var(--caja-in); border: 1px solid var(--caja-borde); } /* taste-skill-ignore: borde que recorta la caja */
+.pa .seg { background: var(--caja); border: 1px solid var(--caja-borde); } /* taste-skill-ignore: borde que recorta la caja */
+.pa .seg button[aria-pressed="true"] { background: var(--caja-in); box-shadow: 0 1px 2px rgba(17, 21, 28, 0.08); } /* taste-skill-ignore: el botón elegido se levanta */
+.pa .btn--ghost, .pa .quitar, .pa .clave__ver { background: var(--caja-in); border: 1px solid var(--caja-borde); } /* taste-skill-ignore: borde que recorta la caja */
+.pa .card input, .pa .card select, .pa .card textarea, .pa .caja input { background: var(--caja-in); border-color: var(--caja-borde); }
 .pa .guardar-barra { background: var(--ground); }
-.pa .slot--libre { background: var(--caja-in); }
-.pa .slot--pasado { background: #ebe8e1; }
-.pa .slot--jugada { background: #dedad1; }
-.pa .sem button { background: var(--caja-in); }
-.pa .sem .o1 { background: #d6efe8; }
-.pa .sem .cerr { background: transparent; }
-.pa .chart .grilla { stroke: #d9d6ce; }
-.pa .tabla th, .pa .tabla td { border-bottom-color: #d9d6ce; }
+/* Agenda: el hueco libre es blanco (se puede usar), lo que ya pasó se funde con la caja */
+.pa .slot--libre { background: var(--caja-in); box-shadow: inset 0 0 0 1px var(--caja-borde); } /* taste-skill-ignore: borde del hueco */
+.pa .slot--pasado { background: transparent; box-shadow: inset 0 0 0 1px var(--caja-linea); } /* taste-skill-ignore: borde del hueco */
+.pa .slot--confirmada { background: #d9efe9; }
+.pa .slot--jugada { background: #e7e6e2; }
+.pa .dia__hora { border-right-color: var(--caja-borde); }
+/* Semana */
+.pa .sem button { background: var(--caja-in); box-shadow: inset 0 0 0 1px var(--caja-linea); } /* taste-skill-ignore: borde de la celda */
+.pa .sem .o1 { background: #d9efe9; box-shadow: none; }
+.pa .sem .o2 { box-shadow: none; }
+.pa .sem .o3 { box-shadow: none; }
+.pa .sem .cerr { background: transparent; box-shadow: none; }
+/* Gráficos y tablas */
+.pa .chart .grilla { stroke: var(--caja-borde); }
+.pa .tabla th, .pa .tabla td { border-bottom-color: var(--caja-linea); }
 .pa .hbar__b { min-width: 2px; }
-.pa .dia__hora { border-right-color: #d9d6ce; }
 @media (hover: hover) and (pointer: fine) {
-  .pa .fecha-btn:hover, .pa .nav-fecha button:hover { background: #e8e5de; }
-  .pa .btn--ghost:hover, .pa .quitar:hover { background: #dbd8cf; }
-  .pa .slot--jugada:hover { background: #d4d0c6; }
+  .pa .fecha-btn:hover, .pa .nav-fecha button:hover { background: var(--caja-hover); }
+  .pa .btn--ghost:hover, .pa .quitar:hover { background: var(--caja-hover); }
+  .pa .slot--libre:hover { background: var(--teal-tint); box-shadow: inset 0 0 0 1px #a9dccf; } /* taste-skill-ignore: borde del hueco */
+  .pa .slot--confirmada:hover { background: #c9e8df; }
+  .pa .slot--jugada:hover { background: #dddbd5; }
+  .pa .tabla tbody tr:hover td { background: var(--caja-hover); }
 }
