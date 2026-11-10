@@ -282,3 +282,15 @@ textos que se entiendan en cada cuadro.
   cerrados sin fondo. Se recorre con flechas y se cierra con Escape o tocando afuera.
 
 - Barra de arriba en tablet y celular (≤960px): se ocultan Reservar turno, Para negocios y Preguntas, pero **"Ingresar" siempre queda visible** al lado de "Sumá tu negocio" (es la única entrada al panel desde el celular). En celulares de menos de 375px el logo queda solo con la B.
+
+## Bienvenida al iniciar sesión (pedido del dueño, 10/11)
+
+- Al ingresar (o al crear una cuenta) aparece una pantalla noche como la carga del sitio: la B se arma con las mismas
+  animaciones (`sp-asta`, `sp-verde`, `sp-naranja`), aparece "Hola, {nombre}." y abajo el nombre del negocio
+  ("Tu cuenta está lista." si es cuenta nueva). A los 1,9 s la persiana sube (760ms) y el panel llega desde abajo en
+  escalera (menú y bloques de la vista, 16px).
+- Se saltea con un toque, un clic o cualquier tecla. Con "reducir movimiento" dura 0,9 s y se va con un fundido.
+- Para lectores de pantalla el saludo se anuncia en `#aviso` sin mostrar el cartel. Ya no sale el cartel "Hola, …"
+  (repetía el saludo); en cuenta nueva, al subir la persiana avisa "Completá los datos de tu negocio."
+- La persiana necesita `clip-path: inset(0 0 0 0)` de partida: desde `none` no se anima (pasaba también en la carga
+  del sitio y quedó corregido).

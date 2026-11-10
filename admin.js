@@ -206,6 +206,38 @@
     clearTimeout(avisoT); avisoT = setTimeout(() => a.classList.remove("is-on"), 3200);
   };
 
+  // ---------- Bienvenida al iniciar sesión ----------
+  // Como la carga del sitio: la B se arma sobre fondo noche, saluda y la persiana sube mostrando el panel.
+  // Dura menos de 3 segundos y se saltea con un toque o una tecla.
+  const B_SVG = `<svg class="bienv__b" viewBox="0 0 1000 1000"><defs><mask id="bv-panzas" maskUnits="userSpaceOnUse" x="0" y="0" width="1000" height="1000">
+    <path d="M391,180 H520 A175,175 0 0 1 520,530 H391 Z" fill="#fff"/><path d="M391,426 H545 A197,197 0 0 1 545,820 H391 Z" fill="#fff"/>
+    <path d="M391,284 H520 A71,71 0 0 1 520,426 H391 Z" fill="#000"/><path d="M391,530 H545 A93,93 0 0 1 545,716 H391 Z" fill="#000"/></mask></defs>
+    <g transform="translate(8,0)"><g mask="url(#bv-panzas)"><polygon class="sp-verde" points="0,0 1000,0 1000,553.38 0,377.06" fill="#1fa08c"/>
+    <polygon class="sp-naranja" points="0,377.06 1000,553.38 1000,1000 0,1000" fill="#e4572e"/></g>
+    <rect class="sp-asta" x="255" y="180" width="136" height="640" fill="#f5ecd7"/></g></svg>`;
+  const bienvenida = (hola, sub, despues) => {
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const v = document.createElement("div");
+    v.className = "bienv"; v.setAttribute("aria-hidden", "true");
+    v.innerHTML = `<div class="bienv__in">${B_SVG}<p class="bienv__hola">${esc(hola)}</p><p class="bienv__sub">${esc(sub)}</p></div>`;
+    document.body.append(v);
+    // lectores de pantalla: el saludo se anuncia sin mostrar el aviso
+    $("#aviso").textContent = `${hola} ${sub}`;
+    let fuera = false;
+    const irse = () => {
+      if (fuera) return;
+      fuera = true;
+      document.removeEventListener("keydown", irse);
+      v.classList.add("is-out");
+      const p = $("#panel");
+      if (!reduce) { p.classList.add("is-llega"); setTimeout(() => p.classList.remove("is-llega"), 1400); }
+      setTimeout(() => { v.remove(); despues && despues(); }, reduce ? 320 : 800);
+    };
+    const t = setTimeout(irse, reduce ? 900 : 1900);
+    v.addEventListener("click", () => { clearTimeout(t); irse(); });
+    document.addEventListener("keydown", irse);
+  };
+
   // ---------- Entrada: ingresar ----------
   let fallos = 0, bloqueadoHasta = 0;
   $$("[data-ver]").forEach((b) => b.addEventListener("click", () => {
@@ -229,7 +261,7 @@
     }
     fallos = 0; msg.textContent = ""; $("#i-clave").value = "";
     entrar(u, "agenda");
-    aviso(`Hola, ${YO.nombre}.`);
+    bienvenida(`Hola, ${YO.nombre.split(" ")[0]}.`, NEG.nombre);
   });
 
   // ---------- Entrada: crear cuenta ----------
@@ -276,7 +308,7 @@
     guardar();
     e.target.reset();
     entrar(usuario, "negocio");
-    aviso("Listo, tu cuenta está creada. Completá los datos de tu negocio.");
+    bienvenida(`Hola, ${nombre.split(" ")[0]}.`, "Tu cuenta está lista.", () => aviso("Completá los datos de tu negocio."));
   });
 
   // ---------- Navegación del panel ----------

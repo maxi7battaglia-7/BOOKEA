@@ -731,3 +731,36 @@
 .mapa .btn .ico { transition: transform 260ms var(--ease-out); }
 @media (max-width: 640px) { .perfil { align-items: flex-start; } .perfil__foto { width: 80px; height: 80px; border-radius: 14px; } .mapa .btn { width: 100%; } }
 @media (prefers-reduced-motion: reduce) { .perfil__foto.recien { animation: none; } }
+
+/* ---------- Bienvenida al iniciar sesión (pedido del dueño): como la carga del sitio ----------
+   la B se arma (mismas animaciones sp-* de styles.css), aparece el saludo y la persiana sube. */
+.bienv {
+  position: fixed; inset: 0; z-index: 200; display: grid; place-items: center;
+  background: #11151c; color: #f5ecd7; cursor: pointer; clip-path: inset(0 0 0 0);
+}
+.bienv__in { display: grid; justify-items: center; text-align: center; padding: 24px; }
+.bienv__b { width: clamp(88px, 11vw, 120px); height: auto; overflow: hidden; margin-bottom: 24px; }
+.bienv__hola {
+  font-family: var(--f-display); font-stretch: var(--display-ancho); font-weight: 600;
+  font-size: clamp(32px, 4.4vw, 48px); line-height: 1.05; letter-spacing: -0.03em;
+}
+.bienv__sub { margin-top: 10px; font-size: 17px; color: rgba(245, 236, 215, 0.74); }
+.bienv.is-out { opacity: 0; visibility: hidden; transition: opacity 300ms ease, visibility 0s linear 300ms; }
+@media (prefers-reduced-motion: no-preference) {
+  .bienv__hola { animation: sp-word 600ms var(--ease-expo) 700ms both; }
+  .bienv__sub { animation: sp-word 600ms var(--ease-expo) 840ms both; }
+  .bienv.is-out {
+    opacity: 1; visibility: hidden; clip-path: inset(0 0 100% 0);
+    transition: clip-path 760ms var(--ease-in-out), visibility 0s linear 760ms;
+  }
+  /* mientras sube la persiana, el panel llega desde abajo, en escalera */
+  .panel.is-llega .vista > *, .panel.is-llega .menu__i { animation: bv-llega 700ms var(--ease-expo) both; }
+  .panel.is-llega .vista > :nth-child(1) { animation-delay: 160ms; }
+  .panel.is-llega .vista > :nth-child(2) { animation-delay: 240ms; }
+  .panel.is-llega .vista > :nth-child(n+3) { animation-delay: 320ms; }
+  .panel.is-llega .menu__i:nth-child(2) { animation-delay: 40ms; }
+  .panel.is-llega .menu__i:nth-child(3) { animation-delay: 80ms; }
+  .panel.is-llega .menu__i:nth-child(4) { animation-delay: 120ms; }
+  .panel.is-llega .menu__i:nth-child(5) { animation-delay: 160ms; }
+  @keyframes bv-llega { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+}

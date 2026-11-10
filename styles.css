@@ -597,7 +597,7 @@ h1, h2, h3 { font-family: var(--f-display); font-stretch: var(--display-ancho); 
 .splash { display: none; }
 .js .splash {
   position: fixed; inset: 0; z-index: 100; display: grid; place-items: center;
-  background: var(--ink); color: var(--cream);
+  background: var(--ink); color: var(--cream); clip-path: inset(0 0 0 0); /* desde acá sube la persiana */
 }
 .js:not(.is-ready) body { overflow: hidden; }
 .splash__logo { display: grid; justify-items: center; gap: 18px; }
