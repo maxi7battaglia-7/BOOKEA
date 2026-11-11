@@ -764,3 +764,9 @@
   .panel.is-llega .menu__i:nth-child(5) { animation-delay: 160ms; }
   @keyframes bv-llega { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
 }
+
+/* ---------- Cuentas en la base: cargando, olvido de contraseña ---------- */
+.cargando { min-height: 100dvh; display: grid; place-items: center; color: var(--tx-2); font-size: 15px; }
+.caja__olvido { margin-top: -6px; font-size: 14px; text-align: right; }
+.caja .form__msg.ok { color: var(--v-tinta); }
+.lado__user { white-space: nowrap; } /* un email largo se corta con "…" */

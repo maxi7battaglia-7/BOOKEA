@@ -13,6 +13,12 @@
 - A futuro habrá app y registro: no prometer en ningún texto "sin bajar una app" ni "sin crear cuenta".
 - Un solo plan para todos y sin precio visible en la página: no poner montos de Bookea, planes, "gratis" ni "sin comisión".
 - Bookea no se limita a canchas y barberías ni a Mendoza: los textos hablan de "negocios que trabajan con turnos". Los rubros y zonas del buscador y los negocios de ejemplo son solo la muestra actual.
-- Panel del negocio en `admin.html`/`admin.css`/`admin.js`; se publica como `admin.html` junto a la landing. Cuenta de prueba: losalamos / bookea2026. Datos en localStorage (`bookea:panel:v1`).
-- Panel: la sesión vive solo en memoria. Cada carga o refresco de admin.html vuelve a pedir usuario y contraseña (pedido del dueño).
+- Panel del negocio en `admin.html`/`admin.css`/`admin.js`; se publica como `admin.html` junto a la landing.
+- Cuentas y datos del panel: dos modos según `config.js`.
+  - Vacío = modo de prueba: todo en localStorage (`bookea:panel:v1`). Cuenta de prueba: `demo@example.com` / `bookea2026` (también entra con `losalamos`).
+  - Con los datos de Supabase = modo nube (`nube.js`): cuentas por email (Supabase Auth), cada cuenta atada a su negocio por la tabla `miembros`, reglas RLS para que nadie vea otro negocio. Esquema: `supabase/esquema.sql`; guía paso a paso: `supabase/LEEME.md`.
+  - Pruebas: `supabase/pruebas/correr.sh` (esquema y permisos en Postgres local) y `node supabase/pruebas/e2e/nube-e2e.js` (panel real contra ese Postgres).
+  - La vista previa publicada (`scripts/preview.py`) siempre va en modo de prueba.
+  - `reservar.html` todavía no está conectada a la base (siguiente paso).
+- Panel: la sesión vive solo en memoria, también con Supabase (`persistSession: false`). Cada carga o refresco de admin.html vuelve a pedir email y contraseña (pedido del dueño). Solo los links de los mails (confirmar cuenta, contraseña nueva) entran sin pedirla.
 - Panel: rediseñado con las skills design-taste-frontend (app, accent-ladder), anti-ui-slop y ui-ux-pro-max. Antes de tocarlo, leer la sección del panel en DESIGN.md. Para medirlo: `scripts/insp-copias.sh` y el inspector con `--app`.

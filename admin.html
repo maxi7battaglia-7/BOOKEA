@@ -42,6 +42,7 @@
 
 
   <!-- ===== Panel ===== -->
+  <p class="cargando" id="cargando" role="status" hidden>Cargando tu panel…</p>
   <div class="panel" id="panel" hidden>
     <aside class="lado" aria-label="Panel">
       <a href="index.html" class="brand" aria-label="Bookea, volver al sitio">
@@ -122,10 +123,10 @@
     <section class="entrada__form">
       <form class="caja" id="f-ingresar" novalidate aria-labelledby="t-ingresar">
         <h2 id="t-ingresar">Ingresá a tu panel</h2>
-        <p class="caja__sub">Con el usuario y la contraseña de tu negocio.</p>
+        <p class="caja__sub">Con el email y la contraseña de tu cuenta.</p>
         <div class="field">
-          <label for="i-usuario">Usuario</label>
-          <input id="i-usuario" name="usuario" autocomplete="username" autocapitalize="none" spellcheck="false" required />
+          <label for="i-email">Email</label>
+          <input id="i-email" name="email" type="email" autocomplete="username" autocapitalize="none" spellcheck="false" inputmode="email" required />
         </div>
         <div class="field">
           <label for="i-clave">Contraseña</label>
@@ -134,10 +135,45 @@
             <button type="button" class="clave__ver" data-ver="i-clave" aria-pressed="false">Mostrar</button>
           </div>
         </div>
+        <p class="caja__olvido solo-nube" hidden><button type="button" class="link" data-ir="olvido">¿Te olvidaste la contraseña?</button></p>
         <p class="form__msg err" id="i-msg" role="alert"></p>
         <button class="btn btn--ink btn--lg btn--block" type="submit">Entrar</button>
         <p class="caja__alt">¿Todavía no tenés cuenta? <button type="button" class="link" data-ir="registro">Creá la de tu negocio</button></p>
-        <p class="caja__demo"><b>Para probar:</b> usuario <code>losalamos</code> y contraseña <code>bookea2026</code>.</p>
+        <p class="caja__demo solo-local"><b>Para probar:</b> email <code>demo@example.com</code> y contraseña <code>bookea2026</code>.</p>
+      </form>
+
+      <form class="caja" id="f-olvido" novalidate aria-labelledby="t-olvido" hidden>
+        <h2 id="t-olvido">Elegí una contraseña nueva</h2>
+        <p class="caja__sub">Escribí el email de tu cuenta y te mandamos un link para elegir otra contraseña.</p>
+        <div class="field">
+          <label for="o-email">Email</label>
+          <input id="o-email" name="email" type="email" autocomplete="username" autocapitalize="none" spellcheck="false" inputmode="email" required aria-describedby="o-email-err" />
+          <p class="field__err" id="o-email-err" hidden>Escribí un email válido, por ejemplo nombre@gmail.com.</p>
+        </div>
+        <p class="form__msg" id="o-msg" role="status"></p>
+        <button class="btn btn--ink btn--lg btn--block" type="submit">Mandame el link</button>
+        <p class="caja__alt"><button type="button" class="link" data-ir="ingresar">Volver a ingresar</button></p>
+      </form>
+
+      <form class="caja" id="f-nueva" novalidate aria-labelledby="t-nueva" hidden>
+        <h2 id="t-nueva">Tu contraseña nueva</h2>
+        <p class="caja__sub">Con esta vas a entrar de ahora en adelante.</p>
+        <input type="email" autocomplete="username" id="nc-email" hidden />
+        <div class="field">
+          <label for="nc-clave">Contraseña nueva</label>
+          <div class="clave">
+            <input id="nc-clave" type="password" autocomplete="new-password" required aria-describedby="nc-clave-err" />
+            <button type="button" class="clave__ver" data-ver="nc-clave" aria-pressed="false">Mostrar</button>
+          </div>
+          <p class="field__err" id="nc-clave-err" hidden>Usá al menos 8 caracteres.</p>
+        </div>
+        <div class="field">
+          <label for="nc-clave2">Repetí la contraseña</label>
+          <input id="nc-clave2" type="password" autocomplete="new-password" required aria-describedby="nc-clave2-err" />
+          <p class="field__err" id="nc-clave2-err" hidden>Las dos contraseñas no coinciden.</p>
+        </div>
+        <p class="form__msg err" id="nc-msg" role="alert"></p>
+        <button class="btn btn--ink btn--lg btn--block" type="submit">Guardar y entrar</button>
       </form>
 
       <form class="caja" id="f-registro" novalidate aria-labelledby="t-registro" hidden>
@@ -158,10 +194,10 @@
           <p class="field__err" id="r-rubro-err" hidden>Escribí a qué se dedica tu negocio.</p>
         </div>
         <div class="field">
-          <label for="r-usuario">Usuario</label>
-          <input id="r-usuario" name="usuario" autocomplete="username" autocapitalize="none" spellcheck="false" required aria-describedby="r-usuario-ayuda r-usuario-err" />
-          <p class="field__help" id="r-usuario-ayuda">Entre 3 y 20 letras o números, sin espacios.</p>
-          <p class="field__err" id="r-usuario-err" hidden></p>
+          <label for="r-email">Email</label>
+          <input id="r-email" name="email" type="email" autocomplete="username" autocapitalize="none" spellcheck="false" inputmode="email" required aria-describedby="r-email-ayuda r-email-err" />
+          <p class="field__help" id="r-email-ayuda">Con este email entrás al panel y, si te olvidás la contraseña, te mandamos un link para cambiarla.</p>
+          <p class="field__err" id="r-email-err" hidden></p>
         </div>
         <div class="field">
           <label for="r-clave">Contraseña</label>
@@ -176,10 +212,11 @@
           <input id="r-clave2" name="clave2" type="password" autocomplete="new-password" required aria-describedby="r-clave2-err" />
           <p class="field__err" id="r-clave2-err" hidden>Las dos contraseñas no coinciden.</p>
         </div>
+        <p class="form__msg err" id="r-msg" role="alert"></p>
         <button class="btn btn--ink btn--lg btn--block" type="submit">Crear cuenta</button>
         <p class="caja__alt">¿Ya tenés cuenta? <button type="button" class="link" data-ir="ingresar">Ingresá</button></p>
       </form>
-      <p class="entrada__nota">Vista previa: las cuentas y los datos se guardan solo en este navegador.</p>
+      <p class="entrada__nota solo-local">Vista de prueba: las cuentas y los datos se guardan solo en este navegador.</p>
     </section>
   </div>
 
@@ -192,6 +229,8 @@
   <dialog class="dlg" id="dlg" aria-labelledby="dlg-t"><div class="dlg__in" id="dlg-in"></div></dialog>
   <p class="aviso" id="aviso" role="status" aria-live="polite"></p>
 
+  <script src="config.js"></script>
+  <script src="nube.js"></script>
   <script src="admin.js"></script>
 </body>
 </html>

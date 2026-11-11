@@ -1,6 +1,9 @@
 // Bookea — panel del negocio.
-// Vista previa sin servidor: las cuentas, el negocio y las reservas se guardan en este navegador (localStorage).
-// Las contraseñas se guardan como hash SHA-256 con sal, nunca en texto. En la versión real todo esto vive en el servidor.
+// Dos modos, según config.js:
+//   · Nube (config.js con los datos de Supabase): cada cuenta (email y contraseña) queda atada a su negocio
+//     y todo se guarda en la base; la base solo deja ver y cambiar los datos del propio negocio (nube.js).
+//   · Prueba (config.js vacío): las cuentas, el negocio y las reservas se guardan en este navegador
+//     (localStorage), con las contraseñas como hash SHA-256 con sal, nunca en texto (almacenLocal, abajo).
 (() => {
   "use strict";
   const $ = (s, el = document) => el.querySelector(s);
@@ -159,7 +162,7 @@
       const neg = negocioDemo(), sal = nuevaSal();
       DB = {
         version: 1, semilla: hoy, demoTocado: false,
-        cuentas: [{ usuario: "losalamos", nombre: "Martín", negocio: "n1", sal, hash: await hashear("bookea2026", sal) }],
+        cuentas: [{ email: "demo@example.com", usuario: "losalamos", nombre: "Martín", negocio: "n1", rol: "dueno", sal, hash: await hashear("bookea2026", sal) }],
         negocios: { n1: neg }, reservas: { n1: reservasDemo(neg) }, sig: 100000,
       };
       guardar();
@@ -167,36 +170,166 @@
       // los datos de ejemplo se corren solos al día de hoy mientras nadie los toque
       DB.reservas.n1 = reservasDemo(DB.negocios.n1); DB.semilla = hoy; guardar();
     }
+    // cuentas de antes, creadas con usuario: entran con el usuario o con el email de ejemplo
+    for (const c of DB.cuentas) if (!c.email) c.email = c.usuario === "losalamos" ? "demo@example.com" : c.usuario;
   };
-  const nuevoId = () => "b" + DB.sig++;
+  // ids únicos en cualquier dispositivo (la base los usa como clave de cada reserva)
+  const nuevoId = () => {
+    if (crypto.randomUUID) return crypto.randomUUID();
+    const b = crypto.getRandomValues(new Uint8Array(16)); b[6] = (b[6] & 15) | 64; b[8] = (b[8] & 63) | 128;
+    const h = hex(b); return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+  };
+
+  // ---------- Dónde se guarda todo ----------
+  // Con config.js completo, en la base (Supabase): cada cuenta con su negocio. Si no, modo de prueba en este navegador.
+  const CONFIG = window.BOOKEA_CONFIG || {};
+  const NUBE = !!(CONFIG.supabaseUrl && CONFIG.supabaseAnonKey && window.BookeaNube);
+  const correo = (t) => String(t || "").trim().toLowerCase();
+  const EMAIL_OK = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const primerNombre = (t) => String(t || "").trim().split(/\s+/)[0] || "";
+
+  const almacenLocal = () => {
+    let yo = null;
+    const datosDe = (c) => ({ cuenta: c, negocio: DB.negocios[c.negocio], reservas: DB.reservas[c.negocio] || (DB.reservas[c.negocio] = []) });
+    return {
+      modo: "local",
+      async sesionActual() { return { ok: false, error: "sin-sesion" }; },
+      async ingresar(email, clave) {
+        const c = DB.cuentas.find((x) => x.email === email || x.usuario === email);
+        if (!c || (await hashear(clave, c.sal)) !== c.hash) return { ok: false, error: "credenciales" };
+        yo = c;
+        return { ok: true, datos: datosDe(c) };
+      },
+      async registrar({ nombre, negocio, rubro, email, clave }) {
+        if (DB.cuentas.some((c) => c.email === email)) return { ok: false, error: "existe" };
+        const id = "n" + Date.now().toString(36), sal = nuevaSal();
+        DB.negocios[id] = negocioNuevo(id, negocio, rubro);
+        DB.reservas[id] = [];
+        const c = { email, nombre, negocio: id, rol: "dueno", sal, hash: await hashear(clave, sal) };
+        DB.cuentas.push(c); guardar(); yo = c;
+        return { ok: true, datos: datosDe(c) };
+      },
+      async salir() { yo = null; },
+      async guardar(neg) {
+        if (Object.values(DB.negocios).some((o) => o.id !== neg.id && o.slug === neg.slug)) return { ok: false, error: "slug" };
+        if (neg.id === "n1") DB.demoTocado = true;
+        guardar();
+        return { ok: true };
+      },
+      async recargar() { return { ok: false, error: "local" }; },
+      async cambiarNombre(nombre) { yo.nombre = nombre; guardar(); return { ok: true }; },
+      async cambiarClave(actual, nueva) {
+        if ((await hashear(actual, yo.sal)) !== yo.hash) return { ok: false, error: "actual-mal" };
+        yo.sal = nuevaSal(); yo.hash = await hashear(nueva, yo.sal); guardar();
+        return { ok: true };
+      },
+      async recuperar() { return { ok: false, error: "local" }; },
+      alRecuperar() {},
+      async ponerClave() { return { ok: false, error: "local" }; },
+    };
+  };
+  const store = NUBE ? window.BookeaNube.crear(CONFIG) : almacenLocal();
+
+  const MENSAJES = {
+    credenciales: "El email o la contraseña no coinciden.",
+    "sin-confirmar": "Todavía no confirmaste tu email. Buscá el mail de Bookea (fijate también en spam) y tocá el link.",
+    muchos: "Probaste muchas veces seguidas. Esperá unos minutos y volvé a intentar.",
+    red: "No hay conexión. Revisá internet y probá de nuevo.",
+    libreria: "No pudimos conectarnos con Bookea. Revisá internet y recargá la página.",
+    "sin-negocio": "Tu cuenta todavía no tiene un negocio asignado.",
+    existe: "Ya hay una cuenta con ese email. Ingresá con él o pedí una contraseña nueva.",
+    "clave-debil": "Esa contraseña es muy fácil de adivinar. Probá con una más larga, con letras y números.",
+    "email-invalido": "Ese email no parece válido. Revisalo.",
+    sesion: "Tu sesión venció. Volvé a ingresar.",
+    otro: "Algo salió mal. Probá de nuevo en un rato.",
+  };
+  const ocupado = (btn, si, txt) => {
+    if (si) { btn.dataset.txt = btn.textContent; btn.textContent = txt; btn.disabled = true; btn.setAttribute("aria-busy", "true"); }
+    else { if (btn.dataset.txt) btn.textContent = btn.dataset.txt; btn.disabled = false; btn.removeAttribute("aria-busy"); }
+  };
 
   // ---------- Sesión ----------
   let YO = null, NEG = null, RES = null;
-  const tocar = () => { if (NEG && NEG.id === "n1") DB.demoTocado = true; guardar(); };
-  const entrar = (usuario, vistaInicial) => {
-    YO = DB.cuentas.find((c) => c.usuario === usuario);
-    if (!YO) { sesion.del(CLAVE_SES); return mostrarEntrada(); }
-    NEG = DB.negocios[YO.negocio]; RES = DB.reservas[YO.negocio] || (DB.reservas[YO.negocio] = []);
-    $("#entrada").hidden = true; $("#panel").hidden = false;
+  // Un negocio recién creado en la base llega sin ajustes: se completan con los de un negocio nuevo
+  const completarNegocio = (n) => {
+    const base = negocioNuevo(n.id, n.nombre || "Mi negocio", n.rubro || "", n.slug);
+    for (const k of Object.keys(base)) if (n[k] === undefined || n[k] === null) n[k] = base[k];
+    if (!Array.isArray(n.recursos) || !n.recursos.length) n.recursos = base.recursos;
+    if (!Array.isArray(n.horario) || n.horario.length !== 7) n.horario = base.horario;
+    if (!Array.isArray(n.franjas)) n.franjas = base.franjas;
+    return n;
+  };
+
+  // Guardado: cada cambio se manda en orden, uno detrás del otro
+  let cola = Promise.resolve({ ok: true }), reintento = null;
+  const sincronizar = () => (cola = cola.then(async () => {
+    if (!NEG) return { ok: true };
+    let r;
+    try { r = await store.guardar(NEG, RES); } catch { r = { ok: false, error: "red" }; }
+    if (!r.ok) avisarError(r);
+    else if (reintento) { clearTimeout(reintento); reintento = null; }
+    return r;
+  }));
+  const tocar = () => { sincronizar(); };
+  const avisarError = (r) => {
+    if (r.error === "slug") return; // lo muestra Mi negocio, al lado del campo
+    if (r.error === "ocupado") { aviso("Ese horario ya lo ocupó otra reserva, quizás desde otro dispositivo. Actualizamos la agenda."); actualizar(true); return; }
+    if (r.error === "sesion") { aviso(MENSAJES.sesion); salir({ vencida: true }); return; }
+    if (r.error === "invalido") { aviso("Ese dato no se pudo guardar: revisá que no sea demasiado largo."); return; }
+    aviso(r.error === "red" ? "No se pudo guardar: parece que no hay conexión. Lo volvemos a intentar solo." : "No se pudo guardar el último cambio. Lo volvemos a intentar.");
+    clearTimeout(reintento); reintento = setTimeout(() => { reintento = null; sincronizar(); }, 8000);
+  };
+  window.addEventListener("online", () => { if (NEG) sincronizar(); });
+
+  // Trae lo último de la base (por si se cargó algo desde otro celular o computadora)
+  const hayEdicion = () => { const a = document.activeElement; return !!(a && a.closest && a.closest("#vista") && a.matches("input, textarea, select")); };
+  const actualizar = async (forzar = false) => {
+    if (store.modo !== "nube" || !NEG) return;
+    const g = await sincronizar();
+    if (!g.ok && !forzar) return; // primero tiene que quedar guardado lo de este dispositivo
+    if (!forzar && (dlg.open || hayEdicion())) return;
+    const r = await store.recargar();
+    if (!r.ok || !NEG) { if (r.error === "sesion") { aviso(MENSAJES.sesion); salir({ vencida: true }); } return; }
+    for (const k of Object.keys(NEG)) delete NEG[k];
+    Object.assign(NEG, completarNegocio(r.datos.negocio));
+    RES.splice(0, RES.length, ...r.datos.reservas);
+    pintarLado();
+    if (["agenda", "finanzas", "clientes"].includes(vistaActual) && !hayEdicion()) refrescar();
+  };
+  if (NUBE) {
+    document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") actualizar(); });
+    setInterval(() => { if (document.visibilityState === "visible") actualizar(); }, 60000);
+  }
+
+  const entrar = (datos, vistaInicial) => {
+    YO = datos.cuenta; NEG = completarNegocio(datos.negocio); RES = datos.reservas;
+    $("#entrada").hidden = true; $("#cargando").hidden = true; $("#panel").hidden = false;
     pintarLado();
     ir(vistaInicial || "agenda", { foco: false });
+    if (store.modo === "nube") sincronizar(); // un negocio nuevo guarda acá sus ajustes iniciales
   };
-  const salir = () => {
-    sesion.del(CLAVE_SES); sesion.del(CLAVE_VISTA); YO = NEG = RES = null;
-    mostrarEntrada(); aviso("Cerraste sesión.");
+  const salir = async (opc) => {
+    const vencida = !!(opc && opc.vencida === true);
+    sesion.del(CLAVE_SES); sesion.del(CLAVE_VISTA);
+    YO = NEG = RES = null;
+    await store.salir();
+    mostrarEntrada();
+    if (!vencida) aviso("Cerraste sesión.");
   };
+  const FORMS = { ingresar: "#f-ingresar", registro: "#f-registro", olvido: "#f-olvido", nueva: "#f-nueva" };
+  const FOCO = { ingresar: "#i-email", registro: "#r-nombre", olvido: "#o-email", nueva: "#nc-clave" };
   const mostrarEntrada = (cual = "ingresar") => {
-    $("#panel").hidden = true; $("#entrada").hidden = false;
-    $("#f-ingresar").hidden = cual !== "ingresar"; $("#f-registro").hidden = cual !== "registro";
-    const f = cual === "ingresar" ? $("#i-usuario") : $("#r-nombre");
+    $("#panel").hidden = true; $("#cargando").hidden = true; $("#entrada").hidden = false;
+    for (const [k, sel] of Object.entries(FORMS)) $(sel).hidden = k !== cual;
+    const f = $(FOCO[cual]);
     f && f.focus({ preventScroll: true });
   };
   const pintarLado = () => {
     $("#lado-neg").textContent = NEG.nombre;
     $("#lado-det").textContent = [NEG.rubro, NEG.ciudad].filter(Boolean).join(" · ") || "Completá los datos en Mi negocio";
     $("#lado-mono").innerHTML = NEG.foto ? `<img src="${NEG.foto}" alt="" />` : esc(iniciales(NEG.nombre));
-    $("#lado-av").textContent = iniciales(YO.nombre).slice(0, 1);
-    $("#lado-user").innerHTML = `<b>${esc(YO.nombre)}</b>${esc(YO.usuario)}`;
+    $("#lado-av").textContent = iniciales(YO.nombre || YO.email).slice(0, 1);
+    $("#lado-user").innerHTML = `<b>${esc(YO.nombre || "Tu cuenta")}</b>${esc(YO.email)}`;
   };
 
   // ---------- Aviso ----------
@@ -244,25 +377,70 @@
     const i = document.getElementById(b.dataset.ver), ver = i.type === "password";
     i.type = ver ? "text" : "password"; b.textContent = ver ? "Ocultar" : "Mostrar"; b.setAttribute("aria-pressed", String(ver));
   }));
-  $$("[data-ir]").forEach((b) => b.addEventListener("click", () => mostrarEntrada(b.dataset.ir)));
+  $$("[data-ir]").forEach((b) => b.addEventListener("click", () => {
+    if (b.dataset.ir === "olvido") { $("#o-email").value = $("#i-email").value.trim(); $("#o-msg").textContent = ""; }
+    mostrarEntrada(b.dataset.ir);
+  }));
+  const saludar = () => { const p = primerNombre(YO.nombre); bienvenida(p ? `Hola, ${p}.` : "Hola.", NEG.nombre); };
   $("#f-ingresar").addEventListener("submit", async (e) => {
     e.preventDefault();
-    const msg = $("#i-msg"), u = $("#i-usuario").value.trim().toLowerCase(), c = $("#i-clave").value;
+    const msg = $("#i-msg"), btn = $('button[type="submit"]', e.target);
+    const email = correo($("#i-email").value), c = $("#i-clave").value;
+    msg.className = "form__msg err";
     if (Date.now() < bloqueadoHasta) { msg.textContent = `Probaste muchas veces. Esperá ${Math.ceil((bloqueadoHasta - Date.now()) / 1000)} segundos.`; return; }
-    if (!u || !c) { msg.textContent = "Escribí tu usuario y tu contraseña."; return; }
-    const cuenta = DB.cuentas.find((x) => x.usuario === u);
-    const ok = cuenta && (await hashear(c, cuenta.sal)) === cuenta.hash;
-    if (!ok) {
-      fallos++;
-      if (fallos >= 5) { bloqueadoHasta = Date.now() + 30000; fallos = 0; msg.textContent = "Probaste muchas veces. Esperá 30 segundos."; }
-      else msg.textContent = "El usuario o la contraseña no coinciden.";
-      $("#i-clave").select();
+    if (!email || !c) { msg.textContent = "Escribí tu email y tu contraseña."; return; }
+    ocupado(btn, true, "Entrando…");
+    const r = await store.ingresar(email, c);
+    ocupado(btn, false);
+    if (!r.ok) {
+      if (r.error === "credenciales") {
+        fallos++;
+        if (fallos >= 5) { bloqueadoHasta = Date.now() + 30000; fallos = 0; msg.textContent = "Probaste muchas veces. Esperá 30 segundos."; }
+        else msg.textContent = MENSAJES.credenciales;
+        $("#i-clave").select();
+      } else msg.textContent = MENSAJES[r.error] || MENSAJES.otro;
       return;
     }
     fallos = 0; msg.textContent = ""; $("#i-clave").value = "";
-    entrar(u, "agenda");
-    bienvenida(`Hola, ${YO.nombre.split(" ")[0]}.`, NEG.nombre);
+    entrar(r.datos, "agenda");
+    saludar();
   });
+
+  // ---------- Entrada: me olvidé la contraseña (solo con la base) ----------
+  $("#f-olvido").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const msg = $("#o-msg"), btn = $('button[type="submit"]', e.target), email = correo($("#o-email").value);
+    msg.textContent = "";
+    if (!marcar($("#o-email"), "o-email-err", !EMAIL_OK.test(email))) return;
+    ocupado(btn, true, "Mandando…");
+    const r = await store.recuperar(email);
+    ocupado(btn, false);
+    if (!r.ok) { msg.className = "form__msg err"; msg.textContent = MENSAJES[r.error] || MENSAJES.otro; return; }
+    msg.className = "form__msg ok";
+    msg.textContent = `Listo. Si ${email} tiene una cuenta, te llega un mail con el link para elegir la contraseña nueva. Fijate también en spam.`;
+  });
+  $("#f-nueva").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const msg = $("#nc-msg"), btn = $('button[type="submit"]', e.target), n = $("#nc-clave").value, n2 = $("#nc-clave2").value;
+    msg.textContent = "";
+    const ok = [
+      marcar($("#nc-clave"), "nc-clave-err", n.length < 8 ? "Usá al menos 8 caracteres." : false),
+      marcar($("#nc-clave2"), "nc-clave2-err", n2 !== n || !n2),
+    ];
+    if (ok.includes(false)) return;
+    ocupado(btn, true, "Guardando…");
+    const r = await store.ponerClave(n);
+    ocupado(btn, false);
+    if (!r.ok) {
+      if (r.error === "clave-debil") { marcar($("#nc-clave"), "nc-clave-err", MENSAJES["clave-debil"]); return; }
+      msg.textContent = r.error === "sesion" ? "El link venció. Pedí uno nuevo desde “¿Te olvidaste la contraseña?”." : MENSAJES[r.error] || MENSAJES.otro;
+      return;
+    }
+    e.target.reset();
+    entrar(r.datos, "agenda");
+    aviso("Listo, ya tenés tu contraseña nueva.");
+  });
+  store.alRecuperar(() => { $("#nc-email").value = (YO && YO.email) || ""; mostrarEntrada("nueva"); });
 
   // ---------- Entrada: crear cuenta ----------
   const marcar = (input, errId, texto) => {
@@ -272,9 +450,9 @@
     return !texto;
   };
   const slugDe = (t) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "").slice(0, 24) || "minegocio";
-  const negocioNuevo = (id, nombre, rubro) => {
-    let slug = slugDe(nombre), k = 2;
-    const usados = new Set(Object.values(DB.negocios).map((n) => n.slug));
+  const negocioNuevo = (id, nombre, rubro, slugDado) => {
+    let slug = slugDado || slugDe(nombre), k = 2;
+    const usados = new Set(!slugDado && DB ? Object.values(DB.negocios).map((n) => n.slug) : []);
     while (usados.has(slug)) slug = slugDe(nombre) + k++;
     const neg = {
       id, nombre, rubro, ciudad: "", direccion: "", whatsapp: "", slug, foto: "", descripcion: "", mapa: "", recursos: [], duracion: 60,
@@ -287,28 +465,40 @@
   };
   $("#f-registro").addEventListener("submit", async (e) => {
     e.preventDefault();
-    const v = (id) => document.getElementById(id);
+    const v = (id) => document.getElementById(id), btn = $('button[type="submit"]', e.target), msg = $("#r-msg");
     const nombre = v("r-nombre").value.trim(), negocio = v("r-negocio").value.trim(), rubro = v("r-rubro").value.trim();
-    const usuario = v("r-usuario").value.trim().toLowerCase(), clave = v("r-clave").value, clave2 = v("r-clave2").value;
+    const email = correo(v("r-email").value), clave = v("r-clave").value, clave2 = v("r-clave2").value;
+    msg.textContent = "";
     const checks = [
       marcar(v("r-nombre"), "r-nombre-err", !nombre),
       marcar(v("r-negocio"), "r-negocio-err", !negocio),
       marcar(v("r-rubro"), "r-rubro-err", !rubro),
-      marcar(v("r-usuario"), "r-usuario-err",
-        !/^[a-z0-9._-]{3,20}$/.test(usuario) ? "Usá entre 3 y 20 letras o números, sin espacios."
-        : DB.cuentas.some((c) => c.usuario === usuario) ? "Ese usuario ya existe. Probá con otro." : false),
-      marcar(v("r-clave"), "r-clave-err", clave.length < 8),
+      marcar(v("r-email"), "r-email-err", !EMAIL_OK.test(email) ? "Escribí un email válido, por ejemplo nombre@gmail.com." : false),
+      marcar(v("r-clave"), "r-clave-err", clave.length < 8 ? "Usá al menos 8 caracteres." : false),
       marcar(v("r-clave2"), "r-clave2-err", clave2 !== clave || !clave2),
     ];
     if (checks.includes(false)) { const p = $(".is-invalid", e.target); p && p.focus(); return; }
-    const id = "n" + Date.now().toString(36), sal = nuevaSal();
-    DB.negocios[id] = negocioNuevo(id, negocio, rubro);
-    DB.reservas[id] = [];
-    DB.cuentas.push({ usuario, nombre, negocio: id, sal, hash: await hashear(clave, sal) });
-    guardar();
+    ocupado(btn, true, "Creando tu cuenta…");
+    const r = await store.registrar({ nombre, negocio, rubro, email, clave });
+    ocupado(btn, false);
+    if (!r.ok) {
+      if (r.error === "existe" || r.error === "email-invalido") { marcar(v("r-email"), "r-email-err", MENSAJES[r.error]); v("r-email").focus(); return; }
+      if (r.error === "clave-debil") { marcar(v("r-clave"), "r-clave-err", MENSAJES["clave-debil"]); v("r-clave").focus(); return; }
+      msg.textContent = MENSAJES[r.error] || MENSAJES.otro;
+      return;
+    }
     e.target.reset();
-    entrar(usuario, "negocio");
-    bienvenida(`Hola, ${nombre.split(" ")[0]}.`, "Tu cuenta está lista.", () => aviso("Completá los datos de tu negocio."));
+    if (r.confirmar) {
+      // la base pide confirmar el email antes de entrar
+      mostrarEntrada("ingresar");
+      $("#i-email").value = email;
+      const m = $("#i-msg"); m.className = "form__msg ok";
+      m.textContent = `Te mandamos un mail a ${email}. Abrilo y tocá el link para activar la cuenta; después entrás acá con tu email y tu contraseña.`;
+      return;
+    }
+    entrar(r.datos, "negocio");
+    const p = primerNombre(nombre);
+    bienvenida(p ? `Hola, ${p}.` : "Hola.", "Tu cuenta está lista.", () => aviso("Completá los datos de tu negocio."));
   });
 
   // ---------- Navegación del panel ----------
@@ -322,7 +512,7 @@
     if (foco) { window.scrollTo(0, 0); $("#vista").focus({ preventScroll: true }); }
   };
   $$(".menu__i").forEach((b) => b.addEventListener("click", () => ir(b.dataset.vista)));
-  $("#salir").addEventListener("click", salir);
+  $("#salir").addEventListener("click", () => salir());
 
   // ---------- Diálogo ----------
   const dlg = $("#dlg");
@@ -1092,9 +1282,10 @@
     $("#g-rec-mas").addEventListener("click", () => { const c = $("#g-recs"); c.insertAdjacentHTML("beforeend", filaRec({ id: "", nombre: `${U} ${c.children.length + 1}`, detalle: "" })); $("input", c.lastElementChild).select(); });
     $("#g-fr-mas").addEventListener("click", () => { const c = $("#g-frs"); c.insertAdjacentHTML("beforeend", filaFr({ desde: "", hasta: "", precio: "" })); $("input", c.lastElementChild).focus(); });
     $$("[data-abierto]", f).forEach((c) => c.addEventListener("change", () => $$('input[type="time"]', c.closest(".fila")).forEach((i) => (i.disabled = !c.checked))));
-    f.addEventListener("submit", (e) => {
+    f.addEventListener("submit", async (e) => {
       e.preventDefault();
       const msg = $("#g-msg"); msg.className = "form__msg"; msg.textContent = "";
+      const slugAntes = n.slug;
       const nombre = $("#g-nombre").value.trim(), slug = slugDe($("#g-slug").value);
       const recs = $$("#g-recs .fila").map((fila, i) => { const [a, b] = $$("input", fila); return { id: fila.dataset.id || `r${Date.now().toString(36)}${i}`, nombre: a.value.trim() || `${U} ${i + 1}`, detalle: b.value.trim() }; });
       const frs = $$("#g-frs .fila").map((fila) => { const [a, b, c] = $$("input", fila); return { desde: a.value, hasta: b.value, precio: Math.max(0, Math.round(+c.value || 0)) }; }).filter((x) => x.desde || x.hasta || x.precio);
@@ -1103,7 +1294,7 @@
       const conTurnos = quitados.filter((r) => RES.some((x) => x.recurso === r.id && x.fecha >= hoy && ocupa(x) && esTurno(x)));
       const ok = [
         marcar($("#g-nombre"), "g-nombre-err", !nombre),
-        marcar($("#g-slug"), "g-slug-err", Object.values(DB.negocios).some((o) => o.id !== n.id && o.slug === slug) ? "Ese link ya lo usa otro negocio." : false),
+        marcar($("#g-slug"), "g-slug-err", false),
         marcar($("#g-mapa"), "g-mapa-err", !!$("#g-mapa").value.trim() && !MAPS_OK.test($("#g-mapa").value.trim())),
       ];
       const eR = $("#g-recs-err"), eF = $("#g-frs-err");
@@ -1120,67 +1311,119 @@
         devolverSena: $("#g-dev").checked,
       });
       $$("#g-hor .fila").forEach((fila) => { const d = +fila.dataset.dia, [a, b] = $$('input[type="time"]', fila); n.horario[d] = { abre: a.value || "09:00", cierra: b.value || "21:00", cerrado: !$("[data-abierto]", fila).checked }; });
-      try { tocar(); } catch { /* el navegador se quedó sin lugar */ }
-      if (local.get(CLAVE) && !local.get(CLAVE).includes(foto.slice(-40))) { n.foto = ""; aviso("No entró la foto en este navegador. Probá con una más chica."); }
+      const g = $("#g-guardar");
+      ocupado(g, true, "Guardando…");
+      let r = await sincronizar();
+      if (!r.ok && r.error === "slug") {
+        // el link ya es de otro negocio: se deja el de antes y se guarda todo lo demás
+        n.slug = slugAntes;
+        r = await sincronizar();
+        ocupado(g, false);
+        pintarLado();
+        marcar($("#g-slug"), "g-slug-err", "Ese link ya lo usa otro negocio. Probá con otro.");
+        msg.className = "form__msg err";
+        msg.textContent = r.ok ? "Guardamos todo menos el link." : "No se pudo guardar. " + (MENSAJES[r.error] || MENSAJES.otro);
+        $("#g-slug").scrollIntoView({ block: "center" });
+        return;
+      }
+      ocupado(g, false);
+      if (!r.ok) { msg.className = "form__msg err"; msg.textContent = "No se pudo guardar. " + (MENSAJES[r.error] || MENSAJES.otro); return; }
+      if (store.modo === "local" && local.get(CLAVE) && foto && !local.get(CLAVE).includes(foto.slice(-40))) { n.foto = ""; aviso("No entró la foto en este navegador. Probá con una más chica."); }
       pintarLado();
       VISTAS.negocio();
       const m2 = $("#g-msg"); m2.className = "form__msg ok"; m2.textContent = "Cambios guardados.";
-      const g = $("#g-guardar"); g.classList.add("is-ok"); g.innerHTML = tilde() + "Guardado";
-      setTimeout(() => { if (g.isConnected) { g.classList.remove("is-ok"); g.textContent = "Guardar cambios"; } }, 2400);
+      const g2 = $("#g-guardar"); g2.classList.add("is-ok"); g2.innerHTML = tilde() + "Guardado";
+      setTimeout(() => { if (g2.isConnected) { g2.classList.remove("is-ok"); g2.textContent = "Guardar cambios"; } }, 2400);
       aviso("Cambios guardados.");
     });
   };
 
   // ---------- Cuenta ----------
   VISTAS.cuenta = () => {
+    const local_ = store.modo === "local";
     $("#vista").innerHTML = `
-      <header class="vhead"><div><h1>Cuenta</h1><p class="vhead__frase">Tus datos para entrar al panel. Cada administrador tiene su usuario y su contraseña.</p></div></header>
+      <header class="vhead"><div><h1>Cuenta</h1><p class="vhead__frase">Tus datos para entrar al panel. Cada administrador entra con su email y su contraseña.</p></div></header>
       <div class="nform">
-        <section class="ajuste" aria-labelledby="cu-1"><div class="ajuste__r"><h2 id="cu-1">Tus datos</h2><p>Tu nombre aparece en el panel. El usuario es con el que entrás y no se puede cambiar.</p></div>
+        <section class="ajuste" aria-labelledby="cu-1"><div class="ajuste__r"><h2 id="cu-1">Tus datos</h2><p>Tu nombre aparece en el panel. El email es con el que entrás${local_ ? "" : " y adonde te llega el link si te olvidás la contraseña"}.</p></div>
           <form class="ajuste__p" id="f-datos" novalidate>
             <div class="field"><label for="cu-nombre">Tu nombre</label><input id="cu-nombre" value="${esc(YO.nombre)}" autocomplete="name" aria-describedby="cu-nombre-err" /><p class="field__err" id="cu-nombre-err" hidden>Escribí tu nombre.</p></div>
-            <div class="field"><label for="cu-user">Usuario</label><input id="cu-user" value="${esc(YO.usuario)}" disabled aria-describedby="cu-user-ayuda" /><p class="field__help" id="cu-user-ayuda">El usuario no se puede cambiar.</p></div>
+            <div class="field"><label for="cu-user">Email</label><input id="cu-user" type="email" value="${esc(YO.email)}" disabled aria-describedby="cu-user-ayuda" /><p class="field__help" id="cu-user-ayuda">El email no se puede cambiar desde acá.</p></div>
             <div class="acciones"><button type="submit" class="btn btn--ink">Guardar</button></div>
           </form></section>
         <section class="ajuste" aria-labelledby="cu-2"><div class="ajuste__r"><h2 id="cu-2">Cambiar contraseña</h2><p>Usá al menos 8 caracteres. Cada vez que abrís o refrescás el panel te la pide de nuevo.</p></div>
           <form class="ajuste__p" id="f-clave" novalidate>
-            <input type="text" autocomplete="username" value="${esc(YO.usuario)}" hidden />
+            <input type="email" autocomplete="username" value="${esc(YO.email)}" hidden />
             <div class="field"><label for="cu-a">Contraseña actual</label><input id="cu-a" type="password" autocomplete="current-password" aria-describedby="cu-a-err" /><p class="field__err" id="cu-a-err" hidden>La contraseña actual no coincide.</p></div>
             <div class="field"><label for="cu-n">Contraseña nueva</label><input id="cu-n" type="password" autocomplete="new-password" aria-describedby="cu-n-err" /><p class="field__err" id="cu-n-err" hidden>Usá al menos 8 caracteres.</p></div>
             <div class="field"><label for="cu-r">Repetí la nueva</label><input id="cu-r" type="password" autocomplete="new-password" aria-describedby="cu-r-err" /><p class="field__err" id="cu-r-err" hidden>Las dos contraseñas no coinciden.</p></div>
+            <p class="form__msg err" id="cu-msg" role="alert"></p>
             <div class="acciones"><button type="submit" class="btn btn--ink">Cambiar contraseña</button></div>
           </form></section>
-        <section class="ajuste" aria-labelledby="cu-3"><div class="ajuste__r"><h2 id="cu-3">Datos de prueba</h2><p>En esta vista previa, todo se guarda solo en este navegador.</p></div>
+        ${local_ ? `<section class="ajuste" aria-labelledby="cu-3"><div class="ajuste__r"><h2 id="cu-3">Datos de prueba</h2><p>En esta vista de prueba, todo se guarda solo en este navegador.</p></div>
           <div class="ajuste__p peligro"><p>Si borrás todo, vuelve el negocio de ejemplo y se pierden las cuentas que creaste.</p>
-          <button type="button" class="btn btn--warn" id="cu-reset">Borrar todo y volver al ejemplo</button></div></section>
+          <button type="button" class="btn btn--warn" id="cu-reset">Borrar todo y volver al ejemplo</button></div></section>` : ""}
       </div>`;
-    $("#f-datos").addEventListener("submit", (e) => {
+    $("#f-datos").addEventListener("submit", async (e) => {
       e.preventDefault();
-      const nom = $("#cu-nombre").value.trim();
-      if (!marcar($("#cu-nombre"), "cu-nombre-err", !nom)) return;
-      YO.nombre = nom; guardar(); pintarLado(); aviso("Datos guardados.");
+      const nom = $("#cu-nombre").value.trim(), btn = $('button[type="submit"]', e.target);
+      if (!marcar($("#cu-nombre"), "cu-nombre-err", !nom ? "Escribí tu nombre." : false)) return;
+      ocupado(btn, true, "Guardando…");
+      const r = await store.cambiarNombre(nom);
+      ocupado(btn, false);
+      if (!r.ok) { marcar($("#cu-nombre"), "cu-nombre-err", "No se pudo guardar. " + (MENSAJES[r.error] || MENSAJES.otro)); return; }
+      YO.nombre = nom; pintarLado(); aviso("Datos guardados.");
     });
     $("#f-clave").addEventListener("submit", async (e) => {
       e.preventDefault();
-      const a = $("#cu-a").value, nn = $("#cu-n").value, rr = $("#cu-r").value;
-      const okA = marcar($("#cu-a"), "cu-a-err", (await hashear(a, YO.sal)) !== YO.hash);
-      const okN = marcar($("#cu-n"), "cu-n-err", nn.length < 8);
+      const a = $("#cu-a").value, nn = $("#cu-n").value, rr = $("#cu-r").value, btn = $('button[type="submit"]', e.target), msg = $("#cu-msg");
+      msg.textContent = "";
+      const okN = marcar($("#cu-n"), "cu-n-err", nn.length < 8 ? "Usá al menos 8 caracteres." : false);
       const okR = marcar($("#cu-r"), "cu-r-err", nn !== rr || !rr);
+      const okA = marcar($("#cu-a"), "cu-a-err", !a ? "Escribí tu contraseña actual." : false);
       if (!okA || !okN || !okR) return;
-      YO.sal = nuevaSal(); YO.hash = await hashear(nn, YO.sal); guardar();
+      ocupado(btn, true, "Cambiando…");
+      const r = await store.cambiarClave(a, nn);
+      ocupado(btn, false);
+      if (!r.ok) {
+        if (r.error === "actual-mal") { marcar($("#cu-a"), "cu-a-err", "La contraseña actual no coincide."); return; }
+        if (r.error === "clave-debil") { marcar($("#cu-n"), "cu-n-err", MENSAJES["clave-debil"]); return; }
+        msg.textContent = MENSAJES[r.error] || MENSAJES.otro;
+        return;
+      }
       e.target.reset(); aviso("Contraseña cambiada.");
     });
-    $("#cu-reset").addEventListener("click", async (e) => {
+    const reset = $("#cu-reset");
+    reset && reset.addEventListener("click", async (e) => {
       if (e.currentTarget.dataset.seguro !== "1") { e.currentTarget.dataset.seguro = "1"; e.currentTarget.textContent = "Tocá de nuevo para confirmar"; return; }
-      local.del(CLAVE); await cargar(); salir(); aviso("Listo. Volvió el negocio de ejemplo.");
+      local.del(CLAVE); await cargar(); await salir(); aviso("Listo. Volvió el negocio de ejemplo.");
     });
   };
 
   // ---------- Arranque ----------
-  // Cada vez que se carga o se refresca la página, se pide usuario y contraseña de nuevo:
-  // la sesión vive solo en memoria y no se guarda en el navegador.
+  $$(".solo-nube").forEach((el) => (el.hidden = !NUBE));
+  $$(".solo-local").forEach((el) => (el.hidden = NUBE));
   sesion.del(CLAVE_SES); sesion.del(CLAVE_VISTA);
-  cargar().then(() => mostrarEntrada());
+  if (!NUBE) {
+    // Modo de prueba: cada vez que se carga o se refresca la página, se pide email y contraseña de nuevo
+    // (la sesión vive solo en memoria y no se guarda en el navegador).
+    cargar().then(() => mostrarEntrada());
+  } else {
+    // Con la base también se pide email y contraseña en cada carga. La excepción son los links de los mails
+    // (confirmar la cuenta u "olvidé mi contraseña"), que traen la sesión en la dirección.
+    const hash = window.location.hash;
+    const vieneDeRecuperar = /type=recovery/.test(hash);
+    const linkMalo = /error_description=/.test(hash);
+    $("#entrada").hidden = true; $("#cargando").hidden = false;
+    store.sesionActual().then((r) => {
+      if (/access_token|error_description|type=/.test(window.location.hash)) history.replaceState(null, "", window.location.pathname + window.location.search);
+      if (r.ok && vieneDeRecuperar) { YO = r.datos.cuenta; $("#nc-email").value = r.datos.cuenta.email; mostrarEntrada("nueva"); return; }
+      if (r.ok) { entrar(r.datos, "agenda"); return; }
+      mostrarEntrada();
+      const msg = $("#i-msg"); msg.className = "form__msg err";
+      if (linkMalo) msg.textContent = "Ese link venció o ya se usó. Si querés cambiar la contraseña, pedí uno nuevo.";
+      else if (r.error !== "sin-sesion") msg.textContent = MENSAJES[r.error] || MENSAJES.otro;
+    });
+  }
 })();
 
 // Toque en pantallas táctiles: mientras el dedo apoya, el botón se aprieta (.is-apreta); al soltar,

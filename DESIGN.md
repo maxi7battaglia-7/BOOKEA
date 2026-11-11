@@ -294,3 +294,14 @@ textos que se entiendan en cada cuadro.
   (repetía el saludo); en cuenta nueva, al subir la persiana avisa "Completá los datos de tu negocio."
 - La persiana necesita `clip-path: inset(0 0 0 0)` de partida: desde `none` no se anima (pasaba también en la carga
   del sitio y quedó corregido).
+
+## Cuentas: entrar con email (11/11)
+
+- Se entra con **email y contraseña** (antes era usuario). Con la base conectada, el email sirve para recuperar la
+  contraseña: "¿Te olvidaste la contraseña?" manda un link y la pantalla "Tu contraseña nueva" la cambia.
+- Formularios de la entrada: Ingresar, Crear cuenta, Elegí una contraseña nueva (pedir el link) y Tu contraseña nueva.
+  Mismo estilo de caja. Los botones dicen qué está pasando mientras esperan ("Entrando…", "Creando tu cuenta…").
+- `.solo-local` (la cuenta de prueba y la nota "Vista de prueba") y `.solo-nube` (el link de olvido) se muestran según el modo.
+- Si la base pide confirmar el email, al crear la cuenta vuelve a Ingresar con el mensaje "Te mandamos un mail a…".
+- Errores de guardado con la base: el aviso de abajo explica qué pasó ("Ese horario ya lo ocupó otra reserva…",
+  "No se pudo guardar: parece que no hay conexión…") y el panel reintenta solo.
