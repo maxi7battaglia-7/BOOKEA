@@ -11,3 +11,11 @@ q -d $BASE -f supabase-simulado.sql >/dev/null
 q -d $BASE -f ../esquema.sql >/dev/null
 q -d $BASE -f ../esquema.sql >/dev/null   # se puede correr dos veces sin romper nada
 PGOPTIONS= psql -X -q -v ON_ERROR_STOP=1 -d $BASE -f pruebas.sql 2>&1 | sed 's/^psql:[^ ]* NOTICE:  //'
+# Avisos por mail, en una base aparte, con Vault y pg_net simulados
+q -d postgres -c "drop database if exists ${BASE}_avisos" >/dev/null
+q -d postgres -c "create database ${BASE}_avisos" >/dev/null
+q -d ${BASE}_avisos -f supabase-simulado.sql >/dev/null
+q -d ${BASE}_avisos -f avisos-simulado.sql >/dev/null
+q -d ${BASE}_avisos -f ../esquema.sql >/dev/null
+grep -v '^create extension' ../avisos-por-mail.sql | q -d ${BASE}_avisos -f - >/dev/null
+PGOPTIONS= psql -X -q -v ON_ERROR_STOP=1 -d ${BASE}_avisos -f pruebas-avisos.sql 2>&1 | sed 's/^psql:[^ ]* NOTICE:  //'

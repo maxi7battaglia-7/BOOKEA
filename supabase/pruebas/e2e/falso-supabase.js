@@ -33,6 +33,11 @@
       _sesion() { if (!guarda) return enMemoria; try { return JSON.parse(localStorage.getItem(KEY)); } catch { return null; } },
       _guardar(s) { if (!guarda) { enMemoria = s; return; } if (s) localStorage.setItem(KEY, JSON.stringify(s)); else localStorage.removeItem(KEY); },
       from(t) { return new Consulta(base, cliente, t); },
+      async rpc(fn, args) {
+        const s = cliente._sesion();
+        const r = await post(base + '/api/q', { token: s && s.access_token, op: 'rpc', fn, args });
+        return { data: r.error ? null : r.data, error: errorDe(r.error) || null };
+      },
       auth: {
         async getSession() { await inicial; return { data: { session: cliente._sesion() }, error: null }; },
         async signInWithPassword({ email, password }) {

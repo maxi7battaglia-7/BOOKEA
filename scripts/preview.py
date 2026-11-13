@@ -50,11 +50,12 @@ print("OK ->", dist / "reservar.html", f"({len(res)//1024} KB)")
 # ---------- Panel del negocio ----------
 adm = leer("admin.html")
 adm = adm.replace('<link rel="stylesheet" href="styles.css" />', f"<style>\n{leer('styles.css')}\n</style>")
-adm = adm.replace('<link rel="stylesheet" href="admin.css" />', f"<style>\n{leer('admin.css')}\n</style>")
+adm = adm.replace('<link rel="stylesheet" href="admin.css?v=3" />', f"<style>\n{leer('admin.css')}\n</style>")
+# Ojo: admin.html pide los archivos con ?v=N (para que el navegador no use una versión vieja); si cambia N, cambiarlo acá.
 # La vista previa siempre va en modo de prueba (sin base): config.js vacío, aunque el local tenga datos
-adm = adm.replace('<script src="config.js"></script>', "<script>window.BOOKEA_CONFIG = {};</script>")
-adm = adm.replace('<script src="nube.js"></script>', f"<script>\n{leer('nube.js')}\n</script>")
-adm = adm.replace('<script src="admin.js"></script>', f"<script>\n{leer('admin.js')}\n</script>")
+adm = adm.replace('<script src="config.js?v=3"></script>', "<script>window.BOOKEA_CONFIG = {};</script>")
+adm = adm.replace('<script src="nube.js?v=3"></script>', f"<script>\n{leer('nube.js')}\n</script>")
+adm = adm.replace('<script src="admin.js?v=3"></script>', f"<script>\n{leer('admin.js')}\n</script>")
 adm = re.sub(r'\s*<link rel="icon"[^>]*>', "", adm)
 adm = adm.replace('href="index.html"', 'href="./"')
 (dist / "admin.html").write_text(adm, encoding="utf-8")

@@ -14,6 +14,11 @@ siempre su negocio, Bookea usa **Supabase** (una base de datos Postgres con cuen
 - **Nadie ve lo de otro negocio.** Las reglas de la base (Row Level Security) solo dejan leer y cambiar los
   datos de los negocios de los que la cuenta es miembro. Lo controla la base, no la página: aunque alguien
   toque el código desde el navegador, no recibe nada ajeno.
+- **Vos aprobás quién entra.** Un negocio recién registrado queda **pendiente**: ve "Tu negocio está en
+  revisión" y no puede usar el panel. El equipo de Bookea (tabla `admins_bookea`) lo aprueba o lo rechaza
+  desde **Solicitudes de negocios** en el panel. La base lo hace cumplir: un negocio pendiente o rechazado no
+  puede leer ni guardar turnos, y nadie puede aprobarse solo.
+- **Aviso por mail cuando alguien se registra** (opcional, con Resend): `avisos-por-mail.sql`.
 - **Un horario no se reserva dos veces.** Si dos dispositivos cargan el mismo turno a la vez, la base acepta
   uno y el otro ve el aviso "Ese horario ya lo ocupó otra reserva" con la agenda actualizada.
 - **Encargados (más adelante).** La tabla `miembros` ya admite varias cuentas por negocio (rol `dueno` o
@@ -45,8 +50,29 @@ panel), `../config.js` (adónde conectarse) y `pruebas/` (pruebas del esquema y 
 7. **Publicar.** El panel tiene que estar en una dirección `https://` (por ejemplo GitHub Pages o Netlify).
    Abierto como archivo desde la compu no puede recibir los links de los mails.
 
-Para probar que quedó bien: creá una cuenta desde el panel, confirmá el mail, cargá un turno y abrí el panel
-desde otro dispositivo con la misma cuenta.
+8. **Hacerte del equipo de Bookea.** Registrate desde el panel con tu email y confirmalo. Después, en el
+   **SQL Editor**, corré (con tu email):
+
+       insert into public.admins_bookea (user_id) select id from auth.users where email = 'tu@email.com';
+
+   Entrá al panel: vas a ver **Solicitudes de negocios** (abajo a la izquierda, o en **Cuenta** desde el
+   celular). Aprobá tu propio negocio para poder usarlo.
+9. **Aviso por mail cuando alguien se registra (opcional).** Creá una cuenta en [resend.com](https://resend.com)
+   con tu email, generá una **API key** y guardala en Supabase (SQL Editor):
+
+       select vault.create_secret('re_TU_API_KEY', 'resend_api_key');
+       select vault.create_secret('tu@email.com', 'aviso_bookea_email');
+
+   y corré todo `supabase/avisos-por-mail.sql`. Mientras no verifiques un dominio propio en Resend, el aviso
+   solo puede llegarte a vos (al email de tu cuenta de Resend). Con dominio propio, sumá
+   `select vault.create_secret('Bookea <avisos@tudominio.com>', 'resend_remitente');` y al aprobar un negocio
+   también le llega un mail a su dueño.
+
+**Si ya tenías corrido `esquema.sql`:** volvé a correrlo entero (se puede correr más de una vez). Agrega la
+aprobación sin borrar nada; los negocios que ya existían quedan pendientes hasta que los apruebes.
+
+Para probar que quedó bien: creá una cuenta desde el panel, confirmá el mail, aprobala desde Solicitudes,
+cargá un turno y abrí el panel desde otro dispositivo con la misma cuenta.
 
 ## Qué falta para la siguiente etapa
 
@@ -54,10 +80,12 @@ desde otro dispositivo con la misma cuenta.
   negocio por su link (`slug`) y que el cliente reserve contra la base, con una función que controle que el
   horario esté libre y que no muestre datos de otros clientes.
 - **Invitar encargados** a un negocio (la base ya lo soporta).
+- **Pasar los mails de Supabase (confirmar cuenta, contraseña nueva) al castellano** en Authentication → Emails → Templates.
 - **Fotos**: hoy la foto de perfil se guarda chica dentro del negocio; más adelante conviene Supabase Storage.
 
 ## Probar sin Supabase
 
 - `bash supabase/pruebas/correr.sh` (como un usuario que pueda crear bases en un Postgres local): prueba el
-  esquema y las reglas de permisos con dos negocios.
+  esquema, la aprobación, las reglas de permisos con dos negocios y los avisos por mail (con Vault y pg_net
+  simulados).
 - `node supabase/pruebas/e2e/nube-e2e.js`: prueba el panel real contra ese Postgres (ver `pruebas/e2e/LEEME.md`).

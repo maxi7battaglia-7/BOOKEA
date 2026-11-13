@@ -36,12 +36,43 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
     ok(await a.isVisible('.caja__olvido') && !(await a.isVisible('.caja__demo')) && !(await a.isVisible('.entrada__nota')), 'con la base: aparece "¿Te olvidaste la contraseña?" y no los datos de prueba');
     await a.screenshot({ path: `${out}/nb-entrada.png` });
 
-    // ---------- Crear cuenta: se crea el negocio y queda atado a la cuenta ----------
+    // ---------- Crear cuenta: queda en revisión hasta que Bookea la apruebe ----------
     await registrar(a, { nombre: 'Ana Gómez', negocio: 'Los Álamos Pádel', rubro: 'Pádel', email: 'ana@prueba.com', clave: 'canchas2026' });
-    await a.waitForSelector('#panel:not([hidden])'); await listo(a);
-    ok(/Mi negocio/.test(await a.textContent('#vista h1')) && (await a.textContent('#lado-neg')) === 'Los Álamos Pádel', 'cuenta nueva: entra a Mi negocio de "Los Álamos Pádel"');
+    await a.waitForSelector('#f-espera:not([hidden])');
+    ok(!(await a.isVisible('#panel')) && (await a.textContent('#t-espera')) === 'Tu negocio está en revisión' && (await a.textContent('#es-texto')).includes('Los Álamos Pádel'),
+      'cuenta nueva: no entra al panel, queda "en revisión"');
+    ok((await sql(`select to_json(estado) from negocios where email_dueno = 'ana@prueba.com'`)) === 'pendiente', 'en la base: el negocio de Ana está pendiente');
+    await a.screenshot({ path: `${out}/nb-espera.png` });
+    await a.click('#es-volver'); await a.waitForFunction(() => /Todavía/.test(document.querySelector('#es-msg').textContent));
+    ok(!(await a.isVisible('#panel')), '"Volver a fijarme" mientras sigue pendiente: sigue afuera');
+
+    // ---------- El equipo de Bookea aprueba desde Solicitudes ----------
+    const adm = await nueva();
+    await adm.goto(URL_); await adm.waitForSelector('#f-ingresar:not([hidden])');
+    await registrar(adm, { nombre: 'Maxi', negocio: 'Bookea', rubro: 'Software', email: 'equipo@bookea.test', clave: 'equipo2026' });
+    await adm.waitForSelector('#f-espera:not([hidden])');
+    await sql(`with x as (insert into admins_bookea (user_id) select id from auth.users where email = 'equipo@bookea.test' returning 1) select count(*) from x`);
+    await adm.click('#es-volver'); await adm.waitForSelector('#panel:not([hidden])'); await listo(adm);
+    ok(await adm.isVisible('#ir-solicitudes') && (await adm.textContent('#sol-n')) === '2', 'el equipo de Bookea entra aunque su negocio esté pendiente, y ve "Solicitudes (2)"');
+    await adm.click('#ir-solicitudes'); await adm.waitForSelector('.sol');
+    ok((await adm.locator('.sol').count()) === 2 && (await adm.textContent('#vista')).includes('ana@prueba.com'), 'Solicitudes: muestra los dos negocios con el email de quien lo pidió');
+    await adm.screenshot({ path: `${out}/nb-solicitudes.png`, fullPage: true });
+    await adm.locator('.sol', { hasText: 'Los Álamos Pádel' }).locator('[data-ok="1"]').click();
+    await adm.waitForFunction(() => /quedó aprobado/.test(document.querySelector('#aviso').textContent));
+    await adm.waitForSelector('.sol');
+    await adm.locator('.sol', { hasText: 'equipo@bookea.test' }).locator('[data-ok="1"]').click();
+    await adm.waitForTimeout(800);
+    ok((await sql(`select json_agg(estado order by email_dueno) from negocios`)).join() === 'aprobado,aprobado', 'aprobó a Ana y a su propio negocio');
+    await adm.screenshot({ path: `${out}/nb-solicitudes-2.png`, fullPage: true });
+
+    // ---------- Ana vuelve a fijarse y entra ----------
+    await a.click('#es-volver'); await a.waitForSelector('#panel:not([hidden])'); await listo(a);
+    ok(/Mi negocio/.test(await a.textContent('#vista h1')) && (await a.textContent('#lado-neg')) === 'Los Álamos Pádel', 'aprobada: entra a Mi negocio de "Los Álamos Pádel"');
+    ok(!(await a.isVisible('#ir-solicitudes')), 'Ana no ve "Solicitudes" (no es del equipo de Bookea)');
+    const autoAprobarse = await a.evaluate(async () => { const c = window.__clientes[window.__clientes.length - 1]; const r = await c.rpc('revisar_negocio', { n: '00000000-0000-0000-0000-000000000000', aprobar: true }); return r.error && r.error.code; });
+    ok(autoAprobarse === '42501', 'Ana no puede aprobar negocios ni pidiéndolo directo a la base');
     await espera(600);
-    const negA = (await sql(`select json_agg(x) from (select n.id, n.slug, n.ajustes, m.rol, u.email from negocios n join miembros m on m.negocio_id = n.id join auth.users u on u.id = m.user_id) x`))[0];
+    const negA = (await sql(`select json_agg(x) from (select n.id, n.slug, n.ajustes, m.rol, u.email from negocios n join miembros m on m.negocio_id = n.id join auth.users u on u.id = m.user_id where u.email = 'ana@prueba.com') x`))[0];
     ok(negA && negA.slug === 'losalamospadel' && negA.rol === 'dueno' && negA.email === 'ana@prueba.com', 'en la base: negocio "losalamospadel" con Ana como dueña');
     ok(negA && negA.ajustes && Array.isArray(negA.ajustes.recursos) && negA.ajustes.horario.length === 7, 'en la base: quedaron guardados los ajustes iniciales (canchas, horarios, precios)');
 
@@ -74,7 +105,9 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
     // ---------- Otra cuenta, mismo nombre de negocio ----------
     await a.click('#salir'); await a.waitForSelector('#f-ingresar:not([hidden])');
     await registrar(a, { nombre: 'Beto', negocio: 'Los Álamos Pádel', rubro: 'Fútbol', email: 'beto@prueba.com', clave: 'futbol2026' });
-    await a.waitForSelector('#panel:not([hidden])'); await listo(a);
+    await a.waitForSelector('#f-espera:not([hidden])');
+    await sql(`with x as (update negocios set estado = 'aprobado' where email_dueno = 'beto@prueba.com' returning 1) select count(*) from x`);
+    await a.click('#es-volver'); await a.waitForSelector('#panel:not([hidden])'); await listo(a);
     ok((await a.inputValue('#g-slug')) === 'losalamospadel2', 'segundo negocio con el mismo nombre: link propio "losalamospadel2"');
     await a.click('[data-vista="clientes"]'); await a.waitForTimeout(300);
     ok(!(await a.textContent('#vista')).includes('Juan P.'), 'Beto no ve los clientes ni turnos de Ana');
@@ -91,7 +124,7 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
     await a.fill('#g-slug', 'losalamospadel'); await a.fill('#g-ciudad', 'Tupungato');
     await a.click('#g-guardar'); await a.waitForFunction(() => document.querySelector('#g-msg').textContent.length > 0);
     ok(await a.isVisible('#g-slug-err') && (await a.textContent('#g-slug-err')).includes('ya lo usa otro negocio'), 'link de otro negocio: avisa al lado del campo');
-    const nb = await sql(`select row_to_json(n) from negocios n where n.id <> '${negA.id}'`);
+    const nb = await sql(`select row_to_json(n) from negocios n where n.email_dueno = 'beto@prueba.com'`);
     ok(nb.slug === 'losalamospadel2' && nb.ciudad === 'Tupungato', 'se guardó todo menos el link (' + nb.slug + ', ' + nb.ciudad + ')');
     await a.screenshot({ path: `${out}/nb-slug.png` });
 
@@ -101,7 +134,7 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
     ok((await a.textContent('#i-msg')) === 'El email o la contraseña no coinciden.', 'contraseña mal: avisa');
     await registrar(a, { nombre: 'Ana', negocio: 'Otro', rubro: 'Pádel', email: 'ana@prueba.com', clave: 'canchas2026' }); await a.waitForTimeout(400);
     ok((await a.textContent('#r-email-err')).includes('Ya hay una cuenta'), 'email que ya tiene cuenta: avisa');
-    ok((await sql(`select count(*) from negocios`)) === 2, 'y no crea otro negocio');
+    ok((await sql(`select count(*) from negocios`)) === 3, 'y no crea otro negocio');
     await a.click('#f-registro [data-ir="ingresar"]');
 
     // ---------- Cambiar nombre y contraseña ----------
@@ -184,6 +217,17 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
     await ingresar(rr, 'ana@prueba.com', 'recuperada26'); await rr.waitForSelector('#panel:not([hidden])');
     ok(true, 'después entra con la contraseña nueva');
     ok(!rr.errs.length, 'sin errores en la consola (recuperar) ' + rr.errs.join(' | '));
+
+    // ---------- Quitarle el acceso a un negocio ----------
+    await adm.click('#ir-solicitudes'); await adm.waitForSelector('.sol');
+    const bBeto = adm.locator('.sol', { hasText: 'beto@prueba.com' }).locator('[data-ok="0"]');
+    await bBeto.click(); ok((await bBeto.textContent()).includes('confirmar'), 'quitar acceso pide confirmar');
+    await bBeto.click(); await adm.waitForFunction(() => /sin acceso/.test(document.querySelector('#aviso').textContent));
+    const bt = await nueva();
+    await bt.goto(URL_); await bt.waitForSelector('#f-ingresar:not([hidden])');
+    await ingresar(bt, 'beto@prueba.com', 'futbol2026'); await bt.waitForSelector('#f-espera:not([hidden])');
+    ok((await bt.textContent('#t-espera')) === 'Tu solicitud no fue aprobada' && !(await bt.isVisible('#es-volver')) && !(await bt.isVisible('#panel')), 'sin acceso: Beto ya no entra al panel y se le explica');
+    ok(!adm.errs.length && !bt.errs.length, 'sin errores en la consola (equipo de Bookea y Beto) ' + adm.errs.concat(bt.errs).join(' | '));
 
     // ---------- Celular ----------
     const m = await nueva(390, 844);

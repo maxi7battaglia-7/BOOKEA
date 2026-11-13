@@ -11,6 +11,10 @@
 --   · miembros  → qué cuenta administra qué negocio (así una cuenta queda atada a su
 --                 negocio, y más adelante un negocio puede sumar encargados).
 --   · reservas  → los turnos de cada negocio.
+--   · admins_bookea → las cuentas del equipo de Bookea, que aprueban o rechazan los negocios nuevos.
+--
+-- Aprobación: un negocio recién registrado queda "pendiente". Hasta que alguien de Bookea lo
+-- apruebe, su cuenta puede ver que está en espera, pero no puede leer ni guardar turnos.
 --
 -- Quién ve qué (Row Level Security): cada cuenta solo puede leer y cambiar los negocios
 -- de los que es miembro y sus reservas. Lo controla la base, no el navegador: aunque
@@ -32,6 +36,21 @@ create table if not exists public.negocios (
   -- canchas o lugares, duración del turno, horarios, precios por franja, seña y cancelación
   ajustes     jsonb not null default '{}'::jsonb check (jsonb_typeof(ajustes) = 'object'),
   creado      timestamptz not null default now()
+);
+
+-- Aprobación por el equipo de Bookea (se agrega así para que funcione también en una base que ya existía)
+alter table public.negocios
+  add column if not exists estado       text not null default 'pendiente' check (estado in ('pendiente', 'aprobado', 'rechazado')),
+  add column if not exists nombre_dueno text not null default '' check (char_length(nombre_dueno) <= 80),
+  add column if not exists email_dueno  text not null default '' check (char_length(email_dueno) <= 200),
+  add column if not exists revisado     timestamptz;
+
+-- ---------- Equipo de Bookea: quién aprueba los negocios nuevos ----------
+-- Se agrega a mano desde el SQL Editor (ver supabase/LEEME.md):
+--   insert into public.admins_bookea (user_id) select id from auth.users where email = 'tu@email.com';
+create table if not exists public.admins_bookea (
+  user_id uuid primary key references auth.users (id) on delete cascade,
+  creado  timestamptz not null default now()
 );
 
 -- ---------- Miembros: qué cuenta administra qué negocio ----------
@@ -84,6 +103,34 @@ language sql stable security definer set search_path = '' as $$
   select exists (select 1 from public.miembros m where m.negocio_id = n and m.user_id = auth.uid());
 $$;
 
+-- ¿Esta cuenta administra este negocio y el negocio ya está aprobado? (para usar el panel)
+create or replace function public.es_miembro_activo(n uuid) returns boolean
+language sql stable security definer set search_path = '' as $$
+  select exists (
+    select 1 from public.miembros m join public.negocios x on x.id = m.negocio_id
+    where m.negocio_id = n and m.user_id = auth.uid() and x.estado = 'aprobado'
+  );
+$$;
+
+-- ¿Esta cuenta es del equipo de Bookea?
+create or replace function public.es_admin_bookea() returns boolean
+language sql stable security definer set search_path = '' as $$
+  select exists (select 1 from public.admins_bookea a where a.user_id = auth.uid());
+$$;
+
+-- Aprobar o rechazar un negocio. Solo el equipo de Bookea; nadie puede aprobarse solo.
+create or replace function public.revisar_negocio(n uuid, aprobar boolean) returns text
+language plpgsql security definer set search_path = '' as $$
+declare nuevo text := case when aprobar then 'aprobado' else 'rechazado' end;
+begin
+  if not public.es_admin_bookea() then
+    raise exception 'Solo el equipo de Bookea puede aprobar negocios' using errcode = '42501';
+  end if;
+  update public.negocios set estado = nuevo, revisado = now() where id = n;
+  if not found then raise exception 'No existe ese negocio' using errcode = 'P0002'; end if;
+  return nuevo;
+end $$;
+
 -- ---------- Alta: al crear la cuenta se crea su negocio y queda atada a él ----------
 -- La página de registro manda el nombre de la persona, del negocio y el rubro como datos
 -- de la cuenta (raw_user_meta_data). Esto corre dentro de la base, en el mismo paso en que
@@ -111,8 +158,9 @@ begin
     k := k + 1;
     s := left(base, 24) || k::text;
   end loop;
-  insert into public.negocios (slug, nombre, rubro)
-    values (s, nom_neg, left(btrim(coalesce(meta ->> 'rubro', '')), 60))
+  insert into public.negocios (slug, nombre, rubro, estado, nombre_dueno, email_dueno)
+    values (s, nom_neg, left(btrim(coalesce(meta ->> 'rubro', '')), 60), 'pendiente',
+            left(btrim(coalesce(meta ->> 'nombre', '')), 80), left(coalesce(new.email, ''), 200))
     returning id into nid;
   insert into public.miembros (negocio_id, user_id, rol) values (nid, new.id, 'dueno');
   return new;
@@ -121,26 +169,44 @@ drop trigger if exists alta_de_cuenta on auth.users;
 create trigger alta_de_cuenta after insert on auth.users
   for each row execute function public.alta_de_cuenta();
 
+-- Negocios creados antes de que existiera la aprobación: se completa quién es el dueño
+update public.negocios x
+   set email_dueno  = left(coalesce(u.email, ''), 200),
+       nombre_dueno = left(btrim(coalesce(u.raw_user_meta_data ->> 'nombre', '')), 80)
+  from public.miembros m join auth.users u on u.id = m.user_id
+ where m.negocio_id = x.id and m.rol = 'dueno' and x.email_dueno = '';
+
 -- ---------- Permisos ----------
 alter table public.negocios enable row level security;
 alter table public.miembros enable row level security;
 alter table public.reservas enable row level security;
+alter table public.admins_bookea enable row level security;
 
 -- Sin sesión (anon) no se ve nada. Con sesión, solo lo propio (las reglas de abajo).
-revoke all on public.negocios, public.miembros, public.reservas from anon;
-grant select, update on public.negocios to authenticated;
+revoke all on public.negocios, public.miembros, public.reservas, public.admins_bookea from anon;
+revoke all on public.negocios from authenticated;
+grant select on public.negocios to authenticated;
+-- Los datos que el dueño puede cambiar. El estado (aprobado o no) NO está: solo cambia con revisar_negocio.
+grant update (slug, nombre, rubro, ciudad, direccion, whatsapp, foto, descripcion, mapa, ajustes) on public.negocios to authenticated;
 grant select on public.miembros to authenticated;
 grant select, insert, update, delete on public.reservas to authenticated;
+grant select on public.admins_bookea to authenticated;
 revoke all on function public.es_miembro(uuid) from public, anon;
 grant execute on function public.es_miembro(uuid) to authenticated;
+revoke all on function public.es_miembro_activo(uuid) from public, anon;
+grant execute on function public.es_miembro_activo(uuid) to authenticated;
+revoke all on function public.es_admin_bookea() from public, anon;
+grant execute on function public.es_admin_bookea() to authenticated;
+revoke all on function public.revisar_negocio(uuid, boolean) from public, anon;
+grant execute on function public.revisar_negocio(uuid, boolean) to authenticated;
 revoke all on function public.alta_de_cuenta() from public, anon, authenticated;
 
 drop policy if exists "negocios: ver los propios" on public.negocios;
 create policy "negocios: ver los propios" on public.negocios
-  for select to authenticated using (public.es_miembro(id));
+  for select to authenticated using (public.es_miembro(id) or public.es_admin_bookea());
 drop policy if exists "negocios: cambiar los propios" on public.negocios;
 create policy "negocios: cambiar los propios" on public.negocios
-  for update to authenticated using (public.es_miembro(id)) with check (public.es_miembro(id));
+  for update to authenticated using (public.es_miembro_activo(id)) with check (public.es_miembro_activo(id));
 
 drop policy if exists "miembros: ver los de mis negocios" on public.miembros;
 create policy "miembros: ver los de mis negocios" on public.miembros
@@ -148,13 +214,17 @@ create policy "miembros: ver los de mis negocios" on public.miembros
 
 drop policy if exists "reservas: ver las de mis negocios" on public.reservas;
 create policy "reservas: ver las de mis negocios" on public.reservas
-  for select to authenticated using (public.es_miembro(negocio_id));
+  for select to authenticated using (public.es_miembro_activo(negocio_id));
 drop policy if exists "reservas: cargar en mis negocios" on public.reservas;
 create policy "reservas: cargar en mis negocios" on public.reservas
-  for insert to authenticated with check (public.es_miembro(negocio_id));
+  for insert to authenticated with check (public.es_miembro_activo(negocio_id));
 drop policy if exists "reservas: cambiar las de mis negocios" on public.reservas;
 create policy "reservas: cambiar las de mis negocios" on public.reservas
-  for update to authenticated using (public.es_miembro(negocio_id)) with check (public.es_miembro(negocio_id));
+  for update to authenticated using (public.es_miembro_activo(negocio_id)) with check (public.es_miembro_activo(negocio_id));
 drop policy if exists "reservas: borrar las de mis negocios" on public.reservas;
 create policy "reservas: borrar las de mis negocios" on public.reservas
-  for delete to authenticated using (public.es_miembro(negocio_id));
+  for delete to authenticated using (public.es_miembro_activo(negocio_id));
+
+drop policy if exists "admins: verse a sí mismo" on public.admins_bookea;
+create policy "admins: verse a sí mismo" on public.admins_bookea
+  for select to authenticated using (user_id = auth.uid());

@@ -24,7 +24,9 @@
 
   // ---------- De la base al panel y vuelta ----------
   const negDeFila = (f) => {
-    const n = { id: f.id };
+    // estado: pendiente / aprobado / rechazado (lo cambia solo el equipo de Bookea). Si la base todavía no
+    // tiene la columna (esquema viejo), se toma como aprobado para no dejar a nadie afuera.
+    const n = { id: f.id, estado: f.estado || "aprobado" };
     for (const c of COLS_NEG) n[c] = f[c] ?? "";
     for (const c of AJUSTES) if (f.ajustes && f.ajustes[c] !== undefined) n[c] = f.ajustes[c];
     return n;
@@ -119,7 +121,9 @@
       let reservas;
       try { reservas = await traerReservas(); } catch (e) { return fallo(e); }
       const negocio = negDeFila(fila);
-      cuenta = { id: user.id, email: user.email, nombre: (user.user_metadata && user.user_metadata.nombre) || "", rol: ms[0].rol };
+      // ¿Es del equipo de Bookea? (si la tabla no existe todavía, no lo es)
+      const { data: ad } = await sb.from("admins_bookea").select("user_id").eq("user_id", user.id);
+      cuenta = { id: user.id, email: user.email, nombre: (user.user_metadata && user.user_metadata.nombre) || "", rol: ms[0].rol, admin: !!(ad && ad.length) };
       fotoNeg = JSON.stringify(filaDeNeg(negocio));
       fotoRes.clear();
       for (const r of reservas) fotoRes.set(r.id, JSON.stringify(filaDeRes(r, negId)));
@@ -242,6 +246,24 @@
         } catch (e) { return fallo(e); }
       },
       alRecuperar(cb) { alRecuperarCbs.push(cb); },
+
+      // ---------- Equipo de Bookea: negocios que se registraron ----------
+      async solicitudes() {
+        try {
+          const { data, error } = await sb.from("negocios")
+            .select("id, nombre, rubro, ciudad, slug, estado, nombre_dueno, email_dueno, creado, revisado")
+            .order("creado", { ascending: false });
+          if (error) return fallo(error);
+          return { ok: true, lista: data };
+        } catch (e) { return fallo(e); }
+      },
+      async revisar(id, aprobar) {
+        try {
+          const { data, error } = await sb.rpc("revisar_negocio", { n: id, aprobar });
+          if (error) return fallo(error);
+          return { ok: true, estado: data };
+        } catch (e) { return fallo(e); }
+      },
       async ponerClave(nueva) {
         try {
           const { data, error } = await sb.auth.updateUser({ password: nueva });

@@ -774,3 +774,19 @@
 /* Registrarse: botón propio debajo de Entrar, separado por una regla */
 .caja__registro { display: grid; gap: 10px; padding-top: 18px; border-top: 1px solid var(--regla); text-align: center; } /* taste-skill-ignore: separa ingresar de registrarse */
 .caja__registro p { font-size: 14px; color: var(--tx-2); }
+
+/* ---------- Solicitudes de negocios (equipo de Bookea) ---------- */
+.lado__sol { border: 0; background: none; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; text-align: left; }
+.lado__sol .chip-n { margin-left: 2px; }
+.sols { list-style: none; display: grid; }
+.sol { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 12px 16px; padding: 14px 0; border-top: 1px solid var(--regla); } /* taste-skill-ignore: filas de la lista */
+.sol:first-child { border-top: 0; padding-top: 0; }
+.sol__q { display: grid; gap: 2px; min-width: 0; font-size: 14px; color: var(--tx-2); }
+.sol__q b { font-size: 16px; color: var(--tx); }
+.sol__q span { overflow-wrap: anywhere; }
+.sol__acc { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+@media (max-width: 640px) {
+  .sol { grid-template-columns: minmax(0, 1fr) auto; }
+  .sol__acc { grid-column: 1 / -1; justify-content: stretch; }
+  .sol__acc .btn { flex: 1; }
+}

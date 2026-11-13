@@ -305,3 +305,11 @@ textos que se entiendan en cada cuadro.
 - Si la base pide confirmar el email, al crear la cuenta vuelve a Ingresar con el mensaje "Te mandamos un mail a…".
 - Errores de guardado con la base: el aviso de abajo explica qué pasó ("Ese horario ya lo ocupó otra reserva…",
   "No se pudo guardar: parece que no hay conexión…") y el panel reintenta solo.
+
+## Aprobación de negocios (13/11)
+
+- Pedido del dueño: nadie usa el panel sin que Bookea lo apruebe. Al registrarse (o al entrar si sigue pendiente) se ve la caja
+  **"Tu negocio está en revisión"** con "Volver a fijarme" y "Salir"; si se rechazó, **"Tu solicitud no fue aprobada"** sin botón para reintentar.
+- Equipo de Bookea: vista **Solicitudes** (link "Solicitudes de negocios" con contador al pie del costado, y en Cuenta desde el celular).
+  Dos tarjetas: "Esperan tu respuesta" y "Ya revisados". Cada fila: nombre, rubro, quién lo pidió con su email y fecha,
+  chip de estado (los mismos `.estado` de la agenda) y botones Aprobar / Rechazar / Quitar acceso. Rechazar y quitar acceso piden un segundo toque.

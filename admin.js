@@ -240,6 +240,7 @@
     existe: "Ya hay una cuenta con ese email. Ingresá con él o pedí una contraseña nueva.",
     "clave-debil": "Esa contraseña es muy fácil de adivinar. Probá con una más larga, con letras y números.",
     "email-invalido": "Ese email no parece válido. Revisalo.",
+    "sin-permiso": "Solo el equipo de Bookea puede hacer eso.",
     "email-no-autorizado": "Por ahora Bookea no puede mandar mails a esa dirección. Probá con otro email o volvé a intentar en unos días.",
     sesion: "Tu sesión venció. Volvé a ingresar.",
     otro: "Algo salió mal. Probá de nuevo en un rato.",
@@ -312,19 +313,66 @@
   const salir = async (opc) => {
     const vencida = !!(opc && opc.vencida === true);
     sesion.del(CLAVE_SES); sesion.del(CLAVE_VISTA);
-    YO = NEG = RES = null;
+    YO = NEG = RES = null; ESPERA = null;
+    $("#ir-solicitudes").hidden = true;
     await store.salir();
     mostrarEntrada();
     if (!vencida) aviso("Cerraste sesión.");
   };
-  const FORMS = { ingresar: "#f-ingresar", registro: "#f-registro", olvido: "#f-olvido", nueva: "#f-nueva" };
-  const FOCO = { ingresar: "#i-email", registro: "#r-nombre", olvido: "#o-email", nueva: "#nc-clave" };
+  const FORMS = { ingresar: "#f-ingresar", registro: "#f-registro", olvido: "#f-olvido", nueva: "#f-nueva", espera: "#f-espera" };
+  const FOCO = { ingresar: "#i-email", registro: "#r-nombre", olvido: "#o-email", nueva: "#nc-clave", espera: "#es-volver" };
   const mostrarEntrada = (cual = "ingresar") => {
     $("#panel").hidden = true; $("#cargando").hidden = true; $("#entrada").hidden = false;
     for (const [k, sel] of Object.entries(FORMS)) $(sel).hidden = k !== cual;
     const f = $(FOCO[cual]);
     f && f.focus({ preventScroll: true });
   };
+  // ---------- Aprobación: un negocio nuevo espera a que el equipo de Bookea lo apruebe ----------
+  // Devuelve true si entró al panel. El equipo de Bookea entra siempre (para poder aprobar).
+  let ESPERA = null;
+  const pasar = (datos, vista, alEntrar) => {
+    const n = datos.negocio || {};
+    if (store.modo === "nube" && n.estado && n.estado !== "aprobado" && !datos.cuenta.admin) { mostrarEspera(datos); return false; }
+    entrar(datos, vista);
+    if (alEntrar) alEntrar();
+    if (YO.admin) avisarSolicitudes();
+    return true;
+  };
+  const mostrarEspera = (datos) => {
+    ESPERA = datos;
+    const n = datos.negocio, rech = n.estado === "rechazado";
+    $("#t-espera").textContent = rech ? "Tu solicitud no fue aprobada" : "Tu negocio está en revisión";
+    $("#es-texto").textContent = rech
+      ? `Por ahora ${n.nombre} no puede usar el panel de Bookea. Si creés que es un error, contactá al equipo de Bookea.`
+      : `Recibimos la solicitud de ${n.nombre}. El equipo de Bookea la revisa y, cuando esté aprobada, vas a poder entrar al panel con tu email y tu contraseña.`;
+    $("#es-volver").hidden = rech;
+    $("#es-msg").textContent = "";
+    mostrarEntrada("espera");
+  };
+  $("#es-volver").addEventListener("click", async (e) => {
+    const btn = e.currentTarget, msg = $("#es-msg");
+    ocupado(btn, true, "Fijándome…");
+    const r = await store.recargar();
+    ocupado(btn, false);
+    if (!r.ok) { msg.className = "form__msg err"; msg.textContent = MENSAJES[r.error] || MENSAJES.otro; return; }
+    if (pasar(r.datos, "negocio", saludar)) return;
+    msg.className = "form__msg"; msg.textContent = "Todavía está en revisión. Probá de nuevo más tarde.";
+  });
+  $("#es-salir").addEventListener("click", async () => { ESPERA = null; await store.salir(); mostrarEntrada(); });
+
+  // Equipo de Bookea: cuántas solicitudes esperan respuesta
+  const avisarSolicitudes = async () => {
+    if (!YO || !YO.admin || !store.solicitudes) return;
+    const r = await store.solicitudes();
+    if (!r.ok || !YO) return;
+    const n = r.lista.filter((x) => x.estado === "pendiente").length;
+    $("#ir-solicitudes").hidden = false;
+    $("#sol-n").hidden = !n; $("#sol-n").textContent = n;
+    if (n) aviso(n === 1 ? "Hay 1 negocio nuevo esperando tu aprobación." : `Hay ${n} negocios nuevos esperando tu aprobación.`);
+    if (NEG && NEG.estado !== "aprobado") aviso("Tu propio negocio también está pendiente: aprobalo en Solicitudes para poder guardar.");
+  };
+  $("#ir-solicitudes").addEventListener("click", () => ir("solicitudes"));
+
   const pintarLado = () => {
     $("#lado-neg").textContent = NEG.nombre;
     $("#lado-det").textContent = [NEG.rubro, NEG.ciudad].filter(Boolean).join(" · ") || "Completá los datos en Mi negocio";
@@ -403,8 +451,7 @@
       return;
     }
     fallos = 0; msg.textContent = ""; $("#i-clave").value = "";
-    entrar(r.datos, "agenda");
-    saludar();
+    pasar(r.datos, "agenda", saludar);
   });
 
   // ---------- Entrada: me olvidé la contraseña (solo con la base) ----------
@@ -438,8 +485,7 @@
       return;
     }
     e.target.reset();
-    entrar(r.datos, "agenda");
-    aviso("Listo, ya tenés tu contraseña nueva.");
+    if (pasar(r.datos, "agenda")) aviso("Listo, ya tenés tu contraseña nueva.");
   });
   store.alRecuperar(() => { $("#nc-email").value = (YO && YO.email) || ""; mostrarEntrada("nueva"); });
 
@@ -494,12 +540,13 @@
       mostrarEntrada("ingresar");
       $("#i-email").value = email;
       const m = $("#i-msg"); m.className = "form__msg ok";
-      m.textContent = `Te mandamos un mail a ${email}. Abrilo y tocá el link para activar la cuenta; después entrás acá con tu email y tu contraseña.`;
+      m.textContent = store.modo === "nube"
+        ? `Te mandamos un mail a ${email}. Abrilo y tocá el link para confirmar tu email. Después, el equipo de Bookea revisa tu negocio y, cuando esté aprobado, entrás acá con tu email y tu contraseña.`
+        : `Te mandamos un mail a ${email}. Abrilo y tocá el link para activar la cuenta; después entrás acá con tu email y tu contraseña.`;
       return;
     }
-    entrar(r.datos, "negocio");
     const p = primerNombre(nombre);
-    bienvenida(p ? `Hola, ${p}.` : "Hola.", "Tu cuenta está lista.", () => aviso("Completá los datos de tu negocio."));
+    pasar(r.datos, "negocio", () => bienvenida(p ? `Hola, ${p}.` : "Hola.", "Tu cuenta está lista.", () => aviso("Completá los datos de tu negocio.")));
   });
 
   // ---------- Navegación del panel ----------
@@ -1339,6 +1386,53 @@
     });
   };
 
+  // ---------- Solicitudes (solo el equipo de Bookea) ----------
+  const fechaCorta = (ts) => { if (!ts) return ""; const d = new Date(ts); return `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`; };
+  const ESTADO_SOL = { pendiente: ["Pendiente", "ausente"], aprobado: ["Aprobado", "confirmada"], rechazado: ["Rechazado", "cancelada"] };
+  VISTAS.solicitudes = async () => {
+    if (!YO || !YO.admin) return VISTAS.agenda();
+    const v = $("#vista");
+    v.innerHTML = `<header class="vhead"><div><h1>Solicitudes</h1><p class="vhead__frase">Los negocios que se registraron en Bookea. Hasta que los aprobás, no pueden usar el panel.</p></div></header>
+      <section class="card"><p class="card__sub">Cargando solicitudes…</p></section>`;
+    const r = await store.solicitudes();
+    if (vistaActual !== "solicitudes") return;
+    if (!r.ok) { v.querySelector(".card").innerHTML = `<p class="form__msg err">No se pudieron traer las solicitudes. ${esc(MENSAJES[r.error] || MENSAJES.otro)}</p>`; return; }
+    const pend = r.lista.filter((x) => x.estado === "pendiente"), rev = r.lista.filter((x) => x.estado !== "pendiente");
+    $("#sol-n").hidden = !pend.length; $("#sol-n").textContent = pend.length;
+    const fila = (x) => {
+      const [txt, cls] = ESTADO_SOL[x.estado] || ESTADO_SOL.pendiente;
+      const quien = [x.nombre_dueno, x.email_dueno].filter(Boolean).map(esc).join(" · ");
+      const btns = x.estado === "pendiente"
+        ? `<button type="button" class="btn btn--ink" data-revisar="${x.id}" data-ok="1">${ico("check")}Aprobar</button><button type="button" class="btn btn--line" data-revisar="${x.id}" data-ok="0">Rechazar</button>`
+        : x.estado === "aprobado"
+          ? `<button type="button" class="btn btn--line" data-revisar="${x.id}" data-ok="0">Quitar acceso</button>`
+          : `<button type="button" class="btn btn--line" data-revisar="${x.id}" data-ok="1">Aprobar</button>`;
+      return `<li class="sol">
+        <div class="sol__q"><b>${esc(x.nombre)}</b><span>${esc([x.rubro, x.ciudad].filter(Boolean).join(" · ") || "Sin rubro")}</span>
+          <span>${quien ? `Lo pidió ${quien}` : ""}${x.creado ? ` · ${x.estado === "pendiente" ? "se registró el" : "desde el"} ${fechaCorta(x.creado)}` : ""}</span></div>
+        <span class="estado estado--${cls}"><i></i>${txt}</span>
+        <div class="sol__acc">${btns}</div></li>`;
+    };
+    v.innerHTML = `<header class="vhead"><div><h1>Solicitudes</h1><p class="vhead__frase">Los negocios que se registraron en Bookea. Hasta que los aprobás, no pueden usar el panel.</p></div></header>
+      <section class="card" aria-labelledby="s-1">
+        <div class="card__head"><div><h2 id="s-1">Esperan tu respuesta</h2><p class="card__sub">${pend.length ? plural(pend.length, "negocio nuevo", "negocios nuevos") : "No hay negocios esperando. Cuando alguien se registre, aparece acá."}</p></div></div>
+        ${pend.length ? `<ul class="sols">${pend.map(fila).join("")}</ul>` : ""}
+      </section>
+      ${rev.length ? `<section class="card" aria-labelledby="s-2">
+        <div class="card__head"><div><h2 id="s-2">Ya revisados</h2><p class="card__sub">Podés quitarle el acceso a un negocio o aprobar uno que habías rechazado.</p></div></div>
+        <ul class="sols">${rev.map(fila).join("")}</ul></section>` : ""}`;
+    $$("[data-revisar]", v).forEach((b) => b.addEventListener("click", async () => {
+      const ok = b.dataset.ok === "1", x = r.lista.find((y) => y.id === b.dataset.revisar);
+      if (!ok && b.dataset.seguro !== "1") { b.dataset.seguro = "1"; b.textContent = "Tocá de nuevo para confirmar"; return; }
+      $$("[data-revisar]", b.parentElement).forEach((y) => (y.disabled = true));
+      const res = await store.revisar(b.dataset.revisar, ok);
+      if (!res.ok) { aviso(res.error === "sesion" ? MENSAJES["sin-permiso"] : "No se pudo guardar. " + (MENSAJES[res.error] || MENSAJES.otro)); VISTAS.solicitudes(); return; }
+      aviso(ok ? `${x.nombre} quedó aprobado. Ya puede entrar al panel.` : `${x.nombre} quedó sin acceso al panel.`);
+      if (NEG && x.id === NEG.id) NEG.estado = res.estado;
+      VISTAS.solicitudes();
+    }));
+  };
+
   // ---------- Cuenta ----------
   VISTAS.cuenta = () => {
     const local_ = store.modo === "local";
@@ -1360,6 +1454,8 @@
             <p class="form__msg err" id="cu-msg" role="alert"></p>
             <div class="acciones"><button type="submit" class="btn btn--ink">Cambiar contraseña</button></div>
           </form></section>
+        ${YO.admin ? `<section class="ajuste" aria-labelledby="cu-4"><div class="ajuste__r"><h2 id="cu-4">Equipo de Bookea</h2><p>Los negocios que se registran esperan tu aprobación antes de poder usar el panel.</p></div>
+          <div class="ajuste__p"><button type="button" class="btn btn--ink" id="cu-sol">Ver solicitudes de negocios</button></div></section>` : ""}
         ${local_ ? `<section class="ajuste" aria-labelledby="cu-3"><div class="ajuste__r"><h2 id="cu-3">Datos de prueba</h2><p>En esta vista de prueba, todo se guarda solo en este navegador.</p></div>
           <div class="ajuste__p peligro"><p>Si borrás todo, vuelve el negocio de ejemplo y se pierden las cuentas que creaste.</p>
           <button type="button" class="btn btn--warn" id="cu-reset">Borrar todo y volver al ejemplo</button></div></section>` : ""}
@@ -1393,6 +1489,8 @@
       }
       e.target.reset(); aviso("Contraseña cambiada.");
     });
+    const sol = $("#cu-sol");
+    sol && sol.addEventListener("click", () => ir("solicitudes"));
     const reset = $("#cu-reset");
     reset && reset.addEventListener("click", async (e) => {
       if (e.currentTarget.dataset.seguro !== "1") { e.currentTarget.dataset.seguro = "1"; e.currentTarget.textContent = "Tocá de nuevo para confirmar"; return; }
@@ -1418,7 +1516,7 @@
     store.sesionActual().then((r) => {
       if (/access_token|error_description|type=/.test(window.location.hash)) history.replaceState(null, "", window.location.pathname + window.location.search);
       if (r.ok && vieneDeRecuperar) { YO = r.datos.cuenta; $("#nc-email").value = r.datos.cuenta.email; mostrarEntrada("nueva"); return; }
-      if (r.ok) { entrar(r.datos, "agenda"); return; }
+      if (r.ok) { pasar(r.datos, "agenda", saludar); return; }
       mostrarEntrada();
       const msg = $("#i-msg"); msg.className = "form__msg err";
       if (linkMalo) msg.textContent = "Ese link venció o ya se usó. Si querés cambiar la contraseña, pedí uno nuevo.";

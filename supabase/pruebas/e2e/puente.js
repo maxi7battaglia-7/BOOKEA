@@ -31,7 +31,7 @@ const lit = (v) => {
   return `'${String(v).replace(/'/g, "''")}'`;
 };
 const id = (c) => { if (!/^[a-z_]+$/.test(c)) throw new Error('columna'); return `"${c}"`; };
-const TABLAS = new Set(['negocios', 'miembros', 'reservas']);
+const TABLAS = new Set(['negocios', 'miembros', 'reservas', 'admins_bookea']);
 
 const comoCuenta = (uid, consulta) => `
 begin;
@@ -50,7 +50,16 @@ const filtros = (fs_) => {
   }).join(' and ');
 };
 
+const FUNCIONES = new Set(['revisar_negocio']);
 const consulta = async (q) => {
+  if (q.op === 'rpc') {
+    if (!FUNCIONES.has(q.fn)) return { error: { code: 'PGRST202', message: 'función' } };
+    let args;
+    try { args = Object.entries(q.args || {}).map(([k, v]) => `${id(k)} => ${lit(v)}`).join(', '); } catch (e) { return { error: { code: '22000', message: e.message } }; }
+    const r = await psql(comoCuenta(q.token, `select to_json(public.${q.fn}(${args}))`));
+    if (r.error) return r;
+    return { data: JSON.parse(r.data || 'null') };
+  }
   if (!TABLAS.has(q.tabla)) return { error: { code: '42P01', message: 'tabla' } };
   const T = `public.${q.tabla}`;
   let sql;

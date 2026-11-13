@@ -30,6 +30,56 @@ select set_config('prueba.neg_b', (select id::text from public.negocios where sl
 insert into public.reservas (negocio_id, recurso, fecha, hora, cliente, wa, precio, estado, origen)
   values (current_setting('prueba.neg_b')::uuid, 'r1', '2026-11-20', 1200, 'Cliente de Beto', '2622 000 000', 48000, 'confirmada', 'link');
 
+-- =============== Recién registrada: el negocio de Ana está pendiente ===============
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false) \g /dev/null
+set role authenticated;
+do $$
+declare e text; m text; n int;
+begin
+  select estado, email_dueno into e, m from public.negocios;
+  assert e = 'pendiente' and m = 'ana@prueba.com', 'estado: ' || coalesce(e, 'nada') || ', email: ' || coalesce(m, 'nada');
+  raise notice 'OK  un negocio nuevo queda pendiente (y guarda el email de la dueña para avisarle)';
+  begin
+    insert into public.reservas (negocio_id, recurso, fecha, hora, estado)
+      values (current_setting('prueba.neg_a')::uuid, 'r1', '2026-11-19', 600, 'confirmada');
+    raise exception 'FALLA: un negocio pendiente cargó un turno';
+  exception when insufficient_privilege then raise notice 'OK  pendiente: no puede cargar turnos';
+  end;
+  update public.negocios set nombre = 'Cambio' where id = current_setting('prueba.neg_a')::uuid;
+  get diagnostics n = row_count;
+  assert n = 0, 'FALLA: un negocio pendiente cambió sus datos';
+  raise notice 'OK  pendiente: no puede cambiar los datos del negocio';
+  begin
+    update public.negocios set estado = 'aprobado' where id = current_setting('prueba.neg_a')::uuid;
+    raise exception 'FALLA: Ana se aprobó sola cambiando el estado';
+  exception when insufficient_privilege then raise notice 'OK  nadie puede aprobarse solo cambiando el estado';
+  end;
+  begin
+    perform public.revisar_negocio(current_setting('prueba.neg_a')::uuid, true);
+    raise exception 'FALLA: Ana se aprobó sola con revisar_negocio';
+  exception when insufficient_privilege then raise notice 'OK  solo el equipo de Bookea puede aprobar';
+  end;
+end $$;
+reset role;
+
+-- =============== Caro es del equipo de Bookea y aprueba ===============
+insert into public.admins_bookea (user_id) values ('00000000-0000-0000-0000-00000000000c');
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000c', false) \g /dev/null
+set role authenticated;
+do $$
+declare n int;
+begin
+  select count(*) into n from public.negocios where estado = 'pendiente';
+  assert n = 2, 'Caro ve ' || n || ' solicitudes pendientes';
+  select count(*) into n from public.reservas;
+  assert n = 0, 'FALLA: el equipo de Bookea ve reservas de los negocios';
+  raise notice 'OK  el equipo de Bookea ve las solicitudes, pero no las reservas de los negocios';
+  assert public.revisar_negocio(current_setting('prueba.neg_a')::uuid, true) = 'aprobado';
+  assert public.revisar_negocio(current_setting('prueba.neg_b')::uuid, true) = 'aprobado';
+  raise notice 'OK  Caro aprueba los dos negocios';
+end $$;
+reset role;
+
 -- =============== Como Ana ===============
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false) \g /dev/null
 set role authenticated;
@@ -152,4 +202,22 @@ begin
   assert n = 0, 'quedaron membresías de una cuenta borrada';
   raise notice 'OK  al borrar una cuenta se borra su membresía';
 end $$;
+-- =============== Un negocio rechazado deja de poder usar el panel ===============
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000c', false) \g /dev/null
+set role authenticated;
+do $$ begin
+  assert public.revisar_negocio(current_setting('prueba.neg_a')::uuid, false) = 'rechazado';
+end $$;
+reset role;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false) \g /dev/null
+set role authenticated;
+do $$
+declare n int; e text;
+begin
+  select count(*) into n from public.reservas;
+  select estado into e from public.negocios;
+  assert n = 0 and e = 'rechazado', 'Ana rechazada ve ' || n || ' reservas';
+  raise notice 'OK  rechazado: ve que fue rechazado, pero ya no ve ni toca sus turnos';
+end $$;
+reset role;
 \echo 'Todas las pruebas del esquema pasaron.'

@@ -13,7 +13,7 @@
   <link rel="icon" href="marca/isotipo.svg" type="image/svg+xml" />
   <link rel="icon" href="marca/isotipo-32.png" sizes="32x32" type="image/png" />
   <link rel="stylesheet" href="styles.css" />
-  <link rel="stylesheet" href="admin.css" />
+  <link rel="stylesheet" href="admin.css?v=3" />
 </head>
 <body class="pa">
   <a class="skip" href="#vista">Saltar al contenido</a>
@@ -76,6 +76,7 @@
         <button type="button" class="menu__i" data-vista="cuenta"><svg class="ico" aria-hidden="true"><use href="#i-cuenta"/></svg><span>Cuenta</span></button>
       </nav>
       <div class="lado__pie">
+        <button type="button" class="lado__pag lado__sol" id="ir-solicitudes" hidden>Solicitudes de negocios<span class="chip-n" id="sol-n" hidden></span></button>
         <a class="lado__pag" href="reservar.html" target="_blank" rel="noopener">Ver tu página de reservas<svg class="ico" aria-hidden="true"><use href="#i-afuera"/></svg></a>
         <div class="yo">
           <span class="yo__av" id="lado-av" aria-hidden="true"></span>
@@ -144,6 +145,14 @@
         </div>
         <p class="caja__demo solo-local"><b>Para probar:</b> email <code>demo@example.com</code> y contraseña <code>bookea2026</code>.</p>
       </form>
+
+      <section class="caja" id="f-espera" aria-labelledby="t-espera" hidden>
+        <h2 id="t-espera">Tu negocio está en revisión</h2>
+        <p class="caja__sub" id="es-texto"></p>
+        <p class="form__msg" id="es-msg" role="status"></p>
+        <button type="button" class="btn btn--ink btn--lg btn--block" id="es-volver">Volver a fijarme</button>
+        <p class="caja__alt"><button type="button" class="link" id="es-salir">Salir</button></p>
+      </section>
 
       <form class="caja" id="f-olvido" novalidate aria-labelledby="t-olvido" hidden>
         <h2 id="t-olvido">Elegí una contraseña nueva</h2>
@@ -232,8 +241,8 @@
   <dialog class="dlg" id="dlg" aria-labelledby="dlg-t"><div class="dlg__in" id="dlg-in"></div></dialog>
   <p class="aviso" id="aviso" role="status" aria-live="polite"></p>
 
-  <script src="config.js"></script>
-  <script src="nube.js"></script>
-  <script src="admin.js"></script>
+  <script src="config.js?v=3"></script>
+  <script src="nube.js?v=3"></script>
+  <script src="admin.js?v=3"></script>
 </body>
 </html>
