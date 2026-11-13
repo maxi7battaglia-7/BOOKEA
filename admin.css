@@ -770,3 +770,7 @@
 .caja__olvido { margin-top: -6px; font-size: 14px; text-align: right; }
 .caja .form__msg.ok { color: var(--v-tinta); }
 .lado__user { white-space: nowrap; } /* un email largo se corta con "…" */
+
+/* Registrarse: botón propio debajo de Entrar, separado por una regla */
+.caja__registro { display: grid; gap: 10px; padding-top: 18px; border-top: 1px solid var(--regla); text-align: center; } /* taste-skill-ignore: separa ingresar de registrarse */
+.caja__registro p { font-size: 14px; color: var(--tx-2); }
