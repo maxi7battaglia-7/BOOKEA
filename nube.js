@@ -54,6 +54,7 @@
     if (cod === "email_not_confirmed" || /email not confirmed/i.test(msj)) return "sin-confirmar";
     if (cod === "user_already_exists" || /already registered|already exists/i.test(msj)) return "existe";
     if (cod === "weak_password" || /password should|weak password/i.test(msj)) return "clave-debil";
+    if (cod === "email_address_not_authorized" || /not authorized/i.test(msj)) return "email-no-autorizado";
     if (cod === "email_address_invalid" || /invalid.*email|email.*invalid/i.test(msj)) return "email-invalido";
     if (cod === "over_request_rate_limit" || cod === "over_email_send_rate_limit" || st === 429) return "muchos";
     if (cod === "23505" && /slug/.test(msj)) return "slug";

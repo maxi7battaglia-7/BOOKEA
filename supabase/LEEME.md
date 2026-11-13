@@ -38,9 +38,10 @@ panel), `../config.js` (adónde conectarse) y `pruebas/` (pruebas del esquema y 
 5. **Mails.** El envío de mails que trae Supabase es para probar y tiene un límite bajo por hora. Antes de
    sumar negocios reales, configurá un servicio de mails propio en **Authentication → Emails → SMTP Settings**.
    Ahí también podés cambiar el texto de los mails ("Confirmá tu cuenta", "Elegí una contraseña nueva").
-6. **Conectar el panel.** En **Project Settings → API** copiá **Project URL** y la clave **anon public** en
-   `config.js`. La clave `anon` es pública a propósito (va en la página); la que **nunca** va en la página es
-   la `service_role`.
+6. **Conectar el panel.** En **Project Settings → API Keys** copiá la **Publishable key** (`sb_publishable_…`;
+   en proyectos viejos, la **anon public**) y en **Data API** la **Project URL**, y pegalas en `config.js`.
+   Esa clave es pública a propósito (va en la página); la que **nunca** va en la página es la **Secret key**
+   (o `service_role`).
 7. **Publicar.** El panel tiene que estar en una dirección `https://` (por ejemplo GitHub Pages o Netlify).
    Abierto como archivo desde la compu no puede recibir los links de los mails.
 

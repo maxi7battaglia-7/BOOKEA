@@ -18,7 +18,9 @@
   - Vacío = modo de prueba: todo en localStorage (`bookea:panel:v1`). Cuenta de prueba: `demo@example.com` / `bookea2026` (también entra con `losalamos`).
   - Con los datos de Supabase = modo nube (`nube.js`): cuentas por email (Supabase Auth), cada cuenta atada a su negocio por la tabla `miembros`, reglas RLS para que nadie vea otro negocio. Esquema: `supabase/esquema.sql`; guía paso a paso: `supabase/LEEME.md`.
   - Pruebas: `supabase/pruebas/correr.sh` (esquema y permisos en Postgres local) y `node supabase/pruebas/e2e/nube-e2e.js` (panel real contra ese Postgres).
-  - La vista previa publicada (`scripts/preview.py`) siempre va en modo de prueba.
+  - `config.js` ya apunta al proyecto real (`vpxzuutavdjwglglbvdt.supabase.co`, clave publishable). Abrir `admin.html` local o en GitHub Pages usa la base real.
+  - Sitio publicado en GitHub Pages: https://maxi7battaglia-7.github.io/BOOKEA/ (repo `maxi7battaglia-7/BOOKEA`, rama `main`).
+  - La vista previa del artifact (`scripts/preview.py`) siempre va en modo de prueba.
   - `reservar.html` todavía no está conectada a la base (siguiente paso).
 - Panel: la sesión vive solo en memoria, también con Supabase (`persistSession: false`). Cada carga o refresco de admin.html vuelve a pedir email y contraseña (pedido del dueño). Solo los links de los mails (confirmar cuenta, contraseña nueva) entran sin pedirla.
 - Panel: rediseñado con las skills design-taste-frontend (app, accent-ladder), anti-ui-slop y ui-ux-pro-max. Antes de tocarlo, leer la sección del panel en DESIGN.md. Para medirlo: `scripts/insp-copias.sh` y el inspector con `--app`.

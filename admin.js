@@ -240,6 +240,7 @@
     existe: "Ya hay una cuenta con ese email. Ingresá con él o pedí una contraseña nueva.",
     "clave-debil": "Esa contraseña es muy fácil de adivinar. Probá con una más larga, con letras y números.",
     "email-invalido": "Ese email no parece válido. Revisalo.",
+    "email-no-autorizado": "Por ahora Bookea no puede mandar mails a esa dirección. Probá con otro email o volvé a intentar en unos días.",
     sesion: "Tu sesión venció. Volvé a ingresar.",
     otro: "Algo salió mal. Probá de nuevo en un rato.",
   };
@@ -482,7 +483,7 @@
     const r = await store.registrar({ nombre, negocio, rubro, email, clave });
     ocupado(btn, false);
     if (!r.ok) {
-      if (r.error === "existe" || r.error === "email-invalido") { marcar(v("r-email"), "r-email-err", MENSAJES[r.error]); v("r-email").focus(); return; }
+      if (r.error === "existe" || r.error === "email-invalido" || r.error === "email-no-autorizado") { marcar(v("r-email"), "r-email-err", MENSAJES[r.error]); v("r-email").focus(); return; }
       if (r.error === "clave-debil") { marcar(v("r-clave"), "r-clave-err", MENSAJES["clave-debil"]); v("r-clave").focus(); return; }
       msg.textContent = MENSAJES[r.error] || MENSAJES.otro;
       return;
