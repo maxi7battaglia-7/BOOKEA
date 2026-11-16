@@ -13,8 +13,8 @@
   <link rel="icon" href="marca/isotipo.svg" type="image/svg+xml" />
   <link rel="icon" href="marca/isotipo-32.png" sizes="32x32" type="image/png" />
   <link rel="apple-touch-icon" href="marca/isotipo-192.png" />
-  <link rel="stylesheet" href="styles.css?v=5" />
-  <link rel="stylesheet" href="admin.css?v=5" />
+  <link rel="stylesheet" href="styles.css?v=6" />
+  <link rel="stylesheet" href="admin.css?v=6" />
 </head>
 <body class="pa">
   <a class="skip" href="#vista">Saltar al contenido</a>
@@ -38,6 +38,8 @@
     <symbol id="i-buscar" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></symbol>
     <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
     <symbol id="i-camara" viewBox="0 0 24 24"><path d="M3.5 8.5a2 2 0 0 1 2-2h2.2L9.3 4h5.4l1.6 2.5h2.2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z"/><circle cx="12" cy="13" r="3.5"/></symbol>
+    <symbol id="i-equipo" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M19 8v6M16 11h6"/></symbol>
+    <symbol id="i-candado" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></symbol>
     <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11Z"/><circle cx="12" cy="10" r="2.4"/></symbol>
   </svg>
 
@@ -74,6 +76,7 @@
         <button type="button" class="menu__i" data-vista="finanzas"><svg class="ico" aria-hidden="true"><use href="#i-plata"/></svg><span>Finanzas</span></button>
         <button type="button" class="menu__i" data-vista="clientes"><svg class="ico" aria-hidden="true"><use href="#i-clientes"/></svg><span>Clientes</span></button>
         <button type="button" class="menu__i" data-vista="negocio"><svg class="ico" aria-hidden="true"><use href="#i-negocio"/></svg><span><span class="menu__largo">Mi negocio</span><span class="menu__corto">Negocio</span></span></button>
+        <button type="button" class="menu__i menu__i--pc" data-vista="equipo" hidden><svg class="ico" aria-hidden="true"><use href="#i-equipo"/></svg><span>Equipo</span></button>
         <button type="button" class="menu__i" data-vista="cuenta"><svg class="ico" aria-hidden="true"><use href="#i-cuenta"/></svg><span>Cuenta</span></button>
       </nav>
       <div class="lado__pie">
@@ -189,6 +192,42 @@
         <button class="btn btn--ink btn--lg btn--block" type="submit">Guardar y entrar</button>
       </form>
 
+      <!-- Sumarse al equipo de un negocio con el link que mandó el dueño (admin.html?invitacion=…) -->
+      <form class="caja" id="f-unirse" novalidate aria-labelledby="t-unirse" hidden>
+        <p class="caja__k" id="u-neg"></p>
+        <h2 id="t-unirse">Sumate al equipo</h2>
+        <p class="caja__sub" id="u-sub"></p>
+        <div class="u-campos">
+          <div class="field">
+            <label for="u-nombre">Tu nombre</label>
+            <input id="u-nombre" name="nombre" autocomplete="name" required aria-describedby="u-nombre-err" />
+            <p class="field__err" id="u-nombre-err" hidden>Escribí tu nombre.</p>
+          </div>
+          <div class="field">
+            <label for="u-email">Email</label>
+            <input id="u-email" name="email" type="email" autocomplete="username" autocapitalize="none" spellcheck="false" inputmode="email" required aria-describedby="u-email-ayuda u-email-err" />
+            <p class="field__help" id="u-email-ayuda">Tiene que ser el mismo email al que te invitaron.</p>
+            <p class="field__err" id="u-email-err" hidden></p>
+          </div>
+          <div class="field">
+            <label for="u-clave">Elegí una contraseña</label>
+            <div class="clave">
+              <input id="u-clave" name="clave" type="password" autocomplete="new-password" required aria-describedby="u-clave-err" />
+              <button type="button" class="clave__ver" data-ver="u-clave" aria-pressed="false">Mostrar</button>
+            </div>
+            <p class="field__err" id="u-clave-err" hidden>Usá al menos 8 caracteres.</p>
+          </div>
+          <div class="field">
+            <label for="u-clave2">Repetí la contraseña</label>
+            <input id="u-clave2" name="clave2" type="password" autocomplete="new-password" required aria-describedby="u-clave2-err" />
+            <p class="field__err" id="u-clave2-err" hidden>Las dos contraseñas no coinciden.</p>
+          </div>
+        </div>
+        <p class="form__msg err" id="u-msg" role="alert"></p>
+        <button class="btn btn--ink btn--lg btn--block" type="submit" id="u-crear">Crear mi cuenta</button>
+        <p class="caja__alt">¿Ya tenés cuenta con ese email? <button type="button" class="link" data-ir="ingresar">Ingresá</button></p>
+      </form>
+
       <form class="caja" id="f-registro" novalidate aria-labelledby="t-registro" hidden>
         <h2 id="t-registro">Creá la cuenta de tu negocio</h2>
         <div class="field">
@@ -242,9 +281,9 @@
   <dialog class="dlg" id="dlg" aria-labelledby="dlg-t"><div class="dlg__in" id="dlg-in"></div></dialog>
   <p class="aviso" id="aviso" role="status" aria-live="polite"></p>
 
-  <script src="config.js?v=5"></script>
-  <script src="nube.js?v=5"></script>
-  <script src="admin.js?v=5"></script>
-  <script src="toque.js?v=5"></script>
+  <script src="config.js?v=6"></script>
+  <script src="nube.js?v=6"></script>
+  <script src="admin.js?v=6"></script>
+  <script src="toque.js?v=6"></script>
 </body>
 </html>

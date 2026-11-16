@@ -180,6 +180,26 @@
     const h = hex(b); return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
   };
 
+  // ---------- Equipo: qué puede hacer cada persona ----------
+  // El dueño puede todo y además maneja el equipo. El resto, lo que le habilitó el dueño.
+  // La base hace cumplir "turnos" y "negocio" (ver supabase/esquema.sql); el panel además esconde lo que no corresponde.
+  const PERMISOS = [
+    { k: "agenda", t: "Ver la agenda", c: "Agenda", d: "Los turnos de cada día y de la semana." },
+    { k: "turnos", t: "Cargar y cambiar turnos", c: "Cargar turnos", d: "Cargar turnos y bloqueos, cancelarlos y marcar si pagaron o si no vinieron." },
+    { k: "clientes", t: "Ver Clientes", c: "Clientes", d: "La lista de clientes, con su WhatsApp." },
+    { k: "finanzas", t: "Ver Finanzas", c: "Finanzas", d: "Lo que entró, las señas y lo que falta cobrar." },
+    { k: "negocio", t: "Cambiar Mi negocio", c: "Mi negocio", d: "Datos, horarios, precios, canchas y el link de reservas." },
+  ];
+  const CLAVES_PERMISO = PERMISOS.map((x) => x.k);
+  // Sin repetidos ni inventados; cargar turnos incluye ver la agenda (igual que la base)
+  const limpiarPermisos = (lista) => {
+    const s = new Set((lista || []).filter((x) => CLAVES_PERMISO.includes(x)));
+    if (s.has("turnos")) s.add("agenda");
+    return [...s].sort();
+  };
+  const PERMISOS_NUEVO = ["agenda", "turnos"]; // lo que viene tildado al sumar a alguien
+  const VENCE_INVITACION = 7 * 864e5;
+
   // ---------- Dónde se guarda todo ----------
   // Con config.js completo, en la base (Supabase): cada cuenta con su negocio. Si no, modo de prueba en este navegador.
   const CONFIG = window.BOOKEA_CONFIG || {};
@@ -189,14 +209,34 @@
   const primerNombre = (t) => String(t || "").trim().split(/\s+/)[0] || "";
 
   const almacenLocal = () => {
-    let yo = null;
-    const datosDe = (c) => ({ cuenta: c, negocio: DB.negocios[c.negocio], reservas: DB.reservas[c.negocio] || (DB.reservas[c.negocio] = []) });
+    let yo = null, sinNegocio = null;
+    const datosDe = (c) => {
+      if (!c.rol) c.rol = "dueno";
+      if (!Array.isArray(c.permisos)) c.permisos = [];
+      return { cuenta: c, negocio: DB.negocios[c.negocio], reservas: DB.reservas[c.negocio] || (DB.reservas[c.negocio] = []) };
+    };
+    const invs = () => (DB.invitaciones = DB.invitaciones || []);
+    const vigente = (i) => i && !i.usada && i.vence > Date.now() && DB.negocios[i.negocio];
+    const esDueno = () => yo && yo.rol === "dueno";
+    // Suma una cuenta al equipo con los permisos de la invitación (como unir_por_invitacion en la base)
+    const unir = (c, token) => {
+      const i = invs().find((x) => x.token === token);
+      if (!vigente(i)) return { ok: false, error: "invitacion-vencida" };
+      if (correo(c.email) !== i.email) return { ok: false, error: "invitacion-otro-email" };
+      if (c.negocio && DB.negocios[c.negocio]) return { ok: false, error: "ya-en-negocio" };
+      Object.assign(c, { negocio: i.negocio, rol: "encargado", permisos: limpiarPermisos(i.permisos) });
+      if (!c.nombre) c.nombre = i.nombre;
+      i.usada = Date.now();
+      guardar();
+      return { ok: true };
+    };
     return {
       modo: "local",
       async sesionActual() { return { ok: false, error: "sin-sesion" }; },
       async ingresar(email, clave) {
         const c = DB.cuentas.find((x) => x.email === email || x.usuario === email);
         if (!c || (await hashear(clave, c.sal)) !== c.hash) return { ok: false, error: "credenciales" };
+        if (!c.negocio || !DB.negocios[c.negocio]) { sinNegocio = c; return { ok: false, error: "sin-negocio" }; }
         yo = c;
         return { ok: true, datos: datosDe(c) };
       },
@@ -209,14 +249,18 @@
         DB.cuentas.push(c); guardar(); yo = c;
         return { ok: true, datos: datosDe(c) };
       },
-      async salir() { yo = null; },
+      async salir() { yo = null; sinNegocio = null; },
       async guardar(neg) {
         if (Object.values(DB.negocios).some((o) => o.id !== neg.id && o.slug === neg.slug)) return { ok: false, error: "slug" };
         if (neg.id === "n1") DB.demoTocado = true;
         guardar();
         return { ok: true };
       },
-      async recargar() { return { ok: false, error: "local" }; },
+      async recargar() {
+        if (!yo) return { ok: false, error: "sesion" };
+        if (!yo.negocio || !DB.negocios[yo.negocio]) return { ok: false, error: "sin-negocio" };
+        return { ok: true, datos: datosDe(yo) };
+      },
       async cambiarNombre(nombre) { yo.nombre = nombre; guardar(); return { ok: true }; },
       async cambiarClave(actual, nueva) {
         if ((await hashear(actual, yo.sal)) !== yo.hash) return { ok: false, error: "actual-mal" };
@@ -226,6 +270,75 @@
       async recuperar() { return { ok: false, error: "local" }; },
       alRecuperar() {},
       async ponerClave() { return { ok: false, error: "local" }; },
+
+      // ---------- Equipo ----------
+      async equipo() {
+        if (!esDueno()) return { ok: false, error: "permiso" };
+        const ahora_ = Date.now();
+        return {
+          ok: true,
+          miembros: DB.cuentas.filter((c) => c.negocio === yo.negocio)
+            .sort((a, b) => (a.rol === "dueno" ? -1 : b.rol === "dueno" ? 1 : 0))
+            .map((c) => ({ id: c.email, rol: c.rol || "dueno", permisos: c.permisos || [], nombre: c.nombre || "", email: c.email, yo: c === yo })),
+          invitaciones: invs().filter((i) => i.negocio === yo.negocio && !i.usada && i.vence > ahora_)
+            .map((i) => ({ id: i.id, email: i.email, nombre: i.nombre, permisos: i.permisos, token: i.token, vence: new Date(i.vence).toISOString() })),
+        };
+      },
+      async invitar({ email, nombre, permisos }) {
+        if (!esDueno()) return { ok: false, error: "permiso" };
+        const e = correo(email);
+        if (!EMAIL_OK.test(e)) return { ok: false, error: "email-invalido" };
+        if (DB.cuentas.some((c) => c.negocio === yo.negocio && c.email === e)) return { ok: false, error: "ya-en-equipo" };
+        DB.invitaciones = invs().filter((i) => !(i.negocio === yo.negocio && i.email === e && !i.usada));
+        const token = hex(crypto.getRandomValues(new Uint8Array(32)));
+        DB.invitaciones.push({ id: nuevoId(), negocio: yo.negocio, email: e, nombre: String(nombre || "").trim().slice(0, 80), permisos: limpiarPermisos(permisos), token, creado: Date.now(), vence: Date.now() + VENCE_INVITACION, usada: null });
+        guardar();
+        return { ok: true, token };
+      },
+      async anularInvitacion(id) {
+        if (!esDueno()) return { ok: false, error: "permiso" };
+        DB.invitaciones = invs().filter((i) => !(i.id === id && i.negocio === yo.negocio && !i.usada));
+        guardar();
+        return { ok: true };
+      },
+      async cambiarPermisos(id, permisos) {
+        const c = esDueno() && DB.cuentas.find((x) => x.email === id && x.negocio === yo.negocio && x.rol === "encargado");
+        if (!c) return { ok: false, error: "permiso" };
+        c.permisos = limpiarPermisos(permisos); guardar();
+        return { ok: true, permisos: c.permisos };
+      },
+      async quitarMiembro(id) {
+        const c = esDueno() && DB.cuentas.find((x) => x.email === id && x.negocio === yo.negocio && x.rol === "encargado");
+        if (!c) return { ok: false, error: "permiso" };
+        c.negocio = null; c.permisos = []; guardar(); // la cuenta sigue, pero sin negocio
+        return { ok: true };
+      },
+      async verInvitacion(token) {
+        const i = invs().find((x) => x.token === token);
+        if (!i || !DB.negocios[i.negocio]) return { ok: false, error: "invitacion-no-existe" };
+        return { ok: true, invitacion: { negocio: DB.negocios[i.negocio].nombre, email: i.email, nombre: i.nombre, permisos: i.permisos, valida: !!vigente(i) } };
+      },
+      async unirse({ token, nombre, email, clave }) {
+        const i = invs().find((x) => x.token === token);
+        if (!vigente(i)) return { ok: false, error: "invitacion-vencida" };
+        if (correo(email) !== i.email) return { ok: false, error: "invitacion-otro-email" };
+        if (DB.cuentas.some((c) => c.email === correo(email))) return { ok: false, error: "existe" };
+        const sal = nuevaSal();
+        const c = { email: correo(email), nombre, negocio: null, rol: "encargado", permisos: [], sal, hash: await hashear(clave, sal) };
+        DB.cuentas.push(c);
+        const r = unir(c, token);
+        if (!r.ok) { guardar(); return r; }
+        yo = c;
+        return { ok: true, datos: datosDe(c) };
+      },
+      async aceptarInvitacion(token) {
+        const c = sinNegocio || yo;
+        if (!c) return { ok: false, error: "sesion" };
+        const r = unir(c, token);
+        if (!r.ok) return r;
+        yo = c; sinNegocio = null;
+        return { ok: true, datos: datosDe(c) };
+      },
     };
   };
   const store = NUBE ? window.BookeaNube.crear(CONFIG) : almacenLocal();
@@ -236,7 +349,13 @@
     muchos: "Probaste muchas veces seguidas. Esperá unos minutos y volvé a intentar.",
     red: "No hay conexión. Revisá internet y probá de nuevo.",
     libreria: "No pudimos conectarnos con Bookea. Revisá internet y recargá la página.",
-    "sin-negocio": "Tu cuenta todavía no tiene un negocio asignado.",
+    "sin-negocio": "Tu cuenta no está en ningún negocio. Si te invitaron a un equipo, abrí el link que te mandaron.",
+    permiso: "No tenés permiso para hacer eso. Si lo necesitás, pedíselo al dueño del negocio.",
+    "ya-en-equipo": "Esa persona ya está en tu equipo.",
+    "ya-en-negocio": "Esa cuenta ya está en un negocio. Usá otro email.",
+    "invitacion-vencida": "Este link ya se usó o venció. Pedile al dueño del negocio uno nuevo.",
+    "invitacion-no-existe": "Este link no es válido. Revisá que esté completo o pedile al dueño del negocio uno nuevo.",
+    "invitacion-otro-email": "Ese no es el email al que te invitaron.",
     existe: "Ya hay una cuenta con ese email. Ingresá con él o pedí una contraseña nueva.",
     "clave-debil": "Esa contraseña es muy fácil de adivinar. Probá con una más larga, con letras y números.",
     "email-invalido": "Ese email no parece válido. Revisalo.",
@@ -277,6 +396,8 @@
     if (r.error === "slug") return; // lo muestra Mi negocio, al lado del campo
     if (r.error === "ocupado") { aviso("Ese horario ya lo ocupó otra reserva, quizás desde otro dispositivo. Actualizamos la agenda."); actualizar(true); return; }
     if (r.error === "sesion") { aviso(MENSAJES.sesion); salir({ vencida: true }); return; }
+    // la base no dejó guardar (le sacaron un permiso mientras tenía el panel abierto): se vuelve a lo que hay en la base
+    if (r.error === "permiso") { aviso(MENSAJES.permiso); actualizar(true); return; }
     if (r.error === "invalido") { aviso("Ese dato no se pudo guardar: revisá que no sea demasiado largo."); return; }
     aviso(r.error === "red" ? "No se pudo guardar: parece que no hay conexión. Lo volvemos a intentar solo." : "No se pudo guardar el último cambio. Lo volvemos a intentar.");
     clearTimeout(reintento); reintento = setTimeout(() => { reintento = null; sincronizar(); }, 8000);
@@ -291,12 +412,35 @@
     if (!g.ok && !forzar) return; // primero tiene que quedar guardado lo de este dispositivo
     if (!forzar && (dlg.open || hayEdicion())) return;
     const r = await store.recargar();
-    if (!r.ok || !NEG) { if (r.error === "sesion") { aviso(MENSAJES.sesion); salir({ vencida: true }); } return; }
+    if (!r.ok || !NEG) {
+      if (r.error === "sesion") { aviso(MENSAJES.sesion); salir({ vencida: true }); }
+      if (r.error === "sin-negocio") { await salir({ vencida: true }); aviso("Ya no estás en el equipo de este negocio."); }
+      return;
+    }
     for (const k of Object.keys(NEG)) delete NEG[k];
     Object.assign(NEG, completarNegocio(r.datos.negocio));
     RES.splice(0, RES.length, ...r.datos.reservas);
-    pintarLado();
+    const antes = JSON.stringify([YO.rol, YO.permisos]);
+    YO.rol = r.datos.cuenta.rol; YO.permisos = r.datos.cuenta.permisos || [];
+    const cambiaron = antes !== JSON.stringify([YO.rol, YO.permisos]);
+    pintarLado(); pintarMenu();
+    if (!puedeVer(vistaActual)) { cerrarDlg(); ir(primeraVista()); aviso("Cambiaron tus permisos en este negocio."); return; }
+    if (cambiaron && !hayEdicion()) { cerrarDlg(); refrescar(); aviso("Cambiaron tus permisos en este negocio."); return; }
     if (["agenda", "finanzas", "clientes"].includes(vistaActual) && !hayEdicion()) refrescar();
+  };
+  // En el modo de prueba también: así, si el dueño cambia permisos en otra pestaña, se ve al volver
+  document.addEventListener("visibilitychange", () => { if (store.modo === "local" && document.visibilityState === "visible" && NEG) recargarLocal(); });
+  const recargarLocal = async () => {
+    try { DB = JSON.parse(local.get(CLAVE)) || DB; } catch { /* queda lo que había */ }
+    if (!YO) return;
+    const c = DB.cuentas.find((x) => x.email === YO.email);
+    if (!c || !c.negocio || !DB.negocios[c.negocio]) { await salir({ vencida: true }); aviso("Ya no estás en el equipo de este negocio."); return; }
+    const antes = JSON.stringify([YO.rol, YO.permisos]);
+    YO.rol = c.rol; YO.permisos = c.permisos || [];
+    if (antes === JSON.stringify([YO.rol, YO.permisos])) return;
+    pintarMenu();
+    if (!puedeVer(vistaActual)) ir(primeraVista()); else if (!hayEdicion()) refrescar();
+    aviso("Cambiaron tus permisos en este negocio.");
   };
   if (NUBE) {
     document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") actualizar(); });
@@ -305,9 +449,11 @@
 
   const entrar = (datos, vistaInicial) => {
     YO = datos.cuenta; NEG = completarNegocio(datos.negocio); RES = datos.reservas;
+    if (!YO.rol) YO.rol = "dueno";
+    if (!Array.isArray(YO.permisos)) YO.permisos = [];
     $("#entrada").hidden = true; $("#cargando").hidden = true; $("#panel").hidden = false;
-    pintarLado();
-    ir(vistaInicial || "agenda", { foco: false });
+    pintarLado(); pintarMenu();
+    ir(primeraVista(vistaInicial || "agenda"), { foco: false });
     if (store.modo === "nube") sincronizar(); // un negocio nuevo guarda acá sus ajustes iniciales
   };
   const salir = async (opc) => {
@@ -319,8 +465,8 @@
     mostrarEntrada();
     if (!vencida) aviso("Cerraste sesión.");
   };
-  const FORMS = { ingresar: "#f-ingresar", registro: "#f-registro", olvido: "#f-olvido", nueva: "#f-nueva", espera: "#f-espera" };
-  const FOCO = { ingresar: "#i-email", registro: "#r-nombre", olvido: "#o-email", nueva: "#nc-clave", espera: "#es-volver" };
+  const FORMS = { ingresar: "#f-ingresar", registro: "#f-registro", olvido: "#f-olvido", nueva: "#f-nueva", espera: "#f-espera", unirse: "#f-unirse" };
+  const FOCO = { ingresar: "#i-email", registro: "#r-nombre", olvido: "#o-email", nueva: "#nc-clave", espera: "#es-volver", unirse: "#u-nombre" };
   const mostrarEntrada = (cual = "ingresar") => {
     $("#panel").hidden = true; $("#cargando").hidden = true; $("#entrada").hidden = false;
     for (const [k, sel] of Object.entries(FORMS)) $(sel).hidden = k !== cual;
@@ -453,6 +599,15 @@
     fallos = 0; msg.textContent = ""; $("#i-clave").value = "";
     pasar(r.datos, "agenda", saludar);
   });
+  // Antes de entrar: si la cuenta no tiene negocio y vino con el link de una invitación, la acepta
+  const ingresarOriginal = store.ingresar.bind(store);
+  store.ingresar = async (email, clave) => {
+    const r = await ingresarOriginal(email, clave);
+    if (r.ok || r.error !== "sin-negocio" || !INVITACION || !store.aceptarInvitacion) return r;
+    const r2 = await store.aceptarInvitacion(INVITACION);
+    if (r2.ok) sacarInvitacionDeLaDireccion();
+    return r2;
+  };
 
   // ---------- Entrada: me olvidé la contraseña (solo con la base) ----------
   $("#f-olvido").addEventListener("submit", async (e) => {
@@ -552,8 +707,23 @@
   // ---------- Navegación del panel ----------
   const VISTAS = {};
   let vistaActual = "agenda";
+  // ¿Puede hacer "p"? El dueño, todo.
+  const puede = (p) => !!YO && (YO.rol === "dueno" || (YO.permisos || []).includes(p));
+  const esDueno = () => !!YO && YO.rol === "dueno";
+  const VISTA_PERMISO = { agenda: "agenda", finanzas: "finanzas", clientes: "clientes", negocio: "negocio" };
+  const puedeVer = (v) => {
+    if (v === "cuenta") return true;
+    if (v === "equipo") return esDueno();
+    if (v === "solicitudes") return !!(YO && YO.admin);
+    return puede(VISTA_PERMISO[v]);
+  };
+  const primeraVista = (pref) => [pref, "agenda", "clientes", "finanzas", "negocio", "cuenta"].find((v) => v && VISTAS[v] && puedeVer(v));
+  const pintarMenu = () => {
+    $$(".menu__i").forEach((b) => (b.hidden = !puedeVer(b.dataset.vista)));
+    // "Ver tu página de reservas" sirve a todos; "Solicitudes", solo al equipo de Bookea (lo maneja avisarSolicitudes)
+  };
   const ir = (v, { foco = true } = {}) => {
-    if (!VISTAS[v]) v = "agenda";
+    if (!VISTAS[v] || !puedeVer(v)) v = primeraVista();
     vistaActual = v;
     $$(".menu__i").forEach((b) => (b.dataset.vista === v ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current")));
     VISTAS[v]();
@@ -649,8 +819,10 @@
 
   // El riel: lo que hay que hacer (para cerrar) y lo que viene (próximos turnos)
   const htmlRiel = () => {
-    const hoy = ahora(), pend = pendientes(), prox = proximos();
+    const hoy = ahora(), pend = pendientes(), prox = proximos(), edita = puede("turnos");
     const filaPend = (r) => {
+      if (!edita) return `<div class="lista__f"><p class="lista__h">${aHora(r.hora)}<small>${cuandoCorto(r.fecha, hoy.fecha)}</small></p>
+        <div class="lista__q"><b>${esc(r.cliente)}</b><small>${esc(nombreRec(r.recurso))} · terminó a las ${aHora(r.hora + NEG.duracion)}</small></div></div>`;
       return `<div class="lista__f lista__f--acc"><p class="lista__h">${aHora(r.hora)}<small>${cuandoCorto(r.fecha, hoy.fecha)}</small></p>
         <div class="lista__q"><b>${esc(r.cliente)}</b><small>${esc(nombreRec(r.recurso))} · terminó a las ${aHora(r.hora + NEG.duracion)}</small></div>
         <div class="lista__acc"><button type="button" class="btn btn--ghost btn--sm" data-rapido="jugada" data-id="${r.id}" aria-label="${esc(`${r.cliente} pagó`)}">${ico("check")}Pagó</button><button type="button" class="btn btn--line btn--sm" data-rapido="ausente" data-id="${r.id}" aria-label="${esc(`${r.cliente} no vino`)}">No vino</button></div></div>`;
@@ -661,7 +833,7 @@
     return `<aside class="riel" aria-label="Para hacer y lo que viene">
         <section class="riel__sec" aria-labelledby="pc-t">
           <h2 id="pc-t" tabindex="-1">Para cerrar ${pend.length ? `<span class="chip-n">${pend.length}</span>` : ""}</h2>
-          <p>${pend.length ? "Turnos que ya terminaron. Marcá si pagaron el resto o si no vinieron." : "Acá aparecen los turnos que ya terminaron, para marcar si pagaron."}</p>
+          <p>${pend.length ? (edita ? "Turnos que ya terminaron. Marcá si pagaron el resto o si no vinieron." : "Turnos que ya terminaron y todavía no se marcó si pagaron.") : "Acá aparecen los turnos que ya terminaron, para marcar si pagaron."}</p>
           <div class="lista">${pend.length ? pend.slice(0, 4).map(filaPend).join("") : `<p class="vacio-l">${ico("check")}Todo al día: no hay turnos sin marcar.</p>`}</div>
           ${pend.length > 4 ? `<p>Y ${plural(pend.length - 4, "turno más", "turnos más")}: están en la agenda de cada día.</p>` : ""}
         </section>
@@ -681,7 +853,7 @@
     $("#vista").innerHTML = `
       <header class="vhead">
         <div><h1>Agenda</h1><p class="vhead__frase">${fraseAgenda(f, hoy, R, esDia)}</p></div>
-        <div class="vhead__acc"><button type="button" class="btn btn--ink" data-nuevo>${ico("mas", "ico-mas")}Cargar turno</button></div>
+        <div class="vhead__acc">${puede("turnos") ? `<button type="button" class="btn btn--ink" data-nuevo>${ico("mas", "ico-mas")}Cargar turno</button>` : `<p class="solo-ver">${ico("candado")}Podés ver la agenda. Para cargar turnos, pedile permiso al dueño.</p>`}</div>
       </header>
       <div class="barra-f">
         <div class="barra-f__izq">
@@ -712,7 +884,8 @@
     $$("[data-mover]", v).forEach((b) => b.addEventListener("click", () => { AG.fecha = sumar(AG.fecha, +b.dataset.mover * (AG.modo === "dia" ? 1 : 7)); VISTAS.agenda(); $(`[data-mover="${b.dataset.mover}"]`).focus(); }));
     $("[data-hoy]", v).addEventListener("click", () => { AG.fecha = ahora().fecha; VISTAS.agenda(); $("[data-hoy]").focus(); });
     engancharCalendario();
-    $("[data-nuevo]", v).addEventListener("click", () => dlgNuevo({ fecha: AG.fecha }));
+    const nuevo = $("[data-nuevo]", v);
+    nuevo && nuevo.addEventListener("click", () => dlgNuevo({ fecha: AG.fecha }));
     $$("[data-res]", v).forEach((b) => b.addEventListener("click", () => dlgTurno(b.dataset.res)));
     $$("[data-libre]", v).forEach((b) => b.addEventListener("click", () => dlgNuevo({ fecha: f, recurso: b.dataset.rec, hora: +b.dataset.hora })));
     $$("[data-ir-dia]", v).forEach((b) => b.addEventListener("click", () => { AG.fecha = b.dataset.irDia; AG.modo = "dia"; VISTAS.agenda(); }));
@@ -813,6 +986,7 @@
           h += `<button type="button" class="slot slot--${r.estado}${r.estado === "confirmada" && !r.sena ? " sin-sena" : ""}${cerrar ? " slot--cerrar" : ""}${pop}" data-res="${r.id}" aria-label="${esc(`${r.cliente}, ${rec.nombre} de ${rangoT}: ${est}`)}"><b>${esc(r.cliente)}</b><small class="slot__e">${est}${cerrar ? "" : extra}</small><small class="slot__t">${donde}</small></button>`;
         }
         else if (f < hoy.fecha || (f === hoy.fecha && t < hoy.min)) h += `<span class="slot slot--pasado" aria-label="${esc(`${rec.nombre} de ${rangoT}: finalizado`)}"><small>Finalizado</small><small class="slot__t">${donde}</small></span>`;
+        else if (!puede("turnos")) h += `<span class="slot slot--libre slot--ver" aria-label="${esc(`${rec.nombre} de ${rangoT}: libre`)}"><b>Libre</b><small class="slot__t">${donde}</small></span>`;
         else h += `<button type="button" class="slot slot--libre" data-libre data-rec="${rec.id}" data-hora="${t}" aria-label="Cargar turno en ${esc(rec.nombre)} de ${rangoT}"><b>${ico("mas")}Libre</b><small class="slot__t">${donde}</small></button>`;
       }
     }
@@ -822,7 +996,7 @@
       <span><i style="background:#eceeee"></i>Pagado</span>
       <span><i style="background:var(--n100)"></i>No vino</span>
       <span><i style="background:var(--tx)"></i>Bloqueado</span>
-      <span><i style="background:var(--v50);box-shadow:inset 0 0 0 1px var(--v100)"></i>Libre: tocalo para cargar un turno</span></div>`;
+      <span><i style="background:var(--v50);box-shadow:inset 0 0 0 1px var(--v100)"></i>${puede("turnos") ? "Libre: tocalo para cargar un turno" : "Libre"}</span></div>`;
     return h;
   };
 
@@ -862,13 +1036,14 @@
   const dlgTurno = (id, paso = "") => {
     const r = RES.find((x) => x.id === id); if (!r) return;
     const rec = nombreRec(r.recurso), cuando = `${largo(r.fecha)} · ${aHora(r.hora)}`;
+    const edita = puede("turnos");
     if (r.estado === "bloqueo") {
       abrirDlg(`${cabezaDlg(`${rec} · ${cuando}`, "Horario bloqueado")}
         <p>${esc(r.nota || "Sin motivo cargado.")}</p>
-        <div class="acciones"><button type="button" class="btn btn--warn" data-acc="quitar">Quitar el bloqueo</button><button type="button" class="btn btn--ghost" data-cerrar>Listo</button></div>`);
+        <div class="acciones">${edita ? `<button type="button" class="btn btn--warn" data-acc="quitar">Quitar el bloqueo</button>` : ""}<button type="button" class="btn btn--ghost" data-cerrar>Listo</button></div>`);
       return bindAcc(r);
     }
-    if (paso === "cancelar") {
+    if (paso === "cancelar" && edita) {
       const h = horasHasta(r), devuelve = NEG.devolverSena && h >= NEG.cancelarHoras;
       abrirDlg(`${cabezaDlg(`${rec} · ${cuando}`, `¿Cancelar el turno de ${r.cliente}?`)}
         <p>${!r.sena ? "Este turno no tiene seña." : devuelve
@@ -882,7 +1057,8 @@
     const msj = `Hola ${r.cliente.split(" ")[0]}, te escribimos de ${NEG.nombre} por tu turno del ${largo(r.fecha).toLowerCase()} a las ${aHora(r.hora)} en ${rec}.`;
     const wa = waLink(r, msj);
     let acc = "";
-    if (r.estado === "confirmada") {
+    if (!edita) acc = "";
+    else if (r.estado === "confirmada") {
       acc = `<button type="button" class="btn btn--ink" data-acc="jugada">${resto > 0 ? `Cobré el resto (${plata(resto)})` : "Marcar como pagado"}</button>
         <button type="button" class="btn btn--line" data-acc="ausente">No vino</button>
         <button type="button" class="btn btn--warn" data-acc="cancelar">Cancelar turno</button>`;
@@ -898,9 +1074,11 @@
         ${r.estado === "confirmada" ? `<div class="falta"><dt>Falta cobrar</dt><dd>${plata(resto)}</dd></div>` : ""}
         <div><dt>Cómo reservó</dt><dd>${mayus(ORIGEN[r.origen] || "—")}</dd></div>
       </dl>
-      <div class="field"><label for="d-nota">Nota</label><textarea id="d-nota" rows="2" placeholder="Por ejemplo, traen paletas prestadas">${esc(r.nota)}</textarea></div>
+      ${edita ? `<div class="field"><label for="d-nota">Nota</label><textarea id="d-nota" rows="2" placeholder="Por ejemplo, traen paletas prestadas">${esc(r.nota)}</textarea></div>`
+        : r.nota ? `<p class="nota-ver"><b>Nota:</b> ${esc(r.nota)}</p>` : ""}
       <div class="acciones">${acc}${wa ? `<a class="btn btn--ghost" href="${wa}" target="_blank" rel="noopener">${ico("chat")}Escribirle por WhatsApp</a>` : ""}</div>`);
-    $("#d-nota").addEventListener("change", (e) => { r.nota = e.target.value.trim(); tocar(); aviso("Nota guardada."); });
+    const nota = $("#d-nota");
+    nota && nota.addEventListener("change", (e) => { r.nota = e.target.value.trim(); tocar(); aviso("Nota guardada."); });
     bindAcc(r);
   };
   const bindAcc = (r) => {
@@ -922,6 +1100,7 @@
 
   // ---------- Cargar turno o bloqueo ----------
   const dlgNuevo = (pre = {}) => {
+    if (!puede("turnos")) return aviso(MENSAJES.permiso);
     const hoy = ahora();
     abrirDlg(`${cabezaDlg(NEG.nombre, "Cargar turno")}
       <form class="nuevo" id="f-nuevo" novalidate>
@@ -1426,11 +1605,182 @@
       if (!ok && b.dataset.seguro !== "1") { b.dataset.seguro = "1"; b.textContent = "Tocá de nuevo para confirmar"; return; }
       $$("[data-revisar]", b.parentElement).forEach((y) => (y.disabled = true));
       const res = await store.revisar(b.dataset.revisar, ok);
-      if (!res.ok) { aviso(res.error === "sesion" ? MENSAJES["sin-permiso"] : "No se pudo guardar. " + (MENSAJES[res.error] || MENSAJES.otro)); VISTAS.solicitudes(); return; }
+      if (!res.ok) { aviso(res.error === "sesion" || res.error === "permiso" ? MENSAJES["sin-permiso"] : "No se pudo guardar. " + (MENSAJES[res.error] || MENSAJES.otro)); VISTAS.solicitudes(); return; }
       aviso(ok ? `${x.nombre} quedó aprobado. Ya puede entrar al panel.` : `${x.nombre} quedó sin acceso al panel.`);
       if (NEG && x.id === NEG.id) NEG.estado = res.estado;
       VISTAS.solicitudes();
     }));
+  };
+
+  // ---------- Equipo (solo el dueño) ----------
+  // El dueño suma personas con un link que les manda por WhatsApp, elige qué puede hacer cada una,
+  // se lo cambia cuando quiere y las saca del equipo.
+  const chipsPermisos = (lista, rol) => rol === "dueno"
+    ? `<span class="chip-p chip-p--todo">Todo, y maneja el equipo</span>`
+    : (lista || []).length
+      ? PERMISOS.filter((x) => lista.includes(x.k)).map((x) => `<span class="chip-p">${esc(x.c)}</span>`).join("")
+      : `<span class="chip-p chip-p--nada">Solo su cuenta</span>`;
+  const linkInvitacion = (token) => `${location.origin}${location.pathname}?invitacion=${token}`;
+  const textoInvitacion = (i) => `Hola${i.nombre ? " " + primerNombre(i.nombre) : ""}, te sumé al equipo de ${NEG.nombre} en Bookea. `
+    + `Creá tu cuenta con tu email (${i.email}) desde este link: ${linkInvitacion(i.token)}`;
+  const waInvitacion = (i) => `https://wa.me/?text=${encodeURIComponent(textoInvitacion(i))}`;
+  const casillasPermisos = (marcados) => `<fieldset class="permisos"><legend>Qué puede hacer en el panel</legend>
+    ${PERMISOS.map((x) => `<label class="perm"><input type="checkbox" name="perm" value="${x.k}" ${marcados.includes(x.k) ? "checked" : ""} />
+      <span><b>${esc(x.t)}</b><small>${esc(x.d)}</small></span></label>`).join("")}
+    <p class="field__help">Cuenta, para cambiar su nombre y su contraseña, la tiene siempre. El equipo lo manejás solo vos.</p></fieldset>`;
+  // Cargar turnos necesita ver la agenda: se tildan y destildan juntas
+  const engancharCasillas = (cont) => cont.addEventListener("change", (e) => {
+    const cb = (k) => $(`input[name="perm"][value="${k}"]`, cont);
+    if (e.target.value === "turnos" && e.target.checked) cb("agenda").checked = true;
+    if (e.target.value === "agenda" && !e.target.checked) cb("turnos").checked = false;
+  });
+  const leerCasillas = (cont) => limpiarPermisos($$('input[name="perm"]:checked', cont).map((i) => i.value));
+  const venceTxt = (iso) => { const d = Math.ceil((new Date(iso) - Date.now()) / 864e5); return d <= 1 ? "vence hoy" : `vence en ${d} días`; };
+  const copiarTexto = async (texto, btn, input) => {
+    try { await navigator.clipboard.writeText(texto); } catch { if (input) { input.select(); try { document.execCommand("copy"); } catch { /* queda seleccionado */ } } }
+    const antes = btn.innerHTML;
+    btn.innerHTML = tilde() + "Copiado";
+    setTimeout(() => { if (btn.isConnected) btn.innerHTML = antes; }, 1800);
+  };
+  // Dos toques para lo que no se deshace (sacar a alguien, anular un link)
+  const dosToques = (b) => {
+    if (b.dataset.seguro === "1") return true;
+    b.dataset.seguro = "1"; b.textContent = "Tocá de nuevo para confirmar";
+    setTimeout(() => { if (b.isConnected && b.dataset.seguro === "1") { b.dataset.seguro = ""; b.textContent = b.dataset.txt0; } }, 4000);
+    return false;
+  };
+
+  VISTAS.equipo = async () => {
+    if (!esDueno()) return ir(primeraVista());
+    const v = $("#vista");
+    const head = `<header class="vhead"><div><h1>Equipo</h1><p class="vhead__frase">Sumá a las personas que te ayudan con el negocio. Cada una entra con su email y su contraseña, y ve solo lo que vos le habilitás.</p></div>
+      <div class="vhead__acc"><button type="button" class="btn btn--ink" data-invitar>${ico("mas", "ico-mas")}Sumar a alguien</button></div></header>`;
+    if (!v.querySelector(".eqs")) {
+      v.innerHTML = head + `<section class="card"><p class="card__sub">Cargando tu equipo…</p></section>`;
+      $("[data-invitar]", v).addEventListener("click", dlgInvitar); // ya responde mientras carga la lista
+    }
+    const r = await store.equipo();
+    if (vistaActual !== "equipo") return;
+    if (!r.ok) {
+      v.innerHTML = head + `<section class="card"><p class="form__msg err">No se pudo traer tu equipo. ${esc(MENSAJES[r.error] || MENSAJES.otro)}</p></section>`;
+      $("[data-invitar]", v).addEventListener("click", dlgInvitar);
+      return;
+    }
+    const otros = r.miembros.filter((m) => m.rol !== "dueno");
+    const fila = (m) => `<li class="eq">
+        <span class="eq__av" aria-hidden="true">${esc(iniciales(m.nombre || m.email))}</span>
+        <div class="eq__q"><b>${esc(m.nombre || m.email)}${m.yo ? " (vos)" : ""}</b><span>${esc(m.email)}</span><div class="eq__p">${chipsPermisos(m.permisos, m.rol)}</div></div>
+        ${m.rol === "dueno" ? `<span class="estado estado--confirmada eq__rol"><i aria-hidden="true"></i>Dueño</span>`
+          : `<div class="eq__acc"><button type="button" class="btn btn--line btn--sm" data-permisos="${esc(m.id)}">Cambiar permisos</button>
+             <button type="button" class="btn btn--warn btn--sm" data-quitar="${esc(m.id)}" data-txt0="Sacar del equipo">Sacar del equipo</button></div>`}
+      </li>`;
+    const filaInv = (i) => `<li class="eq eq--inv">
+        <span class="eq__av eq__av--inv" aria-hidden="true">${ico("chat")}</span>
+        <div class="eq__q"><b>${esc(i.nombre || i.email)}</b><span>${esc(i.email)} · todavía no creó su cuenta · ${venceTxt(i.vence)}</span><div class="eq__p">${chipsPermisos(i.permisos, "encargado")}</div></div>
+        <div class="eq__acc"><a class="btn btn--ghost btn--sm" href="${waInvitacion(i)}" target="_blank" rel="noopener">${ico("chat")}Mandar por WhatsApp</a>
+          <button type="button" class="btn btn--line btn--sm" data-copiar-inv="${esc(i.token)}">${ico("copiar")}Copiar link</button>
+          <button type="button" class="btn btn--warn btn--sm" data-anular="${esc(i.id)}" data-txt0="Anular">Anular</button></div>
+      </li>`;
+    v.innerHTML = head + `
+      <section class="card" aria-labelledby="eq-1">
+        <div class="card__head"><div><h2 id="eq-1">En el equipo</h2><p class="card__sub">${otros.length
+          ? `${plural(r.miembros.length, "persona entra", "personas entran")} a este panel.`
+          : "Por ahora solo vos. Tocá “Sumar a alguien” para invitar a quien te ayuda en el negocio."}</p></div></div>
+        <ul class="eqs">${r.miembros.map(fila).join("")}</ul>
+      </section>
+      ${r.invitaciones.length ? `<section class="card" aria-labelledby="eq-2">
+        <div class="card__head"><div><h2 id="eq-2">Invitaciones sin usar</h2><p class="card__sub">Cada link sirve una sola vez, para ese email, y vence a los 7 días.</p></div></div>
+        <ul class="eqs">${r.invitaciones.map(filaInv).join("")}</ul></section>` : ""}`;
+    $("[data-invitar]", v).addEventListener("click", dlgInvitar);
+    $$("[data-permisos]", v).forEach((b) => b.addEventListener("click", () => dlgPermisos(r.miembros.find((m) => m.id === b.dataset.permisos))));
+    $$("[data-copiar-inv]", v).forEach((b) => b.addEventListener("click", () => { copiarTexto(linkInvitacion(b.dataset.copiarInv), b); aviso("Link copiado. Mandáselo por WhatsApp o por mail."); }));
+    $$("[data-quitar]", v).forEach((b) => b.addEventListener("click", async () => {
+      if (!dosToques(b)) return;
+      const m = r.miembros.find((x) => x.id === b.dataset.quitar);
+      b.disabled = true;
+      const res = await store.quitarMiembro(m.id);
+      if (!res.ok) { aviso("No se pudo sacar del equipo. " + (MENSAJES[res.error] || MENSAJES.otro)); VISTAS.equipo(); return; }
+      aviso(`${m.nombre || m.email} ya no entra a tu panel.`);
+      VISTAS.equipo();
+    }));
+    $$("[data-anular]", v).forEach((b) => b.addEventListener("click", async () => {
+      if (!dosToques(b)) return;
+      b.disabled = true;
+      const res = await store.anularInvitacion(b.dataset.anular);
+      if (!res.ok) { aviso("No se pudo anular. " + (MENSAJES[res.error] || MENSAJES.otro)); VISTAS.equipo(); return; }
+      aviso("Invitación anulada: ese link ya no sirve.");
+      VISTAS.equipo();
+    }));
+  };
+
+  const dlgInvitar = () => {
+    abrirDlg(`${cabezaDlg(NEG.nombre, "Sumar a alguien al equipo")}
+      <form class="nuevo" id="f-invitar" novalidate>
+        <p class="dlg__intro">Te damos un link para mandarle. Con ese link crea su cuenta y entra a tu panel con lo que tildes acá.</p>
+        <div class="field-row">
+          <div class="field"><label for="iv-nombre">Nombre</label><input id="iv-nombre" autocomplete="off" aria-describedby="iv-nombre-err" /><p class="field__err" id="iv-nombre-err" hidden>Escribí su nombre.</p></div>
+          <div class="field"><label for="iv-email">Su email</label><input id="iv-email" type="email" autocapitalize="none" spellcheck="false" inputmode="email" autocomplete="off" aria-describedby="iv-email-ayuda iv-email-err" />
+            <p class="field__help" id="iv-email-ayuda">Con este email va a entrar.</p><p class="field__err" id="iv-email-err" hidden></p></div>
+        </div>
+        ${casillasPermisos(PERMISOS_NUEVO)}
+        <p class="form__msg err" id="iv-msg" role="alert"></p>
+        <div class="acciones"><button type="submit" class="btn btn--ink btn--lg">Crear el link</button><button type="button" class="btn btn--ghost btn--lg" data-cerrar>Cancelar</button></div>
+      </form>`);
+    const f = $("#f-invitar");
+    engancharCasillas(f);
+    f.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const nombre = $("#iv-nombre").value.trim(), email = correo($("#iv-email").value), permisos = leerCasillas(f);
+      $("#iv-msg").textContent = "";
+      const ok = [
+        marcar($("#iv-nombre"), "iv-nombre-err", !nombre),
+        marcar($("#iv-email"), "iv-email-err", !EMAIL_OK.test(email) ? "Escribí un email válido, por ejemplo nombre@gmail.com." : email === correo(YO.email) ? "Ese es tu email: vos ya estás en el equipo." : false),
+      ];
+      if (ok.includes(false)) { const p = $(".is-invalid", f); p && p.focus(); return; }
+      const btn = $('button[type="submit"]', f);
+      ocupado(btn, true, "Creando el link…");
+      const r = await store.invitar({ email, nombre, permisos });
+      ocupado(btn, false);
+      if (!r.ok) {
+        if (r.error === "ya-en-equipo" || r.error === "email-invalido") { marcar($("#iv-email"), "iv-email-err", MENSAJES[r.error]); $("#iv-email").focus(); return; }
+        $("#iv-msg").textContent = MENSAJES[r.error] || MENSAJES.otro;
+        return;
+      }
+      dlgInvitacionLista({ token: r.token, nombre, email });
+      if (vistaActual === "equipo") VISTAS.equipo();
+    });
+  };
+  const dlgInvitacionLista = (i) => {
+    const link = linkInvitacion(i.token), quien = primerNombre(i.nombre) || i.email;
+    abrirDlg(`${cabezaDlg(NEG.nombre, `Listo. Mandale el link a ${quien}`)}
+      <p>Con este link, ${esc(quien)} crea su cuenta con <b>${esc(i.email)}</b> y entra a tu panel con lo que elegiste. Sirve una sola vez y vence en 7 días.</p>
+      <div class="field"><label for="iv-link">Link de invitación</label>
+        <div class="slug slug--link"><input id="iv-link" value="${esc(link)}" readonly /><button type="button" class="btn btn--ghost btn--sm" id="iv-copiar">${ico("copiar")}Copiar</button></div></div>
+      <div class="acciones"><a class="btn btn--ink btn--lg" href="${waInvitacion(i)}" target="_blank" rel="noopener">${ico("chat")}Mandar por WhatsApp</a>
+        <button type="button" class="btn btn--ghost btn--lg" data-cerrar>Listo</button></div>`);
+    $("#iv-copiar").addEventListener("click", (e) => { copiarTexto(link, e.currentTarget, $("#iv-link")); aviso("Link copiado."); });
+  };
+  const dlgPermisos = (m) => {
+    if (!m) return;
+    abrirDlg(`${cabezaDlg(m.email, `Qué puede hacer ${m.nombre || m.email}`)}
+      <form class="nuevo" id="f-perm" novalidate>
+        ${casillasPermisos(m.permisos)}
+        <p class="field__help">Vale enseguida. Si tiene el panel abierto, lo ve al volver a la pantalla.</p>
+        <p class="form__msg err" id="pm-msg" role="alert"></p>
+        <div class="acciones"><button type="submit" class="btn btn--ink btn--lg">Guardar</button><button type="button" class="btn btn--ghost btn--lg" data-cerrar>Cancelar</button></div>
+      </form>`);
+    const f = $("#f-perm");
+    engancharCasillas(f);
+    f.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const btn = $('button[type="submit"]', f);
+      ocupado(btn, true, "Guardando…");
+      const r = await store.cambiarPermisos(m.id, leerCasillas(f));
+      ocupado(btn, false);
+      if (!r.ok) { $("#pm-msg").textContent = MENSAJES[r.error] || MENSAJES.otro; return; }
+      cerrarDlg(); aviso(`Listo: cambiaste lo que puede hacer ${m.nombre || m.email}.`);
+      VISTAS.equipo();
+    });
   };
 
   // ---------- Cuenta ----------
@@ -1454,6 +1804,11 @@
             <p class="form__msg err" id="cu-msg" role="alert"></p>
             <div class="acciones"><button type="submit" class="btn btn--ink">Cambiar contraseña</button></div>
           </form></section>
+        ${esDueno() ? `<section class="ajuste" aria-labelledby="cu-5"><div class="ajuste__r"><h2 id="cu-5">Tu equipo</h2><p>Sumá a las personas que te ayudan y elegí qué puede ver y hacer cada una.</p></div>
+          <div class="ajuste__p"><button type="button" class="btn btn--ink" id="cu-equipo">${ico("equipo")}Ver y sumar personas</button></div></section>`
+        : `<section class="ajuste" aria-labelledby="cu-5"><div class="ajuste__r"><h2 id="cu-5">Tu lugar en el equipo</h2><p>Sos parte del equipo de ${esc(NEG.nombre)}. Lo que podés hacer lo elige el dueño del negocio.</p></div>
+          <div class="ajuste__p"><p>En este panel podés:</p><div class="eq__p">${chipsPermisos(YO.permisos, YO.rol)}</div>
+          <p class="field__help">Si necesitás algo más, pedíselo al dueño.</p></div></section>`}
         ${YO.admin ? `<section class="ajuste" aria-labelledby="cu-4"><div class="ajuste__r"><h2 id="cu-4">Equipo de Bookea</h2><p>Los negocios que se registran esperan tu aprobación antes de poder usar el panel.</p></div>
           <div class="ajuste__p"><button type="button" class="btn btn--ink" id="cu-sol">Ver solicitudes de negocios</button></div></section>` : ""}
         ${local_ ? `<section class="ajuste" aria-labelledby="cu-3"><div class="ajuste__r"><h2 id="cu-3">Datos de prueba</h2><p>En esta vista de prueba, todo se guarda solo en este navegador.</p></div>
@@ -1491,12 +1846,82 @@
     });
     const sol = $("#cu-sol");
     sol && sol.addEventListener("click", () => ir("solicitudes"));
+    const eq = $("#cu-equipo");
+    eq && eq.addEventListener("click", () => ir("equipo"));
     const reset = $("#cu-reset");
     reset && reset.addEventListener("click", async (e) => {
       if (e.currentTarget.dataset.seguro !== "1") { e.currentTarget.dataset.seguro = "1"; e.currentTarget.textContent = "Tocá de nuevo para confirmar"; return; }
       local.del(CLAVE); await cargar(); await salir(); aviso("Listo. Volvió el negocio de ejemplo.");
     });
   };
+
+  // ---------- Entrada: sumarse a un equipo con el link de una invitación (admin.html?invitacion=…) ----------
+  let INVITACION = (() => { const t = new URLSearchParams(window.location.search).get("invitacion"); return t && /^[0-9a-f]{32,128}$/i.test(t) ? t : null; })();
+  let INV_DATOS = null;
+  // Una vez usado, el link se olvida (de la dirección y del panel), así no se intenta usar de nuevo
+  const sacarInvitacionDeLaDireccion = () => {
+    INVITACION = null; INV_DATOS = null;
+    try { history.replaceState(null, "", window.location.pathname + window.location.hash); } catch { /* queda la dirección */ }
+  };
+  const listaPermisos = (lista) => PERMISOS.filter((x) => (lista || []).includes(x.k)).map((x) => x.t.toLowerCase());
+  const mostrarInvitacion = async () => {
+    mostrarEntrada("unirse");
+    $("#u-sub").textContent = "Buscando tu invitación…";
+    $(".u-campos").hidden = true; $("#u-crear").hidden = true;
+    const r = await store.verInvitacion(INVITACION);
+    if (!r.ok || !r.invitacion.valida) {
+      $("#u-neg").textContent = r.ok ? r.invitacion.negocio : "";
+      $("#t-unirse").textContent = "Este link ya no sirve";
+      $("#u-sub").textContent = r.ok ? MENSAJES["invitacion-vencida"] : (MENSAJES[r.error] || MENSAJES["invitacion-no-existe"]);
+      return;
+    }
+    INV_DATOS = r.invitacion;
+    const puedeHacer = listaPermisos(INV_DATOS.permisos);
+    $("#u-neg").textContent = "Invitación de " + INV_DATOS.negocio;
+    $("#t-unirse").textContent = `Sumate al equipo de ${INV_DATOS.negocio}`;
+    $("#u-sub").textContent = `Te invitaron a usar el panel de Bookea con ${INV_DATOS.email}. Elegí tu contraseña y listo.`
+      + (puedeHacer.length ? ` Vas a poder ${puedeHacer.join(", ").replace(/, ([^,]*)$/, " y $1")}.` : "");
+    $(".u-campos").hidden = false; $("#u-crear").hidden = false;
+    $("#u-nombre").value = INV_DATOS.nombre || "";
+    $("#u-email").value = INV_DATOS.email;
+    $("#i-email").value = INV_DATOS.email; // por si ya tiene cuenta y toca "Ingresá"
+    (INV_DATOS.nombre ? $("#u-clave") : $("#u-nombre")).focus({ preventScroll: true });
+  };
+  $("#f-unirse").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (!INV_DATOS) return;
+    const v = (id) => document.getElementById(id), btn = $("#u-crear"), msg = $("#u-msg");
+    const nombre = v("u-nombre").value.trim(), email = correo(v("u-email").value), clave = v("u-clave").value, clave2 = v("u-clave2").value;
+    msg.textContent = "";
+    const ok = [
+      marcar(v("u-nombre"), "u-nombre-err", !nombre),
+      marcar(v("u-email"), "u-email-err", !EMAIL_OK.test(email) ? "Escribí un email válido." : email !== INV_DATOS.email ? `${MENSAJES["invitacion-otro-email"]} Usá ${INV_DATOS.email}.` : false),
+      marcar(v("u-clave"), "u-clave-err", clave.length < 8 ? "Usá al menos 8 caracteres." : false),
+      marcar(v("u-clave2"), "u-clave2-err", clave2 !== clave || !clave2),
+    ];
+    if (ok.includes(false)) { const p = $(".is-invalid", e.target); p && p.focus(); return; }
+    ocupado(btn, true, "Creando tu cuenta…");
+    const r = await store.unirse({ token: INVITACION, nombre, email, clave });
+    ocupado(btn, false);
+    if (!r.ok) {
+      if (r.error === "existe") { marcar(v("u-email"), "u-email-err", "Ya hay una cuenta con ese email. Tocá “Ingresá” y entrá con tu contraseña."); return; }
+      if (r.error === "clave-debil") { marcar(v("u-clave"), "u-clave-err", MENSAJES["clave-debil"]); v("u-clave").focus(); return; }
+      if (r.error === "sin-negocio") { msg.textContent = "Tu cuenta se creó, pero no pudimos sumarte al equipo. Pedile al dueño un link nuevo."; return; }
+      msg.textContent = MENSAJES[r.error] || MENSAJES.otro;
+      return;
+    }
+    sacarInvitacionDeLaDireccion();
+    e.target.reset();
+    if (r.confirmar) {
+      mostrarEntrada("ingresar");
+      $("#i-email").value = email;
+      const m = $("#i-msg"); m.className = "form__msg ok";
+      m.textContent = `Te mandamos un mail a ${email}. Abrilo y tocá el link para confirmar tu email; después entrás acá con tu email y tu contraseña.`;
+      return;
+    }
+    const p = primerNombre(nombre);
+    pasar(r.datos, "agenda", () => bienvenida(p ? `Hola, ${p}.` : "Hola.", `Ya estás en el equipo de ${r.datos.negocio.nombre}.`));
+  });
 
   // ---------- Llegada desde "Sumá tu negocio" (index.html) ----------
   // Ese formulario es el primer paso del registro: trae el nombre, el negocio y el rubro
@@ -1512,6 +1937,7 @@
     return d && typeof d === "object" ? d : null;
   })();
   const entradaInicial = () => {
+    if (INVITACION) return mostrarInvitacion();
     if (!ALTA) return mostrarEntrada();
     mostrarEntrada("registro");
     for (const k of ["nombre", "negocio", "rubro"]) if (ALTA[k]) $("#r-" + k).value = String(ALTA[k]).slice(0, 80);

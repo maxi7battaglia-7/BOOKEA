@@ -229,6 +229,62 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
     ok((await bt.textContent('#t-espera')) === 'Tu solicitud no fue aprobada' && !(await bt.isVisible('#es-volver')) && !(await bt.isVisible('#panel')), 'sin acceso: Beto ya no entra al panel y se le explica');
     ok(!adm.errs.length && !bt.errs.length, 'sin errores en la consola (equipo de Bookea y Beto) ' + adm.errs.concat(bt.errs).join(' | '));
 
+    // ---------- Equipo: el dueño suma a alguien con permisos ----------
+    await fetch('http://localhost:8787/api/confirmar', { method: 'POST', body: JSON.stringify({ si: false }) });
+    // el dueño (Ana) arma la invitación desde Equipo
+    await a.reload(); await a.waitForSelector('#f-ingresar:not([hidden])');
+    await ingresar(a, 'ana@prueba.com', 'recuperada26'); await a.waitForSelector('#panel:not([hidden])'); await listo(a);
+    await a.click('.menu__i[data-vista="equipo"]'); await a.waitForSelector('[data-invitar]');
+    await a.click('[data-invitar]'); await a.waitForSelector('#f-invitar');
+    await a.fill('#iv-nombre', 'Ema Ruiz'); await a.fill('#iv-email', 'ema@prueba.com');
+    await a.click('input[name="perm"][value="turnos"]'); // queda solo "ver la agenda"
+    await a.click('#f-invitar button[type=submit]'); await a.waitForSelector('#iv-link');
+    const link = await a.inputValue('#iv-link');
+    const inv = await sql(`select coalesce(json_agg(json_build_object('e', email, 'p', permisos)), '[]') from invitaciones`);
+    ok(inv.length === 1 && inv[0].e === 'ema@prueba.com' && JSON.stringify(inv[0].p) === '["agenda"]' && link.includes('?invitacion='), 'equipo: el dueño crea la invitación (en la base, con sus permisos) y recibe el link');
+    await a.click('.dlg [data-cerrar].btn'); await a.waitForSelector('.eq--inv');
+    await a.screenshot({ path: `${out}/nb-equipo.png`, fullPage: true });
+    // Ema abre el link y crea su cuenta
+    const e = await nueva();
+    await e.goto(link); await e.waitForSelector('#f-unirse:not([hidden]) #u-crear:not([hidden])');
+    ok((await e.textContent('#t-unirse')).includes('Los Álamos Pádel') && (await e.inputValue('#u-email')) === 'ema@prueba.com', 'equipo: el link muestra el negocio y el email, sin cuenta');
+    await e.fill('#u-clave', 'agenda2026'); await e.fill('#u-clave2', 'agenda2026');
+    await e.click('#u-crear'); await e.waitForSelector('#panel:not([hidden])'); await listo(e);
+    const miembroEma = await sql(`select json_agg(json_build_object('r', m.rol, 'p', m.permisos, 'n', m.nombre)) from miembros m join auth.users u on u.id = m.user_id where u.email = 'ema@prueba.com'`);
+    ok(miembroEma.length === 1 && miembroEma[0].r === 'encargado' && JSON.stringify(miembroEma[0].p) === '["agenda"]' && miembroEma[0].n === 'Ema Ruiz', 'equipo: Ema queda en el equipo de Ana, con solo "ver la agenda"');
+    const menuEma = await e.$$eval('.menu__i', (bs) => bs.filter((b) => !b.hidden).map((b) => b.dataset.vista).join());
+    ok(menuEma === 'agenda,cuenta' && !(await e.isVisible('[data-nuevo]')) && (await e.locator('[data-libre]').count()) === 0, `equipo: Ema ve solo Agenda y Cuenta, y no puede cargar turnos (${menuEma})`);
+    const cargaEma = await e.evaluate(async () => {
+      const c = window.__clientes[window.__clientes.length - 1];
+      const { data: m } = await c.from('miembros').select('*');
+      const r = await c.from('reservas').upsert({ id: crypto.randomUUID(), negocio_id: m[0].negocio_id, recurso: 'r1', fecha: '2030-01-02', hora: 600, estado: 'confirmada' });
+      const n = await c.from('negocios').update({ nombre: 'De Ema' }).eq('id', m[0].negocio_id);
+      return [r.error && r.error.code, n.data && n.data.length, m.length];
+    });
+    ok(cargaEma[0] === '42501' && cargaEma[1] === 0 && cargaEma[2] === 1, `equipo: aunque Ema lo pida directo a la base, no carga turnos, no cambia el negocio ni ve al resto del equipo (${cargaEma})`);
+    await e.screenshot({ path: `${out}/nb-equipo-ema.png`, fullPage: true });
+    // Ana le da "cargar turnos": a Ema le aparece al volver a la pantalla
+    await a.reload(); await a.waitForSelector('#f-ingresar:not([hidden])');
+    await ingresar(a, 'ana@prueba.com', 'recuperada26'); await a.waitForSelector('#panel:not([hidden])'); await listo(a);
+    await a.click('.menu__i[data-vista="equipo"]'); await a.waitForSelector('[data-permisos]');
+    await a.click('[data-permisos]'); await a.waitForSelector('#f-perm');
+    await a.click('#f-perm input[name="perm"][value="turnos"]');
+    await a.click('#f-perm button[type=submit]'); await a.waitForFunction(() => /cambiaste lo que puede hacer/.test(document.querySelector('#aviso').textContent));
+    await e.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await e.waitForSelector('[data-nuevo]', { timeout: 8000 }).catch(() => {});
+    ok(await e.isVisible('[data-nuevo]') && (await e.textContent('#aviso')).includes('Cambiaron tus permisos'), 'equipo: el dueño le da "cargar turnos" y a Ema le aparece "Cargar turno" sin volver a entrar');
+    // Ana la saca del equipo: Ema queda afuera
+    await a.click('[data-quitar]'); await a.click('[data-quitar]');
+    await a.waitForFunction(() => /ya no entra a tu panel/.test(document.querySelector('#aviso').textContent));
+    await e.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await e.waitForSelector('#f-ingresar:not([hidden])', { timeout: 8000 }).catch(() => {});
+    ok(await e.isVisible('#f-ingresar') && !(await e.isVisible('#panel')), 'equipo: si el dueño la saca, Ema queda afuera del panel');
+    await ingresar(e, 'ema@prueba.com', 'agenda2026'); await e.waitForTimeout(800);
+    ok((await e.textContent('#i-msg')).includes('no está en ningún negocio'), 'equipo: y al querer entrar se le explica');
+    await e.goto(link); await e.waitForSelector('#f-unirse:not([hidden])'); await e.waitForTimeout(500);
+    ok((await e.textContent('#t-unirse')) === 'Este link ya no sirve', 'equipo: el link ya usado no sirve más');
+    ok(!e.errs.filter((x) => !/Failed to load resource/.test(x)).length, 'sin errores en la consola (Ema) ' + e.errs.join(' | '));
+
     // ---------- Celular ----------
     const m = await nueva(390, 844);
     await m.goto(URL_); await m.waitForSelector('#f-ingresar:not([hidden])');

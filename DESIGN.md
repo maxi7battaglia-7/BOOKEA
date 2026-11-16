@@ -362,3 +362,20 @@ Pedido: "que no quede nada raro ni nada que no funcione" y "que todo tenga una c
 - El color de la barra del navegador (`theme-color`) es noche en las tres páginas.
 - "Cualquier hora" pasó a "Todo el día" (en el celular se cortaba).
 
+## Equipo: el dueño suma personas con permisos (16/11, pedido del dueño)
+- **Equipo** (solo el dueño): en la computadora está en el menú; en el celular se abre desde **Cuenta → Tu equipo** (el menú de abajo
+  se queda con 5 botones como máximo). Muestra quién entra al panel, con chips de lo que puede hacer, y las invitaciones sin usar.
+- **Sumar a alguien:** nombre, email y casillas de permisos, cada una con su título y para qué sirve. Viene tildado "Ver la agenda" y
+  "Cargar y cambiar turnos". Cargar turnos necesita ver la agenda: se tildan y destildan juntas. Al crearla, Bookea da un **link** para
+  copiar o mandar por **WhatsApp** (sirve una vez, para ese email, y vence a los 7 días).
+- **Permisos:** ver la agenda · cargar y cambiar turnos (incluye marcar si pagaron y cancelar) · ver Clientes · ver Finanzas · cambiar Mi negocio.
+  Cuenta (su nombre y su contraseña) la tienen todos. El equipo lo maneja solo el dueño.
+- **La persona invitada** abre el link, ve "Sumate al equipo de {negocio}" con su nombre y su email ya puestos, elige contraseña y entra.
+  Si ya tenía una cuenta sin negocio, toca "Ingresá" y queda sumada.
+- **Lo que ve un empleado:** solo los botones del menú que le habilitaron. Sin "cargar turnos", la agenda es de solo lectura: un candado
+  con "Podés ver la agenda…", los huecos libres no se tocan, "Para cerrar" sin botones y el detalle del turno sin acciones.
+  En Cuenta ve "Tu lugar en el equipo" con lo que puede hacer.
+- Si el dueño le cambia los permisos o lo saca, el panel del empleado se actualiza al volver a la pantalla (o al minuto) y se lo avisa.
+- **Lo hace cumplir la base** (`supabase/esquema.sql`): cargar, cambiar o borrar turnos pide el permiso "turnos"; cambiar el negocio, "negocio";
+  invitar, cambiar permisos y sacar gente, ser el dueño. Ver Finanzas y Clientes lo controla el panel (los datos salen de los mismos turnos).
+

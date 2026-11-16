@@ -804,3 +804,56 @@
   .tabla a { display: inline-flex; align-items: center; min-height: 44px; }
   .chk { min-height: 44px; }
 }
+
+/* ---------- Equipo: personas del negocio y sus permisos ---------- */
+/* El menú de abajo del celular se arma con los botones que cada uno puede ver (4 o 5) */
+@media (max-width: 900px) {
+  .menu { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+  .menu__i--pc { display: none !important; } /* Equipo, en el celular, se abre desde Cuenta */
+}
+.eqs { list-style: none; display: grid; }
+.eq { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px 14px; padding: 14px 0; border-top: 1px solid var(--regla); } /* taste-skill-ignore: filas de la lista */
+.eq:first-child { border-top: 0; padding-top: 0; }
+.eq__av { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: var(--v100); color: var(--v-tinta); font-weight: 700; font-size: 14px; }
+.eq__av--inv { background: var(--fondo); color: var(--tx-3); }
+.eq__av--inv .ico { width: 18px; height: 18px; }
+.eq__q { display: grid; gap: 2px; min-width: 0; font-size: 14px; color: var(--tx-2); }
+.eq__q b { font-size: 16px; color: var(--tx); }
+.eq__q span { overflow-wrap: anywhere; }
+.eq__p { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.chip-p { display: inline-block; font-size: 12px; font-weight: 700; padding: 2px 9px; border-radius: 999px; background: var(--v50); color: var(--v-tinta); box-shadow: inset 0 0 0 1px var(--v100); } /* taste-skill-ignore: etiqueta de permiso */
+.chip-p--todo { background: var(--tx); color: #fff; box-shadow: none; }
+.chip-p--nada { background: var(--fondo); color: var(--tx-2); box-shadow: inset 0 0 0 1px var(--borde); } /* taste-skill-ignore: etiqueta de permiso */
+.eq__acc { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.eq__rol { align-self: start; }
+@media (max-width: 640px) {
+  .eq { grid-template-columns: auto minmax(0, 1fr); }
+  .eq__acc { grid-column: 1 / -1; justify-content: stretch; }
+  .eq__acc .btn { flex: 1; }
+  .eq__rol { grid-column: 2; }
+}
+
+/* Casillas de permisos: cada una con su título y para qué sirve */
+.permisos { border: 0; margin: 0; padding: 0; display: grid; gap: 8px; }
+.permisos legend { font-size: 14px; font-weight: 600; margin-bottom: 8px; padding: 0; }
+.perm { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; align-items: start; padding: 12px 14px; border-radius: var(--r-ctl); background: var(--fondo); cursor: pointer; transition: background-color var(--t-ui) ease, box-shadow var(--t-ui) ease; }
+.perm input { width: 20px; height: 20px; margin: 1px 0 0; accent-color: var(--v-tinta); }
+.perm span { display: grid; gap: 2px; }
+.perm b { font-size: 15px; }
+.perm small { font-size: 13px; color: var(--tx-2); line-height: 1.4; }
+.perm:has(input:checked) { background: var(--v50); box-shadow: inset 0 0 0 1px var(--v200); } /* taste-skill-ignore: casilla elegida */
+@media (hover: hover) and (pointer: fine) { .perm:hover { background: var(--v50); } }
+
+/* Solo puede mirar: la agenda lo dice y los huecos libres no se tocan */
+.solo-ver { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; color: var(--tx-2); max-width: 340px; }
+.solo-ver .ico { color: var(--tx-3); }
+.slot--ver { cursor: default; }
+.nota-ver { font-size: 15px; background: var(--fondo); border-radius: var(--r-ctl); padding: 10px 14px; }
+
+/* Sumarse con el link: de qué negocio es la invitación */
+.caja__k { font-size: 13px; font-weight: 700; color: var(--v-tinta); text-transform: none; margin-bottom: -8px; }
+.caja__k:empty { display: none; }
+.u-campos { display: grid; gap: 16px; }
+.dlg__intro { color: var(--tx-2); }
+.slug--link input { font-size: 14px !important; color: var(--tx-2); }
+.nuevo .field-row { align-items: start; } /* un campo con ayuda abajo no desalinea al de al lado */

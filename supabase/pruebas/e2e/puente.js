@@ -27,11 +27,13 @@ const lit = (v) => {
   if (v === null || v === undefined) return 'null';
   if (typeof v === 'number') { if (!Number.isFinite(v)) throw new Error('número'); return String(v); }
   if (typeof v === 'boolean') return v ? 'true' : 'false';
+  // una lista de textos va como text[] (así la convierte Supabase para las funciones, por ejemplo los permisos)
+  if (Array.isArray(v) && v.every((x) => typeof x === 'string')) return v.length ? `array[${v.map(lit).join(', ')}]::text[]` : `'{}'::text[]`;
   if (typeof v === 'object') return `'${JSON.stringify(v).replace(/'/g, "''")}'::jsonb`;
   return `'${String(v).replace(/'/g, "''")}'`;
 };
 const id = (c) => { if (!/^[a-z_]+$/.test(c)) throw new Error('columna'); return `"${c}"`; };
-const TABLAS = new Set(['negocios', 'miembros', 'reservas', 'admins_bookea']);
+const TABLAS = new Set(['negocios', 'miembros', 'reservas', 'admins_bookea', 'invitaciones']);
 
 const comoCuenta = (uid, consulta) => `
 begin;
@@ -50,7 +52,7 @@ const filtros = (fs_) => {
   }).join(' and ');
 };
 
-const FUNCIONES = new Set(['revisar_negocio']);
+const FUNCIONES = new Set(['revisar_negocio', 'crear_invitacion', 'ver_invitacion', 'aceptar_invitacion', 'anular_invitacion', 'cambiar_permisos', 'quitar_miembro']);
 const consulta = async (q) => {
   if (q.op === 'rpc') {
     if (!FUNCIONES.has(q.fn)) return { error: { code: 'PGRST202', message: 'función' } };

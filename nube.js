@@ -60,9 +60,16 @@
     if (cod === "email_address_invalid" || /invalid.*email|email.*invalid/i.test(msj)) return "email-invalido";
     if (cod === "over_request_rate_limit" || cod === "over_email_send_rate_limit" || st === 429) return "muchos";
     if (cod === "23505" && /slug/.test(msj)) return "slug";
+    if (/ya est[aá] en el equipo/i.test(msj)) return "ya-en-equipo";
+    if (/ya est[aá] en un negocio/i.test(msj)) return "ya-en-negocio";
+    if (/invitaci[oó]n ya se us[oó]|venci[oó]/i.test(msj)) return "invitacion-vencida";
+    if (/invitaci[oó]n es para otro email/i.test(msj)) return "invitacion-otro-email";
+    if (cod === "22023") return "email-invalido";
     if (cod === "23505") return "ocupado";
     if (cod === "23514") return "invalido";
-    if (cod === "PGRST301" || cod === "42501" || st === 401 || /jwt/i.test(msj)) return "sesion";
+    // sin permiso (las reglas de la base): no es que venció la sesión
+    if (cod === "42501" || /row-level security/i.test(msj)) return "permiso";
+    if (cod === "PGRST301" || st === 401 || /jwt/i.test(msj)) return "sesion";
     if (/fetch|network|failed to/i.test(msj) || st === 0) return "red";
     return "otro";
   };
@@ -111,7 +118,7 @@
 
     // Trae el negocio de la cuenta y sus reservas
     const cargarTodo = async (user) => {
-      const { data: ms, error: e1 } = await sb.from("miembros").select("negocio_id, rol, creado")
+      const { data: ms, error: e1 } = await sb.from("miembros").select("*")
         .eq("user_id", user.id).order("creado", { ascending: true });
       if (e1) return fallo(e1);
       if (!ms || !ms.length) return { ok: false, error: "sin-negocio" };
@@ -123,7 +130,10 @@
       const negocio = negDeFila(fila);
       // ¿Es del equipo de Bookea? (si la tabla no existe todavía, no lo es)
       const { data: ad } = await sb.from("admins_bookea").select("user_id").eq("user_id", user.id);
-      cuenta = { id: user.id, email: user.email, nombre: (user.user_metadata && user.user_metadata.nombre) || "", rol: ms[0].rol, admin: !!(ad && ad.length) };
+      cuenta = {
+        id: user.id, email: user.email, nombre: (user.user_metadata && user.user_metadata.nombre) || "",
+        rol: ms[0].rol, permisos: Array.isArray(ms[0].permisos) ? ms[0].permisos : [], admin: !!(ad && ad.length),
+      };
       fotoNeg = JSON.stringify(filaDeNeg(negocio));
       fotoRes.clear();
       for (const r of reservas) fotoRes.set(r.id, JSON.stringify(filaDeRes(r, negId)));
@@ -176,7 +186,8 @@
         if (!sb || !negId) return { ok: false, error: "sesion" };
         try {
           const filaNeg = filaDeNeg(neg), kNeg = JSON.stringify(filaNeg);
-          if (kNeg !== fotoNeg) {
+          const puedeNeg = cuenta && (cuenta.rol === "dueno" || cuenta.permisos.includes("negocio"));
+          if (kNeg !== fotoNeg && puedeNeg) {
             const { error } = await sb.from("negocios").update(filaNeg).eq("id", negId);
             if (error) return fallo(error);
             fotoNeg = kNeg;
@@ -264,6 +275,88 @@
           return { ok: true, estado: data };
         } catch (e) { return fallo(e); }
       },
+      // ---------- Equipo del negocio ----------
+      // Lo ve solo el dueño: las personas que ya están y las invitaciones sin usar
+      async equipo() {
+        try {
+          const [m, i] = await Promise.all([
+            sb.from("miembros").select("user_id, rol, permisos, nombre, email, creado").eq("negocio_id", negId).order("creado", { ascending: true }),
+            sb.from("invitaciones").select("id, email, nombre, permisos, token, creado, vence, usada").eq("negocio_id", negId).order("creado", { ascending: false }),
+          ]);
+          if (m.error) return fallo(m.error);
+          if (i.error) return fallo(i.error);
+          const ahora = Date.now();
+          return {
+            ok: true,
+            miembros: m.data.map((x) => ({ id: x.user_id, rol: x.rol, permisos: x.permisos || [], nombre: x.nombre || "", email: x.email || "", yo: x.user_id === cuenta.id })),
+            invitaciones: i.data.filter((x) => !x.usada && new Date(x.vence).getTime() > ahora)
+              .map((x) => ({ id: x.id, email: x.email, nombre: x.nombre, permisos: x.permisos || [], token: x.token, vence: x.vence })),
+          };
+        } catch (e) { return fallo(e); }
+      },
+      async invitar({ email, nombre, permisos }) {
+        try {
+          const { data, error } = await sb.rpc("crear_invitacion", { n: negId, correo: email, quien: nombre, puede: permisos });
+          if (error) return fallo(error);
+          return { ok: true, token: data };
+        } catch (e) { return fallo(e); }
+      },
+      async anularInvitacion(id) {
+        try {
+          const { error } = await sb.rpc("anular_invitacion", { i: id });
+          if (error) return fallo(error);
+          return { ok: true };
+        } catch (e) { return fallo(e); }
+      },
+      async cambiarPermisos(id, permisos) {
+        try {
+          const { data, error } = await sb.rpc("cambiar_permisos", { n: negId, u: id, puede: permisos });
+          if (error) return fallo(error);
+          return { ok: true, permisos: data };
+        } catch (e) { return fallo(e); }
+      },
+      async quitarMiembro(id) {
+        try {
+          const { error } = await sb.rpc("quitar_miembro", { n: negId, u: id });
+          if (error) return fallo(error);
+          return { ok: true };
+        } catch (e) { return fallo(e); }
+      },
+      // Quien abre el link de una invitación (todavía sin cuenta)
+      async verInvitacion(token) {
+        try { await listo(); } catch { return { ok: false, error: "libreria" }; }
+        try {
+          const { data, error } = await sb.rpc("ver_invitacion", { t: token });
+          if (error) return fallo(error);
+          if (!data) return { ok: false, error: "invitacion-no-existe" };
+          return { ok: true, invitacion: data };
+        } catch (e) { return fallo(e); }
+      },
+      // Crea la cuenta con el link: la base la suma al equipo en el mismo paso
+      async unirse({ token, nombre, email, clave }) {
+        try { await listo(); } catch { return { ok: false, error: "libreria" }; }
+        try {
+          const vuelta = window.location.href.split("#")[0].split("?")[0];
+          const { data, error } = await sb.auth.signUp({
+            email, password: clave, options: { data: { nombre, invitacion: token }, emailRedirectTo: vuelta },
+          });
+          if (error) return fallo(error);
+          if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) return { ok: false, error: "existe" };
+          if (!data.session) return { ok: true, confirmar: true };
+          return cargarTodo(data.user);
+        } catch (e) { return fallo(e); }
+      },
+      // Una cuenta que ya existía (sin negocio) entra con su email y acepta el link
+      async aceptarInvitacion(token) {
+        try {
+          const { error } = await sb.rpc("aceptar_invitacion", { t: token });
+          if (error) return fallo(error);
+          const { data } = await sb.auth.getSession();
+          if (!data || !data.session) return { ok: false, error: "sesion" };
+          return cargarTodo(data.session.user);
+        } catch (e) { return fallo(e); }
+      },
+
       async ponerClave(nueva) {
         try {
           const { data, error } = await sb.auth.updateUser({ password: nueva });

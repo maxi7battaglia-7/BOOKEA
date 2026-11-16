@@ -21,8 +21,10 @@ siempre su negocio, Bookea usa **Supabase** (una base de datos Postgres con cuen
 - **Aviso por mail cuando alguien se registra** (opcional, con Resend): `avisos-por-mail.sql`.
 - **Un horario no se reserva dos veces.** Si dos dispositivos cargan el mismo turno a la vez, la base acepta
   uno y el otro ve el aviso "Ese horario ya lo ocupó otra reserva" con la agenda actualizada.
-- **Encargados (más adelante).** La tabla `miembros` ya admite varias cuentas por negocio (rol `dueno` o
-  `encargado`); falta la pantalla para invitarlas.
+- **Equipo.** El dueño suma personas desde **Equipo** en el panel: le da un link (tabla `invitaciones`) y elige qué
+  puede hacer cada una (`miembros.permisos`: ver la agenda, cargar turnos, Clientes, Finanzas, Mi negocio). La base hace
+  cumplir que sin el permiso "turnos" no se cargan ni cambian turnos, que sin "negocio" no se cambia el negocio, y que solo
+  el dueño invita, cambia permisos o saca gente.
 
 Archivos: `esquema.sql` (tablas, reglas y alta automática), `../nube.js` (lo que habla con Supabase desde el
 panel), `../config.js` (adónde conectarse) y `pruebas/` (pruebas del esquema y de punta a punta).
@@ -99,8 +101,9 @@ muy pocos por hora: un negocio de afuera no puede registrarse. Hace falta un **d
 
 Resend gratis alcanza para empezar (3.000 mails por mes, 100 por día).
 
-**Si ya tenías corrido `esquema.sql`:** volvé a correrlo entero (se puede correr más de una vez). Agrega la
-aprobación sin borrar nada; los negocios que ya existían quedan pendientes hasta que los apruebes.
+**Si ya tenías corrido `esquema.sql`:** volvé a correrlo entero (se puede correr más de una vez). Agrega lo nuevo
+(aprobación, equipo y permisos) sin borrar nada; los negocios que ya existían quedan pendientes hasta que los apruebes,
+y cada dueño sigue siendo dueño de su negocio.
 
 Para probar que quedó bien: creá una cuenta desde el panel, confirmá el mail, aprobala desde Solicitudes,
 cargá un turno y abrí el panel desde otro dispositivo con la misma cuenta.
@@ -110,7 +113,6 @@ cargá un turno y abrí el panel desde otro dispositivo con la misma cuenta.
 - **La página de reservas (`reservar.html`) todavía usa negocios de ejemplo.** El paso que sigue es que lea el
   negocio por su link (`slug`) y que el cliente reserve contra la base, con una función que controle que el
   horario esté libre y que no muestre datos de otros clientes.
-- **Invitar encargados** a un negocio (la base ya lo soporta).
 - **Pasar los mails de Supabase (confirmar cuenta, contraseña nueva) al castellano** en Authentication → Emails → Templates.
 - **Fotos**: hoy la foto de perfil se guarda chica dentro del negocio; más adelante conviene Supabase Storage.
 

@@ -220,4 +220,244 @@ begin
   raise notice 'OK  rechazado: ve que fue rechazado, pero ya no ve ni toca sus turnos';
 end $$;
 reset role;
+
+-- =============== Equipo: el dueño suma personas con permisos ===============
+-- Dani tiene un negocio aprobado con un turno; Ana (de otro negocio) y Caro (sin negocio) ya existen
+insert into auth.users (id, email, raw_user_meta_data) values
+  ('00000000-0000-0000-0000-0000000000d1', 'dani@prueba.com', '{"nombre":"Dani","negocio":"Cancha Dani","rubro":"Fútbol"}');
+update public.negocios set estado = 'aprobado' where slug = 'canchadani';
+select set_config('prueba.neg_d', (select id::text from public.negocios where slug = 'canchadani'), false) \g /dev/null
+insert into public.reservas (negocio_id, recurso, fecha, hora, cliente, precio, estado)
+  values (current_setting('prueba.neg_d')::uuid, 'r1', '2026-11-21', 1200, 'Cliente de Dani', 40000, 'confirmada');
+
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000d1', false) \g /dev/null
+set role authenticated;
+do $$
+declare t1 text; t2 text; p text[]; m text; nm text;
+begin
+  select email, nombre into m, nm from public.miembros where user_id = auth.uid();
+  assert m = 'dani@prueba.com' and nm = 'Dani', 'el dueño queda en el equipo con su nombre y email: ' || coalesce(m, 'nada');
+  t1 := public.crear_invitacion(current_setting('prueba.neg_d')::uuid, ' Emi@Prueba.com ', 'Emi', array['agenda', 'finanzas']);
+  t2 := public.crear_invitacion(current_setting('prueba.neg_d')::uuid, 'fede@prueba.com', 'Fede', array['turnos', 'inventado']);
+  perform set_config('prueba.t_emi', t1, false);
+  perform set_config('prueba.t_fede', t2, false);
+  assert char_length(t1) = 64 and t1 <> t2, 'token: ' || t1;
+  select permisos into p from public.invitaciones where email = 'fede@prueba.com';
+  assert p = array['agenda', 'turnos'], 'permisos de Fede: ' || p::text;
+  assert (select count(*) from public.invitaciones) = 2, 'el dueño ve sus 2 invitaciones';
+  raise notice 'OK  el dueño invita: email en minúsculas, permisos limpios (cargar turnos incluye ver la agenda)';
+  begin
+    perform public.crear_invitacion(current_setting('prueba.neg_d')::uuid, 'no-es-un-email', 'X', array['agenda']);
+    raise exception 'FALLA: aceptó un email inválido';
+  exception when invalid_parameter_value then raise notice 'OK  no se puede invitar a un email inválido';
+  end;
+  begin
+    perform public.crear_invitacion(current_setting('prueba.neg_d')::uuid, 'dani@prueba.com', 'Yo', array['agenda']);
+    raise exception 'FALLA: se invitó a alguien que ya está en el equipo';
+  exception when unique_violation then raise notice 'OK  no se puede invitar a alguien que ya está en el equipo';
+  end;
+end $$;
+reset role;
+
+-- Ana, dueña de otro negocio, no puede invitar al negocio de Dani ni ver sus invitaciones
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false) \g /dev/null
+set role authenticated;
+do $$ begin
+  begin
+    perform public.crear_invitacion(current_setting('prueba.neg_d')::uuid, 'intruso@prueba.com', 'X', array['negocio']);
+    raise exception 'FALLA: Ana invitó gente al negocio de Dani';
+  exception when insufficient_privilege then raise notice 'OK  solo el dueño puede invitar a su negocio';
+  end;
+  assert (select count(*) from public.invitaciones) = 0, 'Ana ve invitaciones ajenas';
+  raise notice 'OK  las invitaciones de un negocio no las ve nadie más';
+end $$;
+reset role;
+
+-- Quien abre el link, todavía sin cuenta
+set role anon;
+do $$
+declare j jsonb;
+begin
+  j := public.ver_invitacion(current_setting('prueba.t_emi'));
+  assert j ->> 'negocio' = 'Cancha Dani' and j ->> 'email' = 'emi@prueba.com' and (j ->> 'valida')::boolean, 'invitación: ' || coalesce(j::text, 'nada');
+  assert public.ver_invitacion('inventado') is null and public.ver_invitacion(repeat('0', 64)) is null, 'un link inventado mostró algo';
+  raise notice 'OK  el link muestra de qué negocio es, sin cuenta; un link inventado no muestra nada';
+end $$;
+reset role;
+
+-- Altas con el link: con otro email no entra; con el suyo, entra con sus permisos
+insert into auth.users (id, email, raw_user_meta_data) values
+  ('00000000-0000-0000-0000-0000000000d9', 'otro@prueba.com', jsonb_build_object('nombre', 'Otro', 'invitacion', current_setting('prueba.t_fede'))),
+  ('00000000-0000-0000-0000-0000000000d2', 'emi@prueba.com',  jsonb_build_object('nombre', 'Emilia', 'invitacion', current_setting('prueba.t_emi'))),
+  ('00000000-0000-0000-0000-0000000000d3', 'fede@prueba.com', jsonb_build_object('nombre', 'Fede', 'invitacion', current_setting('prueba.t_fede')));
+do $$
+declare r text; p text[]; nm text;
+begin
+  assert not exists (select 1 from public.miembros where user_id = '00000000-0000-0000-0000-0000000000d9'), 'entró con el link de otro email';
+  raise notice 'OK  con el link de otra persona, la cuenta se crea pero no entra al equipo';
+  select rol, permisos, nombre into r, p, nm from public.miembros where user_id = '00000000-0000-0000-0000-0000000000d2';
+  assert r = 'encargado' and p = array['agenda', 'finanzas'] and nm = 'Emilia', 'Emi: ' || coalesce(r, 'nada') || ' ' || coalesce(p::text, '');
+  assert (select usada_por from public.invitaciones where email = 'emi@prueba.com') = '00000000-0000-0000-0000-0000000000d2';
+  assert not (public.ver_invitacion(current_setting('prueba.t_emi')) ->> 'valida')::boolean, 'el link usado sigue sirviendo';
+  raise notice 'OK  con su link y su email, entra al equipo con los permisos elegidos, y el link deja de servir';
+end $$;
+
+-- Emi puede ver la agenda y finanzas, pero no cargar turnos ni tocar el negocio ni el equipo
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000d2', false) \g /dev/null
+set role authenticated;
+do $$
+declare n int;
+begin
+  select count(*) into n from public.reservas;
+  assert n = 1, 'Emi ve ' || n || ' turnos';
+  raise notice 'OK  alguien del equipo ve los turnos de su negocio';
+  begin
+    insert into public.reservas (negocio_id, recurso, fecha, hora, estado)
+      values (current_setting('prueba.neg_d')::uuid, 'r1', '2026-11-22', 600, 'confirmada');
+    raise exception 'FALLA: Emi cargó un turno sin permiso';
+  exception when insufficient_privilege then raise notice 'OK  sin el permiso "turnos" no puede cargar turnos';
+  end;
+  update public.reservas set cliente = 'Cambiado';
+  get diagnostics n = row_count;
+  assert n = 0, 'FALLA: Emi cambió un turno';
+  delete from public.reservas;
+  get diagnostics n = row_count;
+  assert n = 0, 'FALLA: Emi borró un turno';
+  raise notice 'OK  sin el permiso "turnos" no puede cambiar ni borrar turnos';
+  update public.negocios set nombre = 'Cambio';
+  get diagnostics n = row_count;
+  assert n = 0, 'FALLA: Emi cambió el negocio';
+  raise notice 'OK  sin el permiso "negocio" no puede cambiar Mi negocio';
+  select count(*) into n from public.miembros;
+  assert n = 1, 'Emi ve ' || n || ' miembros';
+  raise notice 'OK  alguien del equipo no ve al resto del equipo (solo el dueño)';
+  begin
+    perform public.cambiar_permisos(current_setting('prueba.neg_d')::uuid, auth.uid(), array['negocio']);
+    raise exception 'FALLA: Emi se dio permisos sola';
+  exception when insufficient_privilege then raise notice 'OK  nadie se puede dar permisos solo';
+  end;
+  begin
+    perform public.crear_invitacion(current_setting('prueba.neg_d')::uuid, 'amigo@prueba.com', 'Amigo', array['negocio']);
+    raise exception 'FALLA: Emi invitó a alguien';
+  exception when insufficient_privilege then raise notice 'OK  solo el dueño suma gente al equipo';
+  end;
+  begin
+    update public.miembros set permisos = array['negocio'] where user_id = auth.uid();
+    raise exception 'FALLA: Emi cambió su fila de miembros';
+  exception when insufficient_privilege then raise notice 'OK  nadie puede cambiar su permiso tocando la tabla';
+  end;
+end $$;
+reset role;
+
+-- Fede, con "turnos", carga y cambia turnos, pero no toca el negocio
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000d3', false) \g /dev/null
+set role authenticated;
+do $$
+declare n int;
+begin
+  insert into public.reservas (negocio_id, recurso, fecha, hora, cliente, estado)
+    values (current_setting('prueba.neg_d')::uuid, 'r1', '2026-11-22', 600, 'Cargado por Fede', 'confirmada');
+  update public.reservas set estado = 'jugada' where cliente = 'Cliente de Dani';
+  get diagnostics n = row_count;
+  assert n = 1, 'Fede no pudo marcar un turno';
+  raise notice 'OK  con el permiso "turnos" carga turnos y marca si pagaron';
+  update public.negocios set nombre = 'Cambio';
+  get diagnostics n = row_count;
+  assert n = 0, 'FALLA: Fede cambió el negocio';
+  raise notice 'OK  pero sin el permiso "negocio" no cambia Mi negocio';
+end $$;
+reset role;
+
+-- Dani ve a su equipo, le cambia permisos a Emi y saca a Fede
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000d1', false) \g /dev/null
+set role authenticated;
+do $$
+declare n int; p text[];
+begin
+  select count(*) into n from public.miembros;
+  assert n = 3, 'Dani ve ' || n || ' miembros';
+  raise notice 'OK  el dueño ve a todo su equipo';
+  p := public.cambiar_permisos(current_setting('prueba.neg_d')::uuid, '00000000-0000-0000-0000-0000000000d2', array['negocio', 'clientes']);
+  assert p = array['clientes', 'negocio'], 'permisos nuevos: ' || p::text;
+  perform public.quitar_miembro(current_setting('prueba.neg_d')::uuid, '00000000-0000-0000-0000-0000000000d3');
+  begin
+    perform public.quitar_miembro(current_setting('prueba.neg_d')::uuid, auth.uid());
+    raise exception 'FALLA: el dueño se sacó a sí mismo';
+  exception when no_data_found then raise notice 'OK  el dueño cambia permisos y saca gente, pero no se puede sacar a sí mismo';
+  end;
+end $$;
+reset role;
+
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000d2', false) \g /dev/null
+set role authenticated;
+do $$
+declare n int;
+begin
+  update public.negocios set ciudad = 'Tunuyán';
+  get diagnostics n = row_count;
+  assert n = 1, 'Emi no pudo cambiar el negocio con el permiso nuevo';
+  raise notice 'OK  el permiso nuevo vale enseguida';
+end $$;
+reset role;
+
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000d3', false) \g /dev/null
+set role authenticated;
+do $$
+declare n int;
+begin
+  select count(*) into n from public.reservas;
+  assert n = 0, 'Fede, sacado del equipo, ve ' || n || ' turnos';
+  begin
+    insert into public.reservas (negocio_id, recurso, fecha, hora, estado)
+      values (current_setting('prueba.neg_d')::uuid, 'r1', '2026-11-23', 600, 'confirmada');
+    raise exception 'FALLA: Fede cargó un turno después de que lo sacaron';
+  exception when insufficient_privilege then raise notice 'OK  a quien sacan del equipo ya no ve ni toca nada';
+  end;
+end $$;
+reset role;
+
+-- Una cuenta que ya existía sin negocio (Caro) acepta una invitación; un link anulado deja de servir
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000d1', false) \g /dev/null
+set role authenticated;
+do $$
+declare t text; t2 text;
+begin
+  t := public.crear_invitacion(current_setting('prueba.neg_d')::uuid, 'caro@prueba.com', 'Caro', array['clientes']);
+  perform set_config('prueba.t_caro', t, false);
+  t2 := public.crear_invitacion(current_setting('prueba.neg_d')::uuid, 'gabi@prueba.com', 'Gabi', array['agenda']);
+  perform set_config('prueba.t_gabi', t2, false);
+  perform public.anular_invitacion((select id from public.invitaciones where token = t2));
+  assert public.ver_invitacion(t2) is null, 'el link anulado sigue existiendo';
+  raise notice 'OK  el dueño anula una invitación y el link deja de servir';
+end $$;
+reset role;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000c', false) \g /dev/null
+set role authenticated;
+do $$ begin
+  perform public.aceptar_invitacion(current_setting('prueba.t_caro'));
+  assert (select permisos from public.miembros where user_id = auth.uid()) = array['clientes'];
+  begin
+    perform public.aceptar_invitacion(current_setting('prueba.t_caro'));
+    raise exception 'FALLA: el mismo link sirvió dos veces';
+  exception when no_data_found then raise notice 'OK  una cuenta que ya existía acepta su invitación, una sola vez';
+  end;
+end $$;
+reset role;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false) \g /dev/null
+set role authenticated;
+do $$ begin
+  begin
+    perform public.aceptar_invitacion(current_setting('prueba.t_emi'));
+    raise exception 'FALLA: Ana usó el link de Emi';
+  exception when no_data_found then raise notice 'OK  nadie puede usar el link de otra persona';
+  end;
+end $$;
+reset role;
+
+-- Cambiar el nombre en Cuenta lo actualiza en el equipo
+update auth.users set raw_user_meta_data = raw_user_meta_data || '{"nombre":"Emilia R."}' where id = '00000000-0000-0000-0000-0000000000d2';
+do $$ begin
+  assert (select nombre from public.miembros where user_id = '00000000-0000-0000-0000-0000000000d2') = 'Emilia R.';
+  raise notice 'OK  si alguien cambia su nombre, el dueño lo ve actualizado';
+end $$;
 \echo 'Todas las pruebas del esquema pasaron.'
