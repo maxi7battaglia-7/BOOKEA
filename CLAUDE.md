@@ -1,6 +1,7 @@
 # Proyecto: Bookea (turnos para canchas y barberías)
 
 - El producto se llama **Bookea**.
+- **La página de verdad es https://bookea.ar** (GitHub Pages, rama `main`). Todo cambio se sube a `main` para que llegue ahí, y se confirma mirando bookea.ar. La vista previa del artifact es solo una copia de muestra.
 - Sitio estático, sin frameworks.
   - Landing: `index.html`, `styles.css` y `script.js`. Arriba, el buscador para el cliente; abajo, la parte para negocios.
   - Reservas: `reservar.html`, `app.css` y `reservar.js`, con los turnos libres de cada lugar y la reserva. Por ahora los datos son de ejemplo y el pago es simulado.
