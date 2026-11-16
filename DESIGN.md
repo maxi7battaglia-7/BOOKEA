@@ -232,7 +232,7 @@ El dueño pidió cambiarla por completo.
 ## Sin límite de rubro ni de lugar (pedido del dueño)
 - Los textos ya no dicen "canchas y barberías de Mendoza". Hablan de negocios que trabajan con turnos y reservas.
 - El buscador conserva sus rubros y zonas de ejemplo, pero la opción general dice "Todas las zonas".
-- Pie: "Turnos online con seña para cualquier negocio que trabaje con reservas." y "© Bookea", sin "Mendoza, Argentina".
+- Pie: "Reservá turnos en segundos." y "© Bookea", sin "Mendoza, Argentina".
 
 ## Panel del negocio (admin.html) — rediseño completo (6/11/2026, pedido del dueño)
 Hecho con tres skills: **design-taste-frontend** (capítulo de pantallas de app, estilo "accent-ladder", semilla 930136599,
