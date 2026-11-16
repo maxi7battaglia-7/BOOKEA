@@ -24,7 +24,7 @@ create extension if not exists pg_net with schema extensions;
 
 -- Dirección del panel, para los links de los mails
 create or replace function public.bookea_url_panel() returns text language sql immutable as $$
-  select 'https://maxi7battaglia-7.github.io/BOOKEA/admin.html'
+  select 'https://bookea.ar/admin.html'
 $$;
 
 -- Lo que escribe la gente (nombre del negocio, etc.) va dentro del HTML del mail: se escapa

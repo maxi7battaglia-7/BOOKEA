@@ -20,7 +20,7 @@ begin
   assert e.body ->> 'from' = 'Bookea <onboarding@resend.dev>', 'de: ' || (e.body ->> 'from');
   assert e.body ->> 'subject' like 'Nuevo negocio para aprobar: Pádel%', 'asunto: ' || (e.body ->> 'subject');
   assert e.body ->> 'html' like '%Pádel &lt;b&gt;Lu&lt;/b&gt; &amp; Cía%' and e.body ->> 'html' like '%lu@prueba.com%', 'html sin escapar: ' || (e.body ->> 'html');
-  assert e.body ->> 'html' like '%https://maxi7battaglia-7.github.io/BOOKEA/admin.html%', 'falta el link al panel';
+  assert e.body ->> 'html' like '%https://bookea.ar/admin.html%', 'falta el link al panel';
   raise notice 'OK  negocio nuevo: te llega el aviso con el nombre, quién lo pidió y el link al panel (el HTML va escapado)';
 end $$;
 -- aprobar sin remitente propio: no se le manda al negocio

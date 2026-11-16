@@ -78,7 +78,7 @@ for archivo in ("styles.css", "admin.css", "nube.js", "admin.js", "toque.js"):
 # La vista previa siempre va en modo de prueba (sin base): config.js vacío, aunque el local tenga datos
 adm = adentro(adm, "config.js", "window.BOOKEA_CONFIG = {};")
 # ...y lo dice claro: con tu cuenta real se entra al panel publicado, no acá
-PANEL = "https://maxi7battaglia-7.github.io/BOOKEA/admin.html"
+PANEL = "https://bookea.ar/admin.html"
 demo_viejo = '<p class="caja__demo solo-local"><b>Para probar:</b> email <code>demo@example.com</code> y contraseña <code>bookea2026</code>.</p>'
 assert demo_viejo in adm, "cambió el aviso de la cuenta de prueba en admin.html"
 adm = adm.replace(demo_viejo, '<p class="caja__demo solo-local"><b>Esto es una vista de prueba:</b> tu cuenta real no entra acá. '
