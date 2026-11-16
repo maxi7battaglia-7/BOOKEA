@@ -80,6 +80,12 @@
 .vacio p { color: var(--soft); }
 
 .app-foot { max-width: 1200px; width: 100%; margin-inline: auto; padding-block: 0 40px; font-size: 14px; color: var(--soft); }
+.app-foot { display: grid; gap: 8px; }
+.app-foot__fotos summary { cursor: pointer; list-style: none; text-decoration: underline; text-underline-offset: 0.25em; justify-self: start; }
+.app-foot__fotos summary::-webkit-details-marker { display: none; }
+.app-foot__fotos p { margin-top: 8px; font-size: 13px; line-height: 1.6; max-width: 90ch; }
+.app-foot__fotos a { color: inherit; }
+@media (hover: none), (pointer: coarse) { .app-foot__fotos summary { display: inline-flex; align-items: center; min-height: 44px; } }
 
 /* ---------- Panel de reserva ---------- */
 .reserva {

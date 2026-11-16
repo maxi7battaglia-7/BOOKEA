@@ -136,7 +136,8 @@ h1, h2, h3 { font-family: var(--f-display); font-stretch: var(--display-ancho); 
   :is(.btn, .mini, .call__copy, .rubro, .hora).is-suelta { scale: 1.06; translate: 0 -2px; }
   /* los anchos (un botón de lado a lado, una foto) se mueven menos: si no, se salen de su caja */
   :is(.btn--block, .btn--lg, .rubro).is-apreta { scale: 0.98; }
-  :is(.btn--block, .btn--lg, .rubro).is-suelta { scale: 1.02; }
+  :is(.btn--block, .btn--lg).is-suelta { scale: 1.02; }
+  .rubro.is-suelta { scale: 1.04; translate: none; }
   .btn--ink:is(.is-apreta, .is-suelta) { color: var(--ink); }
   .btn--ink:is(.is-apreta, .is-suelta)::before { opacity: 1; transition-duration: 60ms; }
   :is(.btn--line, .mini, .call__copy):is(.is-apreta, .is-suelta) { background: var(--teal-tint); border-color: var(--teal-200); }
@@ -328,14 +329,25 @@ html:not(.js) .elegido { display: none; }
 .finder__title { font-size: var(--s-m); letter-spacing: -0.01em; }
 .finder__note { font-size: 14px; color: var(--soft); }
 
-/* Rubros con foto: en el buscador del inicio y al entrar a la página de reservas */
+/* Rubros con foto: en el buscador del inicio y al entrar a la página de reservas.
+   Las fotos van en blanco y negro, como las del mosaico de arriba, y al pasar el cursor hacen lo mismo que ellas:
+   se tiñen de verde agua (mix-blend-mode: color). Además la tarjeta entera se agranda un poco. */
 .rubros { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
 .rubro {
   position: relative; display: grid; grid-template-rows: auto auto; width: 100%; padding: 0; border: 0; text-align: left;
   border-radius: var(--r); overflow: hidden; background: var(--raised); color: var(--ink);
+  transition: scale 320ms var(--ease-rebote), translate 320ms var(--ease-rebote);
 }
-.rubro__foto { display: block; aspect-ratio: 3 / 4; overflow: hidden; background: var(--raised-2); }
-.rubro__foto img { width: 100%; height: 100%; object-fit: cover; transition: transform 700ms var(--ease-out); }
+.rubro__foto, .elegido__foto { position: relative; display: block; overflow: hidden; background: var(--raised-2); }
+.rubro__foto { aspect-ratio: 3 / 4; }
+.rubro__foto img, .elegido__foto img { width: 100%; height: 100%; object-fit: cover; filter: grayscale(1) contrast(1.08); }
+/* en las tarjetas apaisadas (celular, reservas) que no se corten las caras */
+img[src*="r-barberia."] { object-position: 50% 0%; }
+img[src*="r-padel."] { object-position: 50% 30%; }
+.rubro__foto::after, .elegido__foto::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: rgba(31, 160, 140, 0); mix-blend-mode: color; transition: background-color 280ms ease;
+}
 .rubro__n {
   position: relative; isolation: isolate; display: flex; align-items: center; justify-content: space-between; gap: 8px;
   min-height: 44px; padding: 0 12px; font-size: 15px; font-weight: 600; white-space: nowrap;
@@ -347,16 +359,22 @@ html:not(.js) .elegido { display: none; }
 }
 .rubro__n::after { content: "→"; color: var(--orange-strong); transition: transform var(--t-ui) var(--ease-out), color 260ms ease; }
 .rubro:focus-visible { outline-offset: 2px; }
+.rubro:focus-visible .rubro__foto::after { background: rgba(31, 160, 140, 1); }
 @media (hover: hover) and (pointer: fine) {
-  .rubro:hover .rubro__foto img { transform: scale(1.06); }
+  .rubro:hover { scale: 1.04; z-index: 1; }
+  .rubro:hover .rubro__foto::after { background: rgba(31, 160, 140, 1); }
   .rubro:hover .rubro__n::before { clip-path: inset(0 0 0 0); }
   .rubro:hover .rubro__n::after { transform: translateX(3px); color: var(--ink); }
+  .rubro:active { scale: 1; transition-duration: 120ms; }
 }
 @media (hover: none), (pointer: coarse) {
   .rubro__n::before { clip-path: none; opacity: 0; transition: opacity 360ms ease; }
+  .rubro:is(.is-apreta, .is-suelta) { z-index: 1; }
+  .rubro:is(.is-apreta, .is-suelta) .rubro__foto::after { background: rgba(31, 160, 140, 1); transition-duration: 60ms; }
   .rubro:is(.is-apreta, .is-suelta) .rubro__n::before { opacity: 1; transition-duration: 60ms; }
   .rubro:is(.is-apreta, .is-suelta) .rubro__n::after { color: var(--ink); }
 }
+@media (prefers-reduced-motion: reduce) { .rubro:hover { scale: none; } }
 /* con poco ancho, los cuatro siguen en fila pero sin flecha (en el celular van de a dos: ver "Teléfono") */
 @container (max-width: 520px) {
   .rubro__n { font-size: 14px; padding: 0 10px; min-height: 40px; }
@@ -369,8 +387,8 @@ html:not(.js) .elegido { display: none; }
 
 /* El rubro ya elegido: foto chica, nombre y "Cambiar" */
 .elegido { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px; align-items: center; }
-.elegido__foto { width: 64px; height: 64px; border-radius: var(--r); overflow: hidden; background: var(--raised-2); }
-.elegido__foto img { width: 100%; height: 100%; object-fit: cover; }
+.elegido__foto { flex: none; width: 64px; height: 64px; border-radius: var(--r); }
+.elegido__foto::after { background: rgba(31, 160, 140, 1); } /* el elegido queda teñido, como una foto del mosaico con el cursor encima */
 .elegido__txt { display: grid; gap: 2px; min-width: 0; }
 .elegido__k { font-size: 13px; color: var(--soft); }
 .elegido__n {

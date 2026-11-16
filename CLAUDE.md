@@ -23,9 +23,9 @@
   - Pruebas: `supabase/pruebas/correr.sh` (esquema y permisos en Postgres local), `node supabase/pruebas/e2e/nube-e2e.js` (panel real contra ese Postgres) y `node pruebas/sitio.js` (inicio, reservas y registro en el navegador, en modo de prueba).
   - `config.js` ya apunta al proyecto real (`vpxzuutavdjwglglbvdt.supabase.co`, clave publishable). Abrir `admin.html` local o en GitHub Pages usa la base real.
   - Sitio publicado en GitHub Pages: https://maxi7battaglia-7.github.io/BOOKEA/ (repo `maxi7battaglia-7/BOOKEA`, rama `main`).
-  - La vista previa del artifact (`scripts/preview.py`) siempre va en modo de prueba.
+  - La vista previa del artifact (`scripts/preview.py`) siempre va en modo de prueba: una cuenta real no entra ahí (el panel de la vista previa lo avisa y lleva al publicado).
   - Aprobación: los negocios nuevos quedan `pendiente` (pantalla "Tu negocio está en revisión") hasta que el equipo de Bookea (`admins_bookea`) los aprueba en la vista **Solicitudes** (`revisar_negocio`). Aviso por mail opcional: `supabase/avisos-por-mail.sql` (pg_net + Resend, claves en Vault).
-  - `admin.html` pide `styles.css`, `admin.css`, `config.js`, `nube.js`, `admin.js` y `toque.js` con `?v=N` para que el navegador no use una versión vieja: al cambiarlos, subir N (y la `V` de `scripts/preview.py`). Hoy N = 4.
+  - `admin.html` pide `styles.css`, `admin.css`, `config.js`, `nube.js`, `admin.js` y `toque.js` con `?v=N` para que el navegador no use una versión vieja: al cambiarlos, subir N en las tres páginas (`index.html` y `reservar.html` piden los suyos igual; `scripts/preview.py` lo saca solo). Hoy N = 5.
   - `reservar.html` todavía no está conectada a la base (siguiente paso).
 - Panel: la sesión vive solo en memoria, también con Supabase (`persistSession: false`). Cada carga o refresco de admin.html vuelve a pedir email y contraseña (pedido del dueño). Solo los links de los mails (confirmar cuenta, contraseña nueva) entran sin pedirla.
 - Panel: rediseñado con las skills design-taste-frontend (app, accent-ladder), anti-ui-slop y ui-ux-pro-max. Antes de tocarlo, leer la sección del panel en DESIGN.md. Para medirlo: `scripts/insp-copias.sh` y el inspector con `--app`.

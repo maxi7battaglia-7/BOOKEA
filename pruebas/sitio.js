@@ -32,7 +32,7 @@ const medir = () => {
       }
       if ((cs.overflowX === 'hidden' || cs.overflowX === 'clip') && el.scrollWidth > el.clientWidth + 1 && cs.textOverflow !== 'ellipsis') res.push(`texto cortado sin "…": ${nombre(el)}`);
     }
-    if (vw < 500 && el.matches('a[href], button, select, input:not([type=hidden]), summary') && cs.position !== 'absolute' && !el.closest('.foot__credits p, .frag, .ex__demo')) {
+    if (vw < 500 && el.matches('a[href], button, select, input:not([type=hidden]), summary') && cs.position !== 'absolute' && !el.closest('.foot__credits p, .app-foot__fotos p, .frag, .ex__demo')) {
       const h = Math.max(r.height, el.closest('label') ? el.closest('label').getBoundingClientRect().height : 0);
       if (h < 40) res.push(`toque chico (${Math.round(h)}px): ${nombre(el)} "${(el.textContent || '').trim().slice(0, 20)}"`);
     }
@@ -153,6 +153,11 @@ const medir = () => {
     await p.goto(B + 'index.html', { waitUntil: 'load' }); await p.waitForTimeout(3600);
     await p.hover('#finder .rubro[value="tenis"]'); await p.waitForTimeout(700);
     ok(/^inset\(0/.test(await p.evaluate(() => getComputedStyle(document.querySelector('#finder .rubro[value="tenis"] .rubro__n'), '::before').clipPath)), 'cursor sobre un rubro: el verde agua barre el nombre');
+    const t = await p.evaluate(() => { const r = document.querySelector('#finder .rubro[value="tenis"]'); const o = document.querySelector('#finder .rubro[value="padel"]');
+      return { escala: getComputedStyle(r).scale, tinte: getComputedStyle(r.querySelector('.rubro__foto'), '::after').backgroundColor, otro: getComputedStyle(o.querySelector('.rubro__foto'), '::after').backgroundColor, gris: getComputedStyle(o.querySelector('img')).filter }; });
+    ok(t.escala === '1.04' && t.tinte === 'rgb(31, 160, 140)' && /grayscale\(1\)/.test(t.gris) && t.otro === 'rgba(31, 160, 140, 0)', `cursor sobre un rubro: la tarjeta se agranda y la foto pasa de gris a verde agua, como el mosaico (${JSON.stringify(t)})`);
+    const fotos = await p.evaluate(() => { const m = new Set([...document.querySelectorAll('.mosaico img')].map((i) => i.getAttribute('src'))); return [...document.querySelectorAll('.rubro img')].filter((i) => m.has(i.getAttribute('src'))).length; });
+    ok(fotos === 0, 'las fotos de los rubros no repiten las del mosaico');
     await p.click('#finder .rubro[value="tenis"]'); await p.waitForTimeout(700);
     await p.hover('.finder__go'); await p.waitForTimeout(600);
     const b = await p.evaluate(() => { const x = document.querySelector('.finder__go'); return [getComputedStyle(x, '::before').clipPath, getComputedStyle(x).color]; });

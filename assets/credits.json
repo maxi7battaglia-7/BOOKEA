@@ -142,5 +142,104 @@
       "Recortada a 2:1, en blanco y negro y achicada a 1600 px."
     ],
     "saved": "2026-11-05"
+  },
+  {
+    "file": "assets/r-padel.webp",
+    "media": "image",
+    "ref": "commons:31134565",
+    "title": "Padel Tennis Arena ISPO 2014",
+    "creator": "Ordercrazy",
+    "creatorUrl": null,
+    "date": "2014-01-28",
+    "license": "CC0",
+    "licenseCode": "cc0",
+    "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    "creditRequired": false,
+    "page": "https://commons.wikimedia.org/wiki/File:Padel_Tennis_Arena_ISPO_2014.jpg",
+    "via": "Wikimedia Commons",
+    "image": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/96/Padel_Tennis_Arena_ISPO_2014.jpg/1280px-Padel_Tennis_Arena_ISPO_2014.jpg",
+    "width": 1280,
+    "height": 905,
+    "bytes": 284117,
+    "credit": "\"Padel Tennis Arena ISPO 2014\" by Ordercrazy, CC0, via Wikimedia Commons",
+    "notes": [
+      "Restrictions named on the source page (personality): personality rights, a trademark or similar. Read it before use.",
+      "Recortada en cuadrado a 640 px para el buscador; se ve en blanco y negro (CSS)."
+    ],
+    "saved": "2026-11-16T12:57:40.843Z"
+  },
+  {
+    "file": "assets/r-futbol.webp",
+    "media": "image",
+    "ref": "commons:104331286",
+    "title": "Futsal indoor",
+    "creator": "Christopherjeffrey04",
+    "creatorUrl": null,
+    "date": "2021-04-25",
+    "license": "CC BY-SA 4.0",
+    "licenseCode": "by-sa",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "creditRequired": true,
+    "page": "https://commons.wikimedia.org/wiki/File:Futsal_indoor.jpg",
+    "via": "Wikimedia Commons",
+    "image": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/5e/Futsal_indoor.jpg/1280px-Futsal_indoor.jpg",
+    "width": 1280,
+    "height": 1600,
+    "bytes": 740035,
+    "credit": "\"Futsal indoor\" by Christopherjeffrey04, CC BY-SA 4.0, via Wikimedia Commons",
+    "notes": [
+      "Share-alike: an altered version (recoloured, combined with other pictures) must be shared under the same licence.",
+      "Recortada en cuadrado a 640 px para el buscador; se ve en blanco y negro (CSS)."
+    ],
+    "saved": "2026-11-16T12:57:44.328Z"
+  },
+  {
+    "file": "assets/r-barberia.webp",
+    "media": "image",
+    "ref": "commons:87453563",
+    "title": "Barbershop in Cancun",
+    "creator": "Ekaterina Kvelidze",
+    "creatorUrl": null,
+    "date": "2019-01-08",
+    "license": "CC BY-SA 4.0",
+    "licenseCode": "by-sa",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "creditRequired": true,
+    "page": "https://commons.wikimedia.org/wiki/File:Barbershop_in_Cancun.jpg",
+    "via": "Wikimedia Commons",
+    "image": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/87/Barbershop_in_Cancun.jpg/1280px-Barbershop_in_Cancun.jpg",
+    "width": 1280,
+    "height": 1707,
+    "bytes": 464503,
+    "credit": "\"Barbershop in Cancun\" by Ekaterina Kvelidze, CC BY-SA 4.0, via Wikimedia Commons",
+    "notes": [
+      "Share-alike: an altered version (recoloured, combined with other pictures) must be shared under the same licence.",
+      "Recortada en cuadrado a 640 px para el buscador; se ve en blanco y negro (CSS)."
+    ],
+    "saved": "2026-11-16T12:57:52.499Z"
+  },
+  {
+    "file": "assets/r-tenis.webp",
+    "media": "image",
+    "ref": "commons:135470346",
+    "title": "Young tennis player",
+    "creator": "David E. Lucas",
+    "creatorUrl": null,
+    "date": "1981 circa",
+    "license": "public domain",
+    "licenseCode": "pd",
+    "licenseUrl": "https://creativecommons.org/publicdomain/mark/1.0/",
+    "creditRequired": false,
+    "page": "https://commons.wikimedia.org/wiki/File:Young_tennis_player_-_DPLA_-_94b67fb8726019dfb9e3bced2eb256b8.jpg",
+    "via": "Wikimedia Commons",
+    "image": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/44/Young_tennis_player_-_DPLA_-_94b67fb8726019dfb9e3bced2eb256b8.jpg/1280px-Young_tennis_player_-_DPLA_-_94b67fb8726019dfb9e3bced2eb256b8.jpg",
+    "width": 1280,
+    "height": 857,
+    "bytes": 138569,
+    "credit": "\"Young tennis player\" by David E. Lucas, public domain, via Wikimedia Commons",
+    "notes": [
+      "Recortada en cuadrado a 640 px para el buscador; se ve en blanco y negro (CSS)."
+    ],
+    "saved": "2026-11-16T12:59:45.719Z"
   }
 ]

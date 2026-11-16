@@ -335,9 +335,13 @@ Pedido: "que no quede nada raro ni nada que no funcione" y "que todo tenga una c
   fondo y cajas del panel, y los horarios libres en el verde pálido de los huecos libres de la agenda.
 
 ## Buscador en dos pasos, con una foto por rubro (16/11, pedido del dueño)
-- **Paso 1, "¿Qué querés reservar?":** cuatro fotos (pádel, fútbol 5, tenis, barbería), a color: la banda de arriba es neutra y el
-  color vivo queda para el contenido. Son recortes de las mismas fotos del mosaico (`assets/r-*.webp`, 600 px).
-  En computadora van las cuatro en fila; en el celular, de a dos. Al pasar el cursor, el verde barre el nombre y la foto se acerca.
+- **Paso 1, "¿Qué querés reservar?":** cuatro fotos (pádel, fútbol 5, tenis, barbería), **distintas de las del mosaico** y
+  tratadas igual que ellas (pedido del dueño, 16/11): en blanco y negro, y al pasar el cursor la tarjeta se agranda un poco (1,04)
+  y la foto se tiñe de verde agua con el mismo efecto del mosaico (`mix-blend-mode: color`); el nombre hace el barrido verde.
+  Al tocarla en el celular pasa lo mismo. El rubro elegido queda con su foto chica teñida de verde.
+  Fotos en `assets/r-*.webp` (640 px, de Wikimedia Commons; créditos en `assets/credits.json` y en el pie del inicio y de reservas).
+  Son de gente común jugando o trabajando: no se usan fotos de deportistas conocidos (parecería que avalan Bookea).
+  En computadora van las cuatro en fila; en el celular, de a dos.
 - **Paso 2:** al tocar un rubro aparece arriba la foto chica con su nombre y "Cambiar", y recién ahí Dónde, Cuándo, Hora y
   "Buscar turnos". La caja acompaña el cambio de alto y lo nuevo entra desde el costado. El foco pasa al nombre del rubro;
   "Cambiar" lo devuelve a la foto que tenías.
