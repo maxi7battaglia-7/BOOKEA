@@ -4,6 +4,9 @@
 - Sitio estático, sin frameworks.
   - Landing: `index.html`, `styles.css` y `script.js`. Arriba, el buscador para el cliente; abajo, la parte para negocios.
   - Reservas: `reservar.html`, `app.css` y `reservar.js`, con los turnos libres de cada lugar y la reserva. Por ahora los datos son de ejemplo y el pago es simulado.
+  - **Lo compartido vive en un solo lugar:** `styles.css` (colores, botones, campos, rubros con foto) lo cargan las tres páginas, y `toque.js` (el toque en pantallas táctiles) también. No redefinir colores, botones ni campos en `app.css` o `admin.css`: ver "Revisión general" en DESIGN.md.
+  - Buscador en dos pasos (inicio y `reservar.html`): primero una foto por rubro (`assets/r-*.webp`), después dónde, cuándo y hora. `reservar.html` sin `?rubro=` muestra las fotos.
+  - "Sumá tu negocio" (inicio) es el primer paso del registro: lleva a `admin.html?alta=1&nombre=…&negocio=…&rubro=…`, que abre el registro con esos datos.
 - **Antes de cualquier cambio visual, leer `DESIGN.md`.** Es la dirección elegida por el dueño: Stripe + Figma + Trello, con los colores de la camiseta del Venezia.
 - Vista previa publicada: https://claude.ai/artifact/EPAeEsx11Px3yKWRQBkgpL. Se regenera con `python3 scripts/preview.py` y se republica con `dist/bookea.html`, más `dist/reservar.html` como archivo aparte (`reservar.html`).
 - Marca en `marca/`: isotipo B (SVG y PNG), lámina de construcción y filosofía "Franja Exacta".
@@ -17,12 +20,12 @@
 - Cuentas y datos del panel: dos modos según `config.js`.
   - Vacío = modo de prueba: todo en localStorage (`bookea:panel:v1`). Cuenta de prueba: `demo@example.com` / `bookea2026` (también entra con `losalamos`).
   - Con los datos de Supabase = modo nube (`nube.js`): cuentas por email (Supabase Auth), cada cuenta atada a su negocio por la tabla `miembros`, reglas RLS para que nadie vea otro negocio. Esquema: `supabase/esquema.sql`; guía paso a paso: `supabase/LEEME.md`.
-  - Pruebas: `supabase/pruebas/correr.sh` (esquema y permisos en Postgres local) y `node supabase/pruebas/e2e/nube-e2e.js` (panel real contra ese Postgres).
+  - Pruebas: `supabase/pruebas/correr.sh` (esquema y permisos en Postgres local), `node supabase/pruebas/e2e/nube-e2e.js` (panel real contra ese Postgres) y `node pruebas/sitio.js` (inicio, reservas y registro en el navegador, en modo de prueba).
   - `config.js` ya apunta al proyecto real (`vpxzuutavdjwglglbvdt.supabase.co`, clave publishable). Abrir `admin.html` local o en GitHub Pages usa la base real.
   - Sitio publicado en GitHub Pages: https://maxi7battaglia-7.github.io/BOOKEA/ (repo `maxi7battaglia-7/BOOKEA`, rama `main`).
   - La vista previa del artifact (`scripts/preview.py`) siempre va en modo de prueba.
   - Aprobación: los negocios nuevos quedan `pendiente` (pantalla "Tu negocio está en revisión") hasta que el equipo de Bookea (`admins_bookea`) los aprueba en la vista **Solicitudes** (`revisar_negocio`). Aviso por mail opcional: `supabase/avisos-por-mail.sql` (pg_net + Resend, claves en Vault).
-  - `admin.html` pide `config.js`, `nube.js`, `admin.js` y `admin.css` con `?v=N` para que el navegador no use una versión vieja: al cambiarlos, subir N (y en `scripts/preview.py`).
+  - `admin.html` pide `styles.css`, `admin.css`, `config.js`, `nube.js`, `admin.js` y `toque.js` con `?v=N` para que el navegador no use una versión vieja: al cambiarlos, subir N (y la `V` de `scripts/preview.py`). Hoy N = 4.
   - `reservar.html` todavía no está conectada a la base (siguiente paso).
 - Panel: la sesión vive solo en memoria, también con Supabase (`persistSession: false`). Cada carga o refresco de admin.html vuelve a pedir email y contraseña (pedido del dueño). Solo los links de los mails (confirmar cuenta, contraseña nueva) entran sin pedirla.
 - Panel: rediseñado con las skills design-taste-frontend (app, accent-ladder), anti-ui-slop y ui-ux-pro-max. Antes de tocarlo, leer la sección del panel en DESIGN.md. Para medirlo: `scripts/insp-copias.sh` y el inspector con `--app`.

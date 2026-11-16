@@ -235,6 +235,15 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
     await m.screenshot({ path: `${out}/nb-m-entrada.png`, fullPage: true });
     ok((await m.evaluate(() => document.documentElement.scrollWidth)) === 390, 'celular: la entrada no se desborda');
 
+    // ---------- Llegada desde "Sumá tu negocio" del inicio: el registro abre con los datos cargados ----------
+    await m.goto(URL_ + '?alta=1&nombre=Carla+Ruiz&negocio=Estudio+Carla&rubro=Peluquer%C3%ADa'); await m.waitForSelector('#f-registro:not([hidden])');
+    ok((await m.inputValue('#r-nombre')) === 'Carla Ruiz' && (await m.inputValue('#r-negocio')) === 'Estudio Carla' && (await m.inputValue('#r-rubro')) === 'Peluquería', 'desde el inicio: el registro abre con nombre, negocio y rubro');
+    ok(!m.url().includes('alta=') && (await m.evaluate(() => document.activeElement.id)) === 'r-email', 'y deja la dirección limpia y el foco en el email');
+    await m.fill('#r-email', 'carla@prueba.com'); await m.fill('#r-clave', 'peluqueria2026'); await m.fill('#r-clave2', 'peluqueria2026');
+    await m.click('#f-registro button[type=submit]'); await m.waitForSelector('#f-espera:not([hidden])');
+    const carla = await sql("select coalesce(json_agg(json_build_object('n', nombre, 'r', rubro, 'e', estado, 'd', nombre_dueno)), '[]') from public.negocios where email_dueno = 'carla@prueba.com'");
+    ok(carla.length === 1 && carla[0].n === 'Estudio Carla' && carla[0].r === 'Peluquería' && carla[0].e === 'pendiente' && carla[0].d === 'Carla Ruiz', 'la cuenta se crea de verdad: negocio pendiente en la base');
+
     for (const [n, p] of [['a', a], ['c', c], ['m', m]]) ok(!p.errs.length, `sin errores en la consola (${n}) ${p.errs.join(' | ')}`);
   } catch (e) {
     console.log('FALLA (excepción)', e.message); process.exitCode = 1;

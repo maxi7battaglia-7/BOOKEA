@@ -23,12 +23,43 @@
       const nombre = i === 0 ? "Hoy" : i === 1 ? "Mañana" : DIAS[d.getDay()][0].toUpperCase() + DIAS[d.getDay()].slice(1);
       return `<option value="${i}">${nombre} ${d.getDate()}/${d.getMonth() + 1}</option>`;
     }).join("");
+
+    // Dos pasos: 1) tocás la foto del rubro  2) elegís dónde y cuándo. "Cambiar" vuelve al paso 1.
+    const paso1 = $("#finder-1"), paso2 = $("#finder-2");
+    let rubro = "";
+    const irAPaso = (n, foco) => {
+      const alto = finder.offsetHeight;
+      const entra = n === 2 ? paso2 : paso1;
+      finder.dataset.paso = String(n);
+      if (!reduce) {
+        // la caja acompaña el cambio de alto y lo nuevo entra desde el lado hacia el que se avanza
+        finder.style.overflow = "hidden";
+        const a = finder.animate({ height: [`${alto}px`, `${finder.offsetHeight}px`] }, { duration: 380, easing: "cubic-bezier(0.16, 1, 0.3, 1)" });
+        a.onfinish = a.oncancel = () => { finder.style.overflow = ""; };
+        entra.style.setProperty("--desde", n === 2 ? "18px" : "-18px");
+        entra.classList.remove("is-entra"); void entra.offsetWidth; entra.classList.add("is-entra");
+        setTimeout(() => entra.classList.remove("is-entra"), 700);
+      }
+      if (foco) foco.focus({ preventScroll: true });
+    };
+    $$(".rubro", finder).forEach((b) => b.addEventListener("click", (e) => {
+      e.preventDefault();
+      rubro = b.value;
+      const nombre = $(".rubro__n", b).textContent;
+      $("#el-foto").src = $("img", b).getAttribute("src");
+      const n = $("#el-n"); n.textContent = nombre; n.setAttribute("aria-label", `${nombre}. Ahora elegí dónde y cuándo.`);
+      irAPaso(2, n);
+    }));
+    $("#el-cambiar").addEventListener("click", () => irAPaso(1, $(`.rubro[value="${rubro}"]`, finder) || $(".rubro", finder)));
     finder.addEventListener("submit", (e) => {
       e.preventDefault();
       const p = new URLSearchParams(new FormData(finder));
+      p.set("rubro", rubro || "padel");
       try { sessionStorage.setItem("bookea:busqueda", p.toString()); } catch {}
       location.href = "reservar.html?" + p.toString();
     });
+    // si volvés con "atrás", el buscador arranca de nuevo en las fotos
+    window.addEventListener("pageshow", (e) => { if (e.persisted) { finder.dataset.paso = "1"; rubro = ""; } });
   }
 
   // ---------- Reglas de cancelación ----------
@@ -51,14 +82,14 @@
     setTimeout(() => (b.textContent = orig), 1600);
   }));
 
-  // ---------- Formulario (sin servidor todavía) ----------
+  // ---------- Sumá tu negocio: primer paso del registro ----------
+  // Los tres datos viajan al panel (admin.html), que abre "Creá la cuenta de tu negocio" con ellos ya cargados.
+  // Ahí se eligen el email y la contraseña, y la cuenta se crea de verdad.
   const form = $("#form-sumate");
   if (form) {
     const msg = $(".form__msg", form);
-    const btn = $('button[type="submit"]', form);
-    const invalido = (f) => f.name === "whatsapp" ? f.value.replace(/\D/g, "").length < 8 : !f.value.trim();
     const marcar = (f) => {
-      const bad = invalido(f);
+      const bad = !f.value.trim();
       f.classList.toggle("is-invalid", bad);
       f.setAttribute("aria-invalid", String(bad));
       $("#" + f.id + "-err").hidden = !bad;
@@ -67,22 +98,18 @@
     // Una vez marcado, el error se corrige mientras escribís
     $$("[required]", form).forEach((f) => f.addEventListener("input", () => { if (f.getAttribute("aria-invalid") === "true") marcar(f); }));
     form.addEventListener("submit", (e) => {
-      e.preventDefault();
       const malos = $$("[required]", form).filter(marcar);
       if (malos.length) {
+        e.preventDefault();
         msg.textContent = malos.length === 1 ? "Falta completar un campo." : `Faltan completar ${malos.length} campos.`;
         msg.className = "form__msg err";
         malos[0].focus();
         return;
       }
-      btn.disabled = true; btn.textContent = "Enviando…";
       msg.textContent = ""; msg.className = "form__msg";
-      setTimeout(() => {
-        btn.disabled = false; btn.textContent = "Quiero probarlo";
-        msg.textContent = "¡Listo! Te escribimos por WhatsApp hoy mismo.";
-        msg.className = "form__msg ok";
-        form.reset();
-      }, 700);
+      const datos = Object.fromEntries($$("[required]", form).map((f) => [f.name, f.value.trim()]));
+      try { sessionStorage.setItem("bookea:alta", JSON.stringify(datos)); } catch {}
+      // sigue el envío normal del formulario: admin.html?alta=1&nombre=…&negocio=…&rubro=…
     });
   }
 
@@ -206,43 +233,4 @@
     if (document.readyState === "complete") listo(); else window.addEventListener("load", listo, { once: true });
     setTimeout(salir, 4000); // tope por si algo tarda en cargar
   }
-})();
-
-// Toque en pantallas táctiles: mientras el dedo apoya, el botón se aprieta (.is-apreta); al soltar,
-// se agranda un poco y el color queda un momento (.is-suelta) antes de apagarse despacio.
-// Si el dedo arrastra para hacer scroll, no queda marcado.
-(() => {
-  const tactil = window.matchMedia("(hover: none), (pointer: coarse)");
-  const SEL = ".brand, .nav__links a, .nav .nav__cta";
-  const QUEDA = 450; // ms que el color queda prendido después de soltar
-  let apretado = null;
-  document.addEventListener("pointerdown", (e) => {
-    if (e.pointerType === "mouse" || !tactil.matches) return;
-    const el = e.target.closest(SEL);
-    if (!el || el.disabled) return;
-    clearTimeout(el._toque);
-    el.classList.remove("is-suelta");
-    el.classList.add("is-apreta");
-    apretado = el;
-  }, { passive: true });
-  const soltar = (e) => {
-    const el = apretado;
-    if (!el) return;
-    apretado = null;
-    el.classList.remove("is-apreta");
-    if (e.type === "pointercancel") return;
-    el.classList.add("is-suelta");
-    el._toque = setTimeout(() => el.classList.remove("is-suelta"), QUEDA);
-  };
-  document.addEventListener("pointerup", soltar, { passive: true });
-  document.addEventListener("pointercancel", soltar, { passive: true });
-  // Un link que lleva a otra página espera un instante, así se llega a ver el toque.
-  document.addEventListener("click", (e) => {
-    const a = e.target.closest("a[href]");
-    if (!a || !a.classList.contains("is-suelta") || e.defaultPrevented) return;
-    const href = a.getAttribute("href");
-    if (href.startsWith("#") || a.target || e.metaKey || e.ctrlKey || e.shiftKey) return;
-    e.preventDefault();
-    setTimeout(() => { window.location.href = a.href; }, 260);
-  });
 })();

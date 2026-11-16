@@ -5,14 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Bookea</title>
   <meta name="description" content="Bookea: turnos online con seña para negocios que trabajan con reservas. Seña con Mercado Pago y recordatorio por WhatsApp." />
-  <meta name="theme-color" content="#ffffff" />
+  <meta name="theme-color" content="#11151c" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900;1,62..125,100..900&display=swap" rel="stylesheet" />
   <link rel="icon" href="marca/isotipo.svg" type="image/svg+xml" />
   <link rel="icon" href="marca/isotipo-32.png" sizes="32x32" type="image/png" />
   <link rel="apple-touch-icon" href="marca/isotipo-192.png" />
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css?v=4" />
   <script>
     document.documentElement.classList.add("js");
     // Al cargar o refrescar, siempre arriba de todo, diga lo que diga la dirección (#preguntas, etc.).
@@ -96,7 +96,7 @@
   </header>
 
   <main id="main">
-    <!-- ===== Hero: la agenda en escena ===== -->
+    <!-- ===== Hero: bienvenida y buscador de turnos ===== -->
     <section class="hero frame" aria-labelledby="titulo">
       <h1 id="titulo" class="hero__title">Bienvenidos a Bookea</h1>
       <div class="hero__copy">
@@ -110,20 +110,29 @@
 
       <div class="stage shutter">
         <div class="stage__inner">
-          <!-- Buscador de turnos: lleva a reservar.html con la búsqueda -->
-          <form class="finder" id="finder" action="reservar.html" method="get" data-ui aria-labelledby="finder-t">
-            <h2 class="finder__title" id="finder-t">¿Qué querés reservar?</h2>
-            <fieldset class="finder__rubros">
-              <legend class="sr-only">Rubro</legend>
-              <label class="rb"><input type="radio" name="rubro" value="padel" checked /><span>Pádel</span></label>
-              <label class="rb"><input type="radio" name="rubro" value="futbol" /><span>Fútbol 5</span></label>
-              <label class="rb"><input type="radio" name="rubro" value="tenis" /><span>Tenis</span></label>
-              <label class="rb"><input type="radio" name="rubro" value="barberia" /><span>Barbería</span></label>
-            </fieldset>
-            <div class="finder__row">
-              <div class="ff">
-                <label for="fz">Dónde</label>
-                <select id="fz" name="zona">
+          <!-- Buscador de turnos en dos pasos: primero qué (una foto por rubro), después dónde y cuándo.
+               Sin JavaScript, cada foto lleva directo a los turnos de ese rubro. -->
+          <form class="finder" id="finder" action="reservar.html" method="get" data-ui data-paso="1" aria-labelledby="finder-t">
+            <div class="finder__paso" id="finder-1">
+              <h2 class="finder__title" id="finder-t">¿Qué querés reservar?</h2>
+              <ul class="rubros">
+              <li><button type="submit" class="rubro" name="rubro" value="padel"><span class="rubro__foto"><img src="assets/r-padel.webp" alt="" width="600" height="600" /></span><span class="rubro__n">Pádel</span></button></li>
+              <li><button type="submit" class="rubro" name="rubro" value="futbol"><span class="rubro__foto"><img src="assets/r-futbol.webp" alt="" width="600" height="600" /></span><span class="rubro__n">Fútbol 5</span></button></li>
+              <li><button type="submit" class="rubro" name="rubro" value="tenis"><span class="rubro__foto"><img src="assets/r-tenis.webp" alt="" width="600" height="600" /></span><span class="rubro__n">Tenis</span></button></li>
+              <li><button type="submit" class="rubro" name="rubro" value="barberia"><span class="rubro__foto"><img src="assets/r-barberia.webp" alt="" width="600" height="600" /></span><span class="rubro__n">Barbería</span></button></li>
+              </ul>
+              <p class="finder__note">Elegí qué buscás y después dónde y cuándo.</p>
+            </div>
+            <div class="finder__paso" id="finder-2">
+              <div class="elegido">
+                <span class="elegido__foto"><img id="el-foto" src="assets/r-padel.webp" alt="" width="600" height="600" /></span>
+                <p class="elegido__txt"><span class="elegido__k">Vas a reservar</span><strong class="elegido__n" id="el-n" tabindex="-1">Pádel</strong></p>
+                <button type="button" class="mini" id="el-cambiar">Cambiar</button>
+              </div>
+              <div class="finder__row">
+                <div class="ff">
+                  <label for="fz">Dónde</label>
+                  <select id="fz" name="zona">
                   <option value="">Todas las zonas</option>
                   <optgroup label="Valle de Uco">
                     <option value="tunuyan">Tunuyán</option>
@@ -142,23 +151,24 @@
                     <option value="maipu">Maipú</option>
                   </optgroup>
                 </select>
+                </div>
+                <div class="ff">
+                  <label for="fd">Cuándo</label>
+                  <select id="fd" name="dia"><option value="0">Hoy</option><option value="1">Mañana</option></select>
+                </div>
+                <div class="ff">
+                  <label for="fh">Hora</label>
+                  <select id="fh" name="franja">
+                    <option value="">Todo el día</option>
+                    <option value="manana">A la mañana</option>
+                    <option value="tarde">A la tarde</option>
+                    <option value="noche">A la noche</option>
+                  </select>
+                </div>
               </div>
-              <div class="ff">
-                <label for="fd">Cuándo</label>
-                <select id="fd" name="dia"><option value="0">Hoy</option><option value="1">Mañana</option></select>
-              </div>
-              <div class="ff">
-                <label for="fh">Hora</label>
-                <select id="fh" name="franja">
-                  <option value="">Cualquier hora</option>
-                  <option value="manana">A la mañana</option>
-                  <option value="tarde">A la tarde</option>
-                  <option value="noche">A la noche</option>
-                </select>
-              </div>
+              <button type="submit" class="btn btn--ink btn--lg btn--block finder__go">Buscar turnos</button>
+              <p class="finder__note">Ves los horarios libres de cada lugar y reservás en el momento.</p>
             </div>
-            <button type="submit" class="btn btn--ink btn--lg btn--block finder__go">Buscar turnos</button>
-            <p class="finder__note">Ves los horarios libres de cada lugar y reservás en el momento.</p>
           </form>
         </div>
       </div>
@@ -355,12 +365,14 @@
         <div class="join__copy">
           <h2 id="join-t" class="join__title">Sumá tu negocio al proyecto.</h2>
           <ol class="join__next">
-            <li><b>Te escribimos por WhatsApp</b> el mismo día para conocer tu negocio.</li>
-            <li><b>Lo armamos juntos:</b> te ayudamos a cargar lo que se reserva, los horarios y los precios.</li>
-            <li><b>Compartís tu link</b> y empezás a recibir reservas con seña.</li>
+            <li><b>Creás tu cuenta</b> con tu email. Te mandamos un mail para confirmarlo.</li>
+            <li><b>Revisamos tu negocio.</b> Cuando está aprobado, entrás al panel con tu email y tu contraseña.</li>
+            <li><b>Armás tu agenda:</b> cargás lo que se reserva, los horarios y los precios.</li>
           </ol>
         </div>
-        <form class="form" id="form-sumate" novalidate data-ui aria-labelledby="join-t">
+        <!-- Primer paso del registro: sigue en el panel (admin.html) con estos datos ya cargados -->
+        <form class="form" id="form-sumate" action="admin.html" method="get" novalidate data-ui aria-labelledby="join-t">
+          <input type="hidden" name="alta" value="1" />
           <div class="field">
             <label for="f-nombre">Tu nombre</label>
             <input id="f-nombre" name="nombre" autocomplete="name" required aria-describedby="f-nombre-err" />
@@ -371,31 +383,18 @@
             <input id="f-negocio" name="negocio" autocomplete="organization" required aria-describedby="f-negocio-err" />
             <p class="field__err" id="f-negocio-err" hidden>Escribí el nombre de tu negocio.</p>
           </div>
-          <div class="field-row">
-            <div class="field">
-              <label for="f-rubro">Rubro</label>
-              <select id="f-rubro" name="rubro" required aria-describedby="f-rubro-err">
-                <option value="">Elegí</option>
-                <option>Pádel</option>
-                <option>Fútbol</option>
-                <option>Tenis</option>
-                <option>Barbería</option>
-                <option>Otro</option>
-              </select>
-            <p class="field__err" id="f-rubro-err" hidden>Elegí el rubro de tu negocio.</p>
-            </div>
-            <div class="field">
-              <label for="f-localidad">Localidad</label>
-              <input id="f-localidad" name="localidad" placeholder="Tu ciudad" required aria-describedby="f-localidad-err" />
-            <p class="field__err" id="f-localidad-err" hidden>Escribí la ciudad donde está tu negocio.</p>
-            </div>
-          </div>
           <div class="field">
-            <label for="f-whatsapp">WhatsApp</label>
-            <input id="f-whatsapp" name="whatsapp" type="tel" inputmode="tel" autocomplete="tel" placeholder="Código de área y número" required aria-describedby="f-whatsapp-err" />
-            <p class="field__err" id="f-whatsapp-err" hidden>Escribí un WhatsApp con código de área.</p>
+            <label for="f-rubro">Rubro</label>
+            <input id="f-rubro" name="rubro" list="rubros" placeholder="Por ejemplo, pádel o peluquería" required aria-describedby="f-rubro-err" />
+            <p class="field__err" id="f-rubro-err" hidden>Escribí a qué se dedica tu negocio.</p>
+            <datalist id="rubros">
+              <option value="Pádel"></option><option value="Fútbol"></option><option value="Tenis"></option>
+              <option value="Barbería"></option><option value="Peluquería"></option><option value="Estética"></option>
+              <option value="Consultorio"></option><option value="Gimnasio"></option><option value="Sala de ensayo"></option>
+            </datalist>
           </div>
-          <button class="btn btn--ink btn--lg btn--block" type="submit">Quiero probarlo</button>
+          <button class="btn btn--ink btn--lg btn--block" type="submit">Crear mi cuenta</button>
+          <p class="form__note">Seguís en el panel: ahí elegís tu email y tu contraseña.</p>
           <p class="form__msg" role="status" aria-live="polite"></p>
         </form>
       </div>
@@ -473,12 +472,13 @@
         <p>© <span id="year">2026</span> Bookea</p>
         <details class="foot__credits">
           <summary>Créditos de las fotos</summary>
-          <p><a href="https://commons.wikimedia.org/wiki/File:Multiple_Paddle_tennis_players_engage_in_a_lively_match_on_blue_courts_surrounded_by_lush_greenery.jpg">“Multiple Paddle tennis players…”</a>, Nenad Stojković, CC BY 2.0; <a href="https://commons.wikimedia.org/wiki/File:Barber_cutting_hair_with_comb._Back_view_of_young_man_in_barber_shop.jpg">“Barber cutting hair with comb…”</a>, Nenad Stojkovic, CC BY 2.0; <a href="https://commons.wikimedia.org/w/index.php?curid=4217148">“Tennis racket and ball”</a>, nao2g, CC BY 3.0; <a href="https://commons.wikimedia.org/wiki/File:DFC_5331_A_late-night_match_at_Klet_Kaeo_a_player_in_red_sprints_toward_goal_as_defenders_close_in_under_the_floodlights.jpg">“DFC 5331 A late-night match at Klet Kaeo…”</a>, PattayaPatrol, CC BY-SA 4.0; <a href="https://commons.wikimedia.org/wiki/File:Young_men_with_trendy_haircut_at_barber_shop.jpg">“Young men with trendy haircut at barber shop”</a>, Nenad Stojkovic, CC BY 2.0; <a href="https://commons.wikimedia.org/wiki/File:Padel_rackets_and_balls.jpg">“Padel rackets and balls”</a>, Anton Gustafsson, CC BY 2.0; <a href="https://commons.wikimedia.org/wiki/File:Cancha_de_p%C3%A1del_en_el_centro_deportivo_%22El_Tuc%C3%A1n%22.jpg">“Cancha de pádel en el centro deportivo El Tucán”</a>, Diegodlh, CC BY 4.0. Todas vía Wikimedia Commons, en blanco y negro en el mosaico. Los negocios de la página de reservas son ejemplos.</p>
+          <p><a href="https://commons.wikimedia.org/wiki/File:Multiple_Paddle_tennis_players_engage_in_a_lively_match_on_blue_courts_surrounded_by_lush_greenery.jpg">“Multiple Paddle tennis players…”</a>, Nenad Stojković, CC BY 2.0; <a href="https://commons.wikimedia.org/wiki/File:Barber_cutting_hair_with_comb._Back_view_of_young_man_in_barber_shop.jpg">“Barber cutting hair with comb…”</a>, Nenad Stojkovic, CC BY 2.0; <a href="https://commons.wikimedia.org/w/index.php?curid=4217148">“Tennis racket and ball”</a>, nao2g, CC BY 3.0; <a href="https://commons.wikimedia.org/wiki/File:DFC_5331_A_late-night_match_at_Klet_Kaeo_a_player_in_red_sprints_toward_goal_as_defenders_close_in_under_the_floodlights.jpg">“DFC 5331 A late-night match at Klet Kaeo…”</a>, PattayaPatrol, CC BY-SA 4.0; <a href="https://commons.wikimedia.org/wiki/File:Young_men_with_trendy_haircut_at_barber_shop.jpg">“Young men with trendy haircut at barber shop”</a>, Nenad Stojkovic, CC BY 2.0; <a href="https://commons.wikimedia.org/wiki/File:Padel_rackets_and_balls.jpg">“Padel rackets and balls”</a>, Anton Gustafsson, CC BY 2.0; <a href="https://commons.wikimedia.org/wiki/File:Cancha_de_p%C3%A1del_en_el_centro_deportivo_%22El_Tuc%C3%A1n%22.jpg">“Cancha de pádel en el centro deportivo El Tucán”</a>, Diegodlh, CC BY 4.0. Todas vía Wikimedia Commons: en blanco y negro en el mosaico y recortadas en el buscador. Los negocios de la página de reservas son ejemplos.</p>
         </details>
       </div>
     </div>
   </footer>
 
-  <script src="script.js"></script>
+  <script src="script.js?v=4"></script>
+  <script src="toque.js?v=4"></script>
 </body>
 </html>

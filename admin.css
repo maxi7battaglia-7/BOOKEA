@@ -15,18 +15,20 @@
 [hidden] { display: none !important; } /* que ningún display le gane a hidden */
 
 .pa {
+  /* Los colores, los radios y los tiempos son los de styles.css (los mismos del sitio y de las reservas);
+     acá solo tienen el nombre corto que usa el panel. */
   /* superficies */
-  --fondo: #f4f7f6;  --caja: #ffffff;  --borde: #e1e8e6;  --regla: #edf1f0;  --control: #c5d0cd;
+  --fondo: var(--fondo-app);  --caja: var(--ground);  --borde: var(--ui-line);  --regla: #edf1f0;
   /* texto */
-  --tx: #11151c;  --tx-2: #4b5260;  --tx-3: #5e6672;
+  --tx: var(--ink);  --tx-2: var(--soft);  --tx-3: #5e6672;
   /* escalera del verde agua */
-  --v50: #eef7f5;  --v100: #dcf0eb;  --v200: #b5e0d6;  --v: #1fa08c;  --v-tinta: #0f5e52;
+  --v50: var(--teal-pale);  --v100: var(--teal-tint);  --v200: var(--teal-200);  --v: var(--teal);  --v-tinta: var(--teal-deep);
   /* alerta (naranja de la marca) */
-  --n50: #fdeee8;  --n100: #fbdccf;  --n: #e4572e;  --n-tinta: #9c3412;
+  --n50: #fdeee8;  --n100: #fbdccf;  --n: var(--orange);  --n-tinta: var(--orange-ink);
   /* forma */
-  --r-caja: 8px;  --r-ctl: 6px;
+  --r-caja: 8px;  --r-ctl: var(--r);
   --alto-ctl: 40px;
-  --t-rapido: 140ms;  --t-ui: 220ms;
+  --t-rapido: var(--t-press);
   background: var(--fondo);
   color: var(--tx);
   font-size: 15px;
@@ -83,6 +85,9 @@
   :is(.pa .btn, .menu__i, .slot, .nav-fecha button, .lado__salir).is-suelta { scale: 1.06; translate: 0 -2px; }
   .pa .slot.is-apreta { scale: 0.97; }
   .pa .slot.is-suelta { scale: 1.03; }
+  /* los botones anchos se mueven menos, igual que en el sitio */
+  .pa :is(.btn--block, .btn--lg).is-apreta { scale: 0.98; }
+  .pa :is(.btn--block, .btn--lg).is-suelta { scale: 1.02; }
 
   .pa .btn--ink:is(.is-apreta, .is-suelta) { color: var(--tx); }
   .pa .btn--ink:is(.is-apreta, .is-suelta)::before { opacity: 1; }
@@ -113,9 +118,10 @@
 .pa .field { display: grid; gap: 6px; }
 .pa .field label { font-size: 14px; font-weight: 600; }
 .pa .field input, .pa .field select, .pa .field textarea, .pa .fila input, .pa .fila select, .pa .buscar {
-  width: 100%; min-height: 42px; border: 1px solid var(--control); border-radius: var(--r-ctl); background: var(--caja); /* taste-skill-ignore: campo de formulario */
+  width: 100%; min-height: 42px; border: 1px solid var(--control); border-radius: var(--r-ctl); background-color: var(--caja); /* taste-skill-ignore: campo de formulario */
   padding: 9px 12px; font: inherit; font-size: 16px; color: var(--tx); transition: border-color var(--t-ui) ease, box-shadow var(--t-ui) ease;
 }
+.pa .field select, .pa .fila select, .pa select.buscar { padding-right: 36px; } /* lugar para la flecha (styles.css) */
 .pa .field textarea { resize: vertical; min-height: 76px; }
 .pa .field input:focus, .pa .field select:focus, .pa .field textarea:focus, .pa .fila input:focus, .pa .fila select:focus, .pa .buscar:focus, .pa .slug:focus-within {
   outline: none; border-color: var(--v); box-shadow: 0 0 0 3px var(--v100); /* taste-skill-ignore: foco de campo */
@@ -198,7 +204,7 @@
 .menu__i:active { transform: scale(0.98); }
 .menu__corto { display: none; }
 
-.lado__pie { margin-top: auto; display: grid; gap: 12px; }
+.lado__pie { margin-top: auto; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; } /* minmax(0): un email largo se corta con "…" y no empuja "Salir" afuera */
 .lado__pag { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: var(--v-tinta); text-decoration: none; padding: 4px 12px; }
 .lado__pag .ico { width: 16px; height: 16px; transition: transform 260ms var(--ease-out); }
 @media (hover: hover) and (pointer: fine) { .lado__pag:hover { color: var(--tx); } .lado__pag:hover .ico { transform: translate(2px, -2px); } }
@@ -789,4 +795,12 @@
   .sol { grid-template-columns: minmax(0, 1fr) auto; }
   .sol__acc { grid-column: 1 / -1; justify-content: stretch; }
   .sol__acc .btn { flex: 1; }
+}
+
+/* ---------- Toque en el celular: como en el sitio, ningún control mide menos de 44px ---------- */
+@media (hover: none), (pointer: coarse) {
+  .pa .btn, .pa .btn--sm, .seg button, .lado__salir, .nav-fecha button { min-height: 44px; }
+  .pa .link, .pa summary.link { display: inline-flex; align-items: center; min-height: 44px; }
+  .tabla a { display: inline-flex; align-items: center; min-height: 44px; }
+  .chk { min-height: 44px; }
 }

@@ -1055,7 +1055,7 @@
         kpi("Falta cobrar", plata(futPlata), `De ${plural(futuros.length, "turno", "turnos")} de hoy en adelante, en el lugar`),
       ])}
       <section class="card" aria-labelledby="g-t">
-        <div class="card__head"><div><h2 id="g-t">Cobrado por día</h2><p class="card__sub">Cada barra es lo que entró ese día. Pasá el cursor o usá las flechas para ver el detalle.</p></div></div>
+        <div class="card__head"><div><h2 id="g-t">Cobrado por día</h2><p class="card__sub">Cada barra es lo que entró ese día. ${window.matchMedia("(hover: none), (pointer: coarse)").matches ? "Tocá una barra" : "Pasá el cursor o usá las flechas"} para ver el detalle.</p></div></div>
         <div class="chart" id="chart"></div>
         <details class="tabla-dias" style="margin-top:12px"><summary class="link" style="display:inline-block;cursor:pointer">Ver los números de cada día</summary>
           <div class="tabla-wrap"><table class="tabla" style="margin-top:8px"><thead><tr><th scope="col">Día</th><th scope="col" class="num">Turnos</th><th scope="col" class="num">Cobrado</th></tr></thead>
@@ -1498,6 +1498,27 @@
     });
   };
 
+  // ---------- Llegada desde "Sumá tu negocio" (index.html) ----------
+  // Ese formulario es el primer paso del registro: trae el nombre, el negocio y el rubro
+  // (en la dirección y, por las dudas, anotados en el navegador). Acá se sigue con el email y la contraseña.
+  const ALTA = (() => {
+    let d = null;
+    try { d = JSON.parse(sessionStorage.getItem("bookea:alta") || "null"); sessionStorage.removeItem("bookea:alta"); } catch { /* sin datos */ }
+    const q = new URLSearchParams(window.location.search);
+    if (q.has("alta")) {
+      d = { nombre: q.get("nombre") || (d && d.nombre), negocio: q.get("negocio") || (d && d.negocio), rubro: q.get("rubro") || (d && d.rubro) };
+      try { history.replaceState(null, "", window.location.pathname + window.location.hash); } catch { /* queda la dirección larga */ }
+    }
+    return d && typeof d === "object" ? d : null;
+  })();
+  const entradaInicial = () => {
+    if (!ALTA) return mostrarEntrada();
+    mostrarEntrada("registro");
+    for (const k of ["nombre", "negocio", "rubro"]) if (ALTA[k]) $("#r-" + k).value = String(ALTA[k]).slice(0, 80);
+    const falta = ["#r-nombre", "#r-negocio", "#r-rubro", "#r-email"].map((sel) => $(sel)).find((el) => !el.value);
+    falta && falta.focus({ preventScroll: true });
+  };
+
   // ---------- Arranque ----------
   $$(".solo-nube").forEach((el) => (el.hidden = !NUBE));
   $$(".solo-local").forEach((el) => (el.hidden = NUBE));
@@ -1505,7 +1526,7 @@
   if (!NUBE) {
     // Modo de prueba: cada vez que se carga o se refresca la página, se pide email y contraseña de nuevo
     // (la sesión vive solo en memoria y no se guarda en el navegador).
-    cargar().then(() => mostrarEntrada());
+    cargar().then(entradaInicial);
   } else {
     // Con la base también se pide email y contraseña en cada carga. La excepción son los links de los mails
     // (confirmar la cuenta u "olvidé mi contraseña"), que traen la sesión en la dirección.
@@ -1517,40 +1538,10 @@
       if (/access_token|error_description|type=/.test(window.location.hash)) history.replaceState(null, "", window.location.pathname + window.location.search);
       if (r.ok && vieneDeRecuperar) { YO = r.datos.cuenta; $("#nc-email").value = r.datos.cuenta.email; mostrarEntrada("nueva"); return; }
       if (r.ok) { pasar(r.datos, "agenda", saludar); return; }
-      mostrarEntrada();
+      entradaInicial();
       const msg = $("#i-msg"); msg.className = "form__msg err";
       if (linkMalo) msg.textContent = "Ese link venció o ya se usó. Si querés cambiar la contraseña, pedí uno nuevo.";
       else if (r.error !== "sin-sesion") msg.textContent = MENSAJES[r.error] || MENSAJES.otro;
     });
   }
-})();
-
-// Toque en pantallas táctiles: mientras el dedo apoya, el botón se aprieta (.is-apreta); al soltar,
-// se agranda un poco y el color queda un momento (.is-suelta) antes de apagarse despacio.
-// Si el dedo arrastra para hacer scroll, no queda marcado.
-(() => {
-  const tactil = window.matchMedia("(hover: none), (pointer: coarse)");
-  const SEL = ".pa .btn, .menu__i, .slot, .nav-fecha button, .lado__salir";
-  const QUEDA = 450; // ms que el color queda prendido después de soltar
-  let apretado = null;
-  document.addEventListener("pointerdown", (e) => {
-    if (e.pointerType === "mouse" || !tactil.matches) return;
-    const el = e.target.closest(SEL);
-    if (!el || el.disabled) return;
-    clearTimeout(el._toque);
-    el.classList.remove("is-suelta");
-    el.classList.add("is-apreta");
-    apretado = el;
-  }, { passive: true });
-  const soltar = (e) => {
-    const el = apretado;
-    if (!el) return;
-    apretado = null;
-    el.classList.remove("is-apreta");
-    if (e.type === "pointercancel") return;
-    el.classList.add("is-suelta");
-    el._toque = setTimeout(() => el.classList.remove("is-suelta"), QUEDA);
-  };
-  document.addEventListener("pointerup", soltar, { passive: true });
-  document.addEventListener("pointercancel", soltar, { passive: true });
 })();

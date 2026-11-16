@@ -1,36 +1,43 @@
 /* =========================================================
    Bookea — página de reservas (pantalla de app)
-   Usa los tokens de styles.css. Pantalla de trabajo: tranquila,
-   bordes finos donde ordenan, color solo en lo que se toca.
+   Usa los tokens y las piezas de styles.css (botones, campos, rubros con foto) y la misma cara
+   que el panel: fondo gris con un paso hacia el verde agua, cajas blancas con borde finito,
+   sin sombra, y el verde agua solo en lo que se toca.
    ========================================================= */
-.app { background: var(--raised); }
+.app { background: var(--fondo-app); min-height: 100dvh; display: flex; flex-direction: column; }
+.app main { flex: 1; }
+.app { --r-caja: 8px; } /* las cajas, como en el panel; los controles siguen en 6px */
 
-/* Barra superior: noche, sin mosaico */
+/* Barra superior: la del inicio, sobre noche lisa (acá no hay mosaico) */
 .nav--app {
-  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20;
-  min-height: 64px; background: var(--ink); color: var(--ground);
+  position: sticky; top: 0; z-index: 20;
+  min-height: 64px; padding-top: env(safe-area-inset-top, 0px); background: var(--ink); color: var(--ground);
 }
 .nav--app .brand__mark { width: 30px; height: 30px; }
-.nav__biz {
-  margin-left: auto; font-size: var(--s-s); color: #c9ced6; text-decoration: underline;
-  text-decoration-color: transparent; text-underline-offset: 0.3em; padding-block: 10px;
-  transition: text-decoration-color var(--t-hover) ease, color var(--t-hover) ease;
-}
-@media (hover: hover) and (pointer: fine) { .nav__biz:hover { color: var(--ground); text-decoration-color: currentColor; } }
 
-/* Búsqueda */
-.busq { background: var(--ground); }
+/* ---------- Paso 1: qué querés reservar ---------- */
+.elegir__in { max-width: 1200px; margin-inline: auto; padding-block: clamp(32px, 6vw, 72px) clamp(56px, 8vw, 96px); display: grid; gap: 12px; }
+.elegir__t { font-size: var(--s-l); letter-spacing: -0.02em; line-height: 1.1; outline: none; }
+.elegir__sub { font-size: var(--s-b); color: var(--soft); max-width: 46ch; }
+/* las mismas fotos del buscador del inicio, más grandes */
+.rubros--g { margin-top: 16px; gap: 12px; }
+.rubros--g .rubro { background: var(--ground); border-radius: var(--r-caja); box-shadow: inset 0 0 0 1px var(--ui-line); } /* taste-skill-ignore: borde de caja de la app */
+.rubros--g .rubro__foto { aspect-ratio: 4 / 3; }
+.rubros--g .rubro__n { min-height: 56px; padding: 0 18px; font-family: var(--f-display); font-stretch: var(--display-ancho); font-size: var(--s-m); letter-spacing: -0.01em; }
+
+/* ---------- Paso 2: el filtro ---------- */
+.busq { background: var(--ground); border-bottom: 1px solid var(--ui-line); } /* taste-skill-ignore: regla de la barra de filtros */
 .busq__form {
-  max-width: 1200px; margin-inline: auto; padding-block: 20px;
-  display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr);
-  gap: 12px; align-items: end;
+  max-width: 1200px; margin-inline: auto; padding-block: 16px;
+  display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px 16px; align-items: end;
 }
-.busq__rubros { align-self: end; }
+.busq .elegido { align-self: center; padding-right: 8px; }
 
-/* Resultados */
-.res { max-width: 1200px; margin-inline: auto; padding-block: 28px 96px; display: grid; gap: 20px; }
+/* ---------- Resultados ---------- */
+.res { max-width: 1200px; margin-inline: auto; padding-block: 24px 80px; display: grid; gap: 20px; }
 .demo {
-  font-size: 14px; color: var(--soft); background: var(--cream); border-radius: var(--r);
+  font-size: 14px; color: var(--teal-deep); background: var(--teal-pale); border-radius: var(--r);
   padding: 10px 14px; justify-self: start;
 }
 .res__head { display: grid; gap: 4px; }
@@ -40,42 +47,44 @@
 .grupo { font-size: var(--s-m); margin-top: 20px; }
 
 .lugar {
-  background: var(--ground); border-radius: var(--r); padding: 20px 22px;
+  background: var(--ground); border: 1px solid var(--ui-line); border-radius: var(--r-caja); padding: 20px 22px; /* taste-skill-ignore: caja de la app */
   display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.7fr); gap: 24px; align-items: start;
 }
 .lugar__nombre { font-size: var(--s-m); letter-spacing: -0.01em; line-height: 1.2; }
 .lugar__zona { font-size: var(--s-s); color: var(--soft); margin-top: 4px; }
 .lugar__precio { font-size: 14px; margin-top: 10px; font-variant-numeric: tabular-nums; }
 .slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; }
+/* un horario libre: el mismo verde pálido de los huecos libres de la agenda del panel */
 .hora {
   width: 100%; min-height: 56px; display: grid; place-content: center; gap: 1px; text-align: center;
-  background: var(--ground); color: var(--ink); border-radius: var(--r);
-  border: 1px solid #cfe3de; /* taste-skill-ignore: botón de horario dentro de la app */
+  background: var(--teal-pale); color: var(--ink); border-radius: var(--r);
+  border: 1px solid var(--teal-tint); /* taste-skill-ignore: botón de horario dentro de la app */
   transition: background-color var(--t-hover) ease, border-color var(--t-hover) ease, transform var(--t-press) var(--ease-out);
 }
 .hora b { font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .hora small { font-size: 13px; color: var(--teal-deep); }
 .hora:active { transform: scale(0.96); }
-@media (hover: hover) and (pointer: fine) { .hora:hover { background: var(--teal-tint); border-color: var(--teal); } }
+@media (hover: hover) and (pointer: fine) { .hora:hover { background: var(--teal-tint); border-color: var(--teal-200); } }
+@media (hover: none), (pointer: coarse) {
+  .hora:active { transform: none; }
+  .hora:is(.is-apreta, .is-suelta) { background: var(--teal-tint); border-color: var(--teal-200); }
+}
 .sin { display: grid; gap: 6px; justify-items: start; font-size: var(--s-s); color: var(--soft); padding-top: 4px; }
 .link {
-  border: 0; background: none; padding: 6px 0; font-size: var(--s-s); font-weight: 600; color: var(--ink);
-  text-decoration: underline; text-underline-offset: 0.25em; min-height: 32px;
+  border: 0; background: none; padding: 6px 0; font-size: var(--s-s); font-weight: 600; color: var(--teal-deep);
+  text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 0.25em; min-height: 32px;
 }
-.vacio { background: var(--ground); border-radius: var(--r); padding: 24px; display: grid; gap: 6px; }
+@media (hover: hover) and (pointer: fine) { .link:hover { color: var(--ink); } }
+.vacio { background: var(--ground); border: 1px solid var(--ui-line); border-radius: var(--r-caja); padding: 24px; display: grid; gap: 6px; } /* taste-skill-ignore: caja de la app */
 .vacio h2 { font-size: var(--s-m); }
 .vacio p { color: var(--soft); }
 
-.app-foot {
-  max-width: 1200px; margin-inline: auto; padding-block: 0 48px;
-  display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: space-between; font-size: var(--s-s); color: var(--soft);
-}
-.app-foot a { color: var(--ink); font-weight: 500; }
+.app-foot { max-width: 1200px; width: 100%; margin-inline: auto; padding-block: 0 40px; font-size: 14px; color: var(--soft); }
 
 /* ---------- Panel de reserva ---------- */
 .reserva {
   width: min(480px, calc(100vw - 32px)); max-height: calc(100dvh - 48px); padding: 0; border: 0;
-  border-radius: var(--r); background: var(--ground); color: var(--ink);
+  border-radius: var(--r-caja); background: var(--ground); color: var(--ink);
   box-shadow: 0 24px 60px rgba(17, 21, 28, 0.35); /* taste-skill-ignore: diálogo que flota */
 }
 .reserva::backdrop { background: rgba(17, 21, 28, 0.55); }
@@ -103,6 +112,7 @@
 .opc__i small { font-size: 14px; color: inherit; opacity: 0.8; font-variant-numeric: tabular-nums; }
 .opc__i input:checked + span { background: var(--ink); color: var(--ground); }
 .opc__i input:focus-visible + span { outline: 3px solid var(--teal); outline-offset: 2px; }
+@media (hover: hover) and (pointer: fine) { .opc__i input:not(:checked):hover + span { background: var(--raised-2); } }
 .cuenta { margin: 0; display: grid; gap: 8px; padding: 14px 0 0; }
 .cuenta div { display: flex; justify-content: space-between; gap: 16px; font-variant-numeric: tabular-nums; }
 .cuenta dt { color: var(--soft); }
@@ -110,35 +120,38 @@
 .cuenta__resto { padding-top: 8px; }
 .cuenta--fin { padding-top: 0; }
 .rv__form { display: grid; gap: 16px; }
-.field__help { font-size: 13px; color: var(--soft); }
 .rv__acc { display: flex; gap: 10px; justify-content: space-between; align-items: center; flex-wrap: wrap; }
-.btn--ghost-ink { background: var(--raised); color: var(--ink); }
-@media (hover: hover) and (pointer: fine) { .btn--ghost-ink:hover { background: var(--raised-2); } }
-.btn[disabled] { opacity: 0.7; cursor: progress; }
 .mp { background: var(--raised); border-radius: var(--r); padding: 18px; display: grid; gap: 4px; }
 .mp__k { font-size: 14px; color: var(--soft); }
 .mp__v { font-family: var(--f-display); font-stretch: var(--display-ancho); font-size: var(--s-l); font-weight: 600; font-variant-numeric: tabular-nums; }
 .mp__nota { font-size: 14px; color: var(--soft); margin-top: 6px; }
 
+/* ---------- Movimiento: el mismo de la llegada al panel ---------- */
 @media (prefers-reduced-motion: no-preference) {
   .reserva[open] { animation: rv-in 320ms var(--ease-out); }
   .reserva[open]::backdrop { animation: rv-fondo 240ms ease; }
-  @keyframes rv-in { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+  @keyframes rv-in { from { opacity: 0; transform: translateY(14px) scale(0.98); } to { opacity: 1; transform: none; } }
   @keyframes rv-fondo { from { opacity: 0; } to { opacity: 1; } }
-  .lugar { animation: rv-in 420ms var(--ease-out) both; }
+  /* los lugares llegan desde abajo, en escalera */
+  .lugar, .vacio { animation: llega 700ms var(--ease-expo) both; animation-delay: calc(var(--i, 0) * 55ms); }
+  @keyframes llega { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
 }
 
 /* ---------- Tablet y celular ---------- */
 @media (max-width: 900px) {
   .busq__form { grid-template-columns: 1fr 1fr 1fr; }
-  .busq__rubros { grid-column: 1 / -1; }
+  .busq .elegido { grid-column: 1 / -1; padding-right: 0; }
   .lugar { grid-template-columns: 1fr; gap: 16px; }
 }
+@media (max-width: 760px) {
+  .rubros--g { gap: 8px; }
+  .rubros--g .rubro__n { min-height: 48px; padding: 0 14px; }
+}
 @media (max-width: 560px) {
-  .nav__biz { display: none; }
-  .busq__form { grid-template-columns: 1fr 1fr; padding-block: 16px; }
-  .busq__form .ff:nth-of-type(1) { grid-column: 1 / -1; }
-  .res { padding-block: 20px 72px; }
+  .busq__form { grid-template-columns: 1fr 1fr; padding-block: 14px; }
+  .busq__form .ff:nth-of-type(2) { grid-column: 1 / -1; } /* "Dónde", a lo ancho */
+  .busq .elegido__foto { width: 52px; height: 52px; }
+  .res { padding-block: 20px 64px; }
   .lugar { padding: 16px; }
   .slots { grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); }
   .reserva { width: 100vw; max-width: 100vw; margin: auto 0 0; border-radius: 14px 14px 0 0; max-height: 92dvh; }

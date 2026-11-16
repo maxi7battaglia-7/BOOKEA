@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="es-AR" class="js is-ready">
+<html lang="es-AR" class="js is-ready nav-lista">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -11,12 +11,14 @@
   <link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900;1,62..125,100..900&display=swap" rel="stylesheet" />
   <link rel="icon" href="marca/isotipo.svg" type="image/svg+xml" />
   <link rel="icon" href="marca/isotipo-32.png" sizes="32x32" type="image/png" />
-  <link rel="stylesheet" href="styles.css" />
-  <link rel="stylesheet" href="app.css" />
+  <link rel="apple-touch-icon" href="marca/isotipo-192.png" />
+  <link rel="stylesheet" href="styles.css?v=4" />
+  <link rel="stylesheet" href="app.css?v=4" />
 </head>
 <body class="app">
-  <a class="skip" href="#resultados">Saltar a los turnos</a>
+  <a class="skip" href="#main">Saltar al contenido</a>
 
+  <!-- La misma barra del inicio, sobre noche -->
   <header class="nav nav--app frame">
     <a href="index.html" class="brand" aria-label="Bookea, volver al inicio">
       <svg class="brand__mark" viewBox="0 0 1000 1000" aria-hidden="true">
@@ -29,79 +31,97 @@
         <rect width="1000" height="1000" rx="200" fill="#11151c"/>
         <g transform="translate(8,0)">
           <g mask="url(#ap-panzas)">
-            <polygon points="0,0 1000,0 1000,553.39 0,377.06" fill="#1fa08c"/>
-            <polygon points="0,377.06 1000,553.39 1000,1000 0,1000" fill="#e4572e"/>
+            <polygon points="0,0 1000,0 1000,553.38 0,377.06" fill="#1fa08c"/>
+            <polygon points="0,377.06 1000,553.38 1000,1000 0,1000" fill="#e4572e"/>
           </g>
           <rect x="255" y="180" width="136" height="640" fill="#f5ecd7"/>
         </g>
       </svg>
       <span class="brand__word">Bookea</span>
     </a>
-    <a href="index.html#sumate" class="nav__biz">¿Tenés un negocio con turnos?</a>
+    <nav class="nav__links" aria-label="Principal">
+      <a href="index.html">Inicio</a>
+      <a href="index.html#como-funciona">Para negocios</a>
+      <a href="admin.html" class="nav__ingresar">Ingresar</a>
+    </nav>
+    <a href="index.html#sumate" class="btn btn--ink nav__cta">Sumá tu negocio</a>
   </header>
 
   <main id="main">
-    <!-- Búsqueda: cada cambio actualiza los turnos -->
-    <section class="busq" aria-label="Buscar turnos">
-      <form class="busq__form frame" id="busq" data-ui>
-        <fieldset class="finder__rubros busq__rubros">
-          <legend class="sr-only">Rubro</legend>
-          <label class="rb"><input type="radio" name="rubro" value="padel" checked /><span>Pádel</span></label>
-          <label class="rb"><input type="radio" name="rubro" value="futbol" /><span>Fútbol 5</span></label>
-          <label class="rb"><input type="radio" name="rubro" value="tenis" /><span>Tenis</span></label>
-          <label class="rb"><input type="radio" name="rubro" value="barberia" /><span>Barbería</span></label>
-        </fieldset>
-        <div class="ff">
-          <label for="bz">Dónde</label>
-          <select id="bz" name="zona">
-            <option value="">Todas las zonas</option>
-            <optgroup label="Valle de Uco">
-              <option value="tunuyan">Tunuyán</option>
-              <option value="tupungato">Tupungato</option>
-              <option value="san-carlos">San Carlos</option>
-            </optgroup>
-            <optgroup label="Sur">
-              <option value="san-rafael">San Rafael</option>
-            </optgroup>
-            <optgroup label="Gran Mendoza">
-              <option value="capital">Ciudad de Mendoza</option>
-              <option value="godoy-cruz">Godoy Cruz</option>
-              <option value="guaymallen">Guaymallén</option>
-              <option value="las-heras">Las Heras</option>
-              <option value="lujan">Luján de Cuyo</option>
-              <option value="maipu">Maipú</option>
-            </optgroup>
-          </select>
-        </div>
-        <div class="ff">
-          <label for="bd">Cuándo</label>
-          <select id="bd" name="dia"><option value="0">Hoy</option></select>
-        </div>
-        <div class="ff">
-          <label for="bh">Hora</label>
-          <select id="bh" name="franja">
-            <option value="">Cualquier hora</option>
-            <option value="manana">A la mañana</option>
-            <option value="tarde">A la tarde</option>
-            <option value="noche">A la noche</option>
-          </select>
-        </div>
-      </form>
+    <!-- Paso 1: qué querés reservar (una foto por rubro) -->
+    <section class="elegir" id="elegir" aria-labelledby="elegir-t" hidden>
+      <div class="elegir__in frame">
+        <h1 id="elegir-t" class="elegir__t" tabindex="-1">¿Qué querés reservar?</h1>
+        <p class="elegir__sub">Elegí qué buscás y te mostramos los turnos libres de cada lugar.</p>
+        <ul class="rubros rubros--g">
+          <li><button type="button" class="rubro" value="padel"><span class="rubro__foto"><img src="assets/r-padel.webp" alt="" width="600" height="600" /></span><span class="rubro__n">Pádel</span></button></li>
+          <li><button type="button" class="rubro" value="futbol"><span class="rubro__foto"><img src="assets/r-futbol.webp" alt="" width="600" height="600" /></span><span class="rubro__n">Fútbol 5</span></button></li>
+          <li><button type="button" class="rubro" value="tenis"><span class="rubro__foto"><img src="assets/r-tenis.webp" alt="" width="600" height="600" /></span><span class="rubro__n">Tenis</span></button></li>
+          <li><button type="button" class="rubro" value="barberia"><span class="rubro__foto"><img src="assets/r-barberia.webp" alt="" width="600" height="600" /></span><span class="rubro__n">Barbería</span></button></li>
+        </ul>
+      </div>
     </section>
 
-    <section class="res frame" id="resultados" aria-labelledby="res-t">
-      <p class="demo">Vista previa: los negocios, horarios y precios son de ejemplo y no se cobra nada.</p>
-      <div class="res__head">
-        <h1 id="res-t" class="res__title">Turnos de pádel</h1>
-        <p class="res__meta" id="res-meta" role="status" aria-live="polite"></p>
-      </div>
-      <div id="lista" class="lista"></div>
-    </section>
+    <!-- Paso 2: el rubro elegido, dónde y cuándo, y los turnos. Cada cambio actualiza la lista. -->
+    <div id="buscar" hidden>
+      <section class="busq" aria-label="Buscar turnos">
+        <form class="busq__form frame" id="busq" data-ui>
+          <div class="elegido">
+            <span class="elegido__foto"><img id="el-foto" src="assets/r-padel.webp" alt="" width="600" height="600" /></span>
+            <p class="elegido__txt"><span class="elegido__k">Vas a reservar</span><strong class="elegido__n" id="el-n">Pádel</strong></p>
+            <button type="button" class="mini" id="el-cambiar">Cambiar</button>
+          </div>
+          <div class="ff">
+            <label for="bz">Dónde</label>
+            <select id="bz" name="zona">
+              <option value="">Todas las zonas</option>
+              <optgroup label="Valle de Uco">
+                <option value="tunuyan">Tunuyán</option>
+                <option value="tupungato">Tupungato</option>
+                <option value="san-carlos">San Carlos</option>
+              </optgroup>
+              <optgroup label="Sur">
+                <option value="san-rafael">San Rafael</option>
+              </optgroup>
+              <optgroup label="Gran Mendoza">
+                <option value="capital">Ciudad de Mendoza</option>
+                <option value="godoy-cruz">Godoy Cruz</option>
+                <option value="guaymallen">Guaymallén</option>
+                <option value="las-heras">Las Heras</option>
+                <option value="lujan">Luján de Cuyo</option>
+                <option value="maipu">Maipú</option>
+              </optgroup>
+            </select>
+          </div>
+          <div class="ff">
+            <label for="bd">Cuándo</label>
+            <select id="bd" name="dia"><option value="0">Hoy</option></select>
+          </div>
+          <div class="ff">
+            <label for="bh">Hora</label>
+            <select id="bh" name="franja">
+              <option value="">Todo el día</option>
+              <option value="manana">A la mañana</option>
+              <option value="tarde">A la tarde</option>
+              <option value="noche">A la noche</option>
+            </select>
+          </div>
+        </form>
+      </section>
+
+      <section class="res frame" id="resultados" aria-labelledby="res-t">
+        <p class="demo">Vista previa: los negocios, horarios y precios son de ejemplo y no se cobra nada.</p>
+        <div class="res__head">
+          <h1 id="res-t" class="res__title" tabindex="-1">Turnos de pádel</h1>
+          <p class="res__meta" id="res-meta" role="status" aria-live="polite"></p>
+        </div>
+        <div id="lista" class="lista"></div>
+      </section>
+    </div>
   </main>
 
   <footer class="app-foot frame">
     <p>Bookea · Turnos online con seña para cualquier negocio que trabaje con reservas.</p>
-    <a href="index.html#sumate">Sumá tu negocio</a>
   </footer>
 
   <!-- Reserva: elegir, tus datos, seña y confirmación -->
@@ -109,6 +129,7 @@
     <div class="reserva__in" id="rv"></div>
   </dialog>
 
-  <script src="reservar.js"></script>
+  <script src="reservar.js?v=4"></script>
+  <script src="toque.js?v=4"></script>
 </body>
 </html>

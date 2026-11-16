@@ -2,23 +2,45 @@
 """Genera la vista previa para publicar como página de claude.ai, con el CSS y el JS adentro.
 
 - dist/bookea.html: la landing. claude.ai le agrega el esqueleto (<!doctype>, <head>, <body>).
-- dist/reservar.html: la página de reservas. Se publica como archivo aparte, así que lleva su
+- dist/reservar.html y dist/admin.html: se publican como archivos aparte, así que llevan su
   documento completo. Sus links a la landing apuntan a "./", la raíz de la página publicada.
+
+Las páginas piden sus archivos con ?v=N (para que el navegador no use una versión vieja).
+Acá ese número se saca antes de meter cada archivo adentro, así que no hay que tocar nada al subirlo.
 """
 import re
 from pathlib import Path
 
 root = Path(__file__).resolve().parent.parent
 leer = lambda n: (root / n).read_text(encoding="utf-8")
+pagina = lambda n: re.sub(r"(\.(?:css|js))\?v=\d+", r"\1", leer(n))  # la página, sin los ?v=N
 dist = root / "dist"
 dist.mkdir(exist_ok=True)
 
+
+def adentro(html, archivo, contenido=None):
+    """Cambia el <link> o el <script> que pide `archivo` por su contenido."""
+    contenido = leer(archivo) if contenido is None else contenido
+    if archivo.endswith(".css"):
+        pedido, puesto = f'<link rel="stylesheet" href="{archivo}" />', f"<style>\n{contenido}\n</style>"
+    else:
+        pedido, puesto = f'<script src="{archivo}"></script>', f"<script>\n{contenido}\n</script>"
+    assert pedido in html, f"no encontré {pedido}"
+    return html.replace(pedido, puesto)
+
+
+def sin_iconos(html):
+    return re.sub(r'\s*<link rel="(?:icon|apple-touch-icon)"[^>]*>', "", html)  # el ícono lo pone claude.ai
+
+
 # ---------- Landing ----------
-html = leer("index.html")
+html = pagina("index.html")
 fonts = re.search(r'<link href="https://fonts.googleapis.com[^>]+>', html).group(0)
 head_js = re.search(r"<head>.*?<script>(.*?)</script>", html, re.S).group(1)
 body = re.search(r"<body>(.*)</body>", html, re.S).group(1)
-body = body.replace('<script src="script.js"></script>', "").strip()
+for js in ("script.js", "toque.js"):
+    assert f'<script src="{js}"></script>' in body, js
+    body = body.replace(f'<script src="{js}"></script>', "")
 
 landing = f"""<title>Bookea</title>
 <meta name="claude:viewport-fit-sides" content="cover">
@@ -29,34 +51,33 @@ landing = f"""<title>Bookea</title>
 <style>
 {leer("styles.css")}
 </style>
-{body}
+{body.strip()}
 <script>
 {leer("script.js")}
+</script>
+<script>
+{leer("toque.js")}
 </script>
 """
 (dist / "bookea.html").write_text(landing, encoding="utf-8")
 print("OK ->", dist / "bookea.html", f"({len(landing)//1024} KB)")
 
 # ---------- Reservas ----------
-res = leer("reservar.html")
-res = res.replace('<link rel="stylesheet" href="styles.css" />', f"<style>\n{leer('styles.css')}\n</style>")
-res = res.replace('<link rel="stylesheet" href="app.css" />', f"<style>\n{leer('app.css')}\n</style>")
-res = res.replace('<script src="reservar.js"></script>', f"<script>\n{leer('reservar.js')}\n</script>")
-res = re.sub(r'\s*<link rel="icon"[^>]*>', "", res)  # el ícono lo pone claude.ai
+res = pagina("reservar.html")
+for archivo in ("styles.css", "app.css", "reservar.js", "toque.js"):
+    res = adentro(res, archivo)
+res = sin_iconos(res)
 res = res.replace('href="index.html#', 'href="./#').replace('href="index.html"', 'href="./"')
 (dist / "reservar.html").write_text(res, encoding="utf-8")
 print("OK ->", dist / "reservar.html", f"({len(res)//1024} KB)")
 
 # ---------- Panel del negocio ----------
-adm = leer("admin.html")
-adm = adm.replace('<link rel="stylesheet" href="styles.css" />', f"<style>\n{leer('styles.css')}\n</style>")
-adm = adm.replace('<link rel="stylesheet" href="admin.css?v=3" />', f"<style>\n{leer('admin.css')}\n</style>")
-# Ojo: admin.html pide los archivos con ?v=N (para que el navegador no use una versión vieja); si cambia N, cambiarlo acá.
+adm = pagina("admin.html")
+for archivo in ("styles.css", "admin.css", "nube.js", "admin.js", "toque.js"):
+    adm = adentro(adm, archivo)
 # La vista previa siempre va en modo de prueba (sin base): config.js vacío, aunque el local tenga datos
-adm = adm.replace('<script src="config.js?v=3"></script>', "<script>window.BOOKEA_CONFIG = {};</script>")
-adm = adm.replace('<script src="nube.js?v=3"></script>', f"<script>\n{leer('nube.js')}\n</script>")
-adm = adm.replace('<script src="admin.js?v=3"></script>', f"<script>\n{leer('admin.js')}\n</script>")
-adm = re.sub(r'\s*<link rel="icon"[^>]*>', "", adm)
+adm = adentro(adm, "config.js", "window.BOOKEA_CONFIG = {};")
+adm = sin_iconos(adm)
 adm = adm.replace('href="index.html"', 'href="./"')
 (dist / "admin.html").write_text(adm, encoding="utf-8")
 print("OK ->", dist / "admin.html", f"({len(adm)//1024} KB)")

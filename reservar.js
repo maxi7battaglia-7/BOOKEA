@@ -20,10 +20,10 @@
   };
   const NOMBRE_REGION = { uco: "el Valle de Uco", sur: "el Sur", gran: "el Gran Mendoza" };
   const RUBROS = {
-    padel: { nombre: "Pádel", unidad: "cancha", unidades: "canchas", dur: 90 },
-    futbol: { nombre: "Fútbol 5", unidad: "cancha", unidades: "canchas", dur: 60 },
-    tenis: { nombre: "Tenis", unidad: "cancha", unidades: "canchas", dur: 60 },
-    barberia: { nombre: "Barbería", unidad: "barbero", unidades: "barberos", dur: 45 },
+    padel: { nombre: "Pádel", unidad: "cancha", unidades: "canchas", dur: 90, foto: "assets/r-padel.webp" },
+    futbol: { nombre: "Fútbol 5", unidad: "cancha", unidades: "canchas", dur: 60, foto: "assets/r-futbol.webp" },
+    tenis: { nombre: "Tenis", unidad: "cancha", unidades: "canchas", dur: 60, foto: "assets/r-tenis.webp" },
+    barberia: { nombre: "Barbería", unidad: "barbero", unidades: "barberos", dur: 45, foto: "assets/r-barberia.webp" },
   };
   const SERVICIOS = [
     { id: "corte", n: "Corte", p: 12000 },
@@ -91,36 +91,76 @@
   };
 
   // ---------- Estado de la búsqueda ----------
+  // Dos pasos, como el buscador del inicio: sin rubro se ven las fotos para elegir uno;
+  // con rubro, el filtro (dónde, cuándo, hora) y los turnos. La dirección dice en cuál estás.
   const form = $("#busq");
   const bd = $("#bd");
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   bd.innerHTML = Array.from({ length: 7 }, (_, i) => `<option value="${i}">${nombreDia(i)}</option>`).join("");
 
-  const leerInicial = () => {
-    let q = location.search.slice(1);
-    if (!q) { try { q = sessionStorage.getItem("bookea:busqueda") || ""; } catch {} }
+  const leer = (q) => {
     const p = new URLSearchParams(q);
-    const rubro = RUBROS[p.get("rubro")] ? p.get("rubro") : "padel";
+    const rubro = RUBROS[p.get("rubro")] ? p.get("rubro") : "";
     const zona = ZONAS[p.get("zona")] ? p.get("zona") : "";
     const dia = Math.min(6, Math.max(0, parseInt(p.get("dia") || "0", 10) || 0));
     const franja = ["manana", "tarde", "noche"].includes(p.get("franja")) ? p.get("franja") : "";
     return { rubro, zona, dia, franja };
   };
-  let S = leerInicial();
-  const aplicarAlForm = () => {
-    $(`input[name="rubro"][value="${S.rubro}"]`, form).checked = true;
-    $("#bz").value = S.zona; bd.value = String(S.dia); $("#bh").value = S.franja;
+  const leerInicial = () => {
+    let q = location.search.slice(1);
+    // el buscador del inicio deja la búsqueda anotada por si la dirección llega sin ella; se usa una sola vez
+    try { const g = sessionStorage.getItem("bookea:busqueda"); sessionStorage.removeItem("bookea:busqueda"); if (!q && g) q = g; } catch {}
+    return leer(q);
   };
-  const guardar = () => {
-    const q = new URLSearchParams({ rubro: S.rubro, zona: S.zona, dia: S.dia, franja: S.franja }).toString();
-    try { sessionStorage.setItem("bookea:busqueda", q); } catch {}
-    try { history.replaceState(null, "", location.pathname + "?" + q); } catch {}
+  let S = leerInicial();
+  const consulta = () => (S.rubro ? "?" + new URLSearchParams({ rubro: S.rubro, zona: S.zona, dia: S.dia, franja: S.franja }).toString() : "");
+  const aplicarAlForm = () => { $("#bz").value = S.zona; bd.value = String(S.dia); $("#bh").value = S.franja; };
+  const guardar = (nuevoPaso) => {
+    try { history[nuevoPaso ? "pushState" : "replaceState"](null, "", location.pathname + consulta()); } catch {}
   };
   form.addEventListener("change", () => {
     const fd = new FormData(form);
-    S = { rubro: fd.get("rubro"), zona: fd.get("zona"), dia: +fd.get("dia"), franja: fd.get("franja") };
+    S = { ...S, zona: fd.get("zona"), dia: +fd.get("dia"), franja: fd.get("franja") };
     guardar(); pintar();
   });
   form.addEventListener("submit", (e) => e.preventDefault());
+
+  // ---------- Los dos pasos ----------
+  const elegir = $("#elegir"), buscar = $("#buscar");
+  const entrar = (el, desde) => {
+    if (reduce) return;
+    el.style.setProperty("--desde", desde);
+    el.classList.remove("is-entra"); void el.offsetWidth; el.classList.add("is-entra");
+    setTimeout(() => el.classList.remove("is-entra"), 800);
+  };
+  // animar: "adelante" (elegiste un rubro), "atras" (tocaste Cambiar) o nada (llegada, botón atrás)
+  function mostrar(animar) {
+    const hay = !!S.rubro;
+    elegir.hidden = hay; buscar.hidden = !hay;
+    if (hay) {
+      const R = RUBROS[S.rubro];
+      $("#el-foto").src = R.foto; $("#el-n").textContent = R.nombre;
+      aplicarAlForm(); pintar();
+      document.title = `Bookea · Turnos de ${R.nombre.toLowerCase()}`;
+      if (animar) { entrar($(".busq__form"), "18px"); window.scrollTo(0, 0); $("#res-t").focus({ preventScroll: true }); }
+    } else {
+      document.title = "Bookea · Reservar";
+      if (animar) { entrar($(".elegir__in"), "-18px"); window.scrollTo(0, 0); }
+    }
+  }
+  elegir.addEventListener("click", (e) => {
+    const b = e.target.closest(".rubro");
+    if (!b) return;
+    S = { ...S, rubro: b.value };
+    guardar(true); mostrar("adelante");
+  });
+  $("#el-cambiar").addEventListener("click", () => {
+    const antes = S.rubro;
+    S = { ...S, rubro: "" };
+    guardar(true); mostrar("atras");
+    ($(`.rubro[value="${antes}"]`, elegir) || $("#elegir-t")).focus({ preventScroll: true });
+  });
+  window.addEventListener("popstate", () => { S = leer(location.search.slice(1)); mostrar(); });
 
   // ---------- Resultados ----------
   const lista = $("#lista");
@@ -129,7 +169,7 @@
     .map((t) => ({ t, libres: l.recursos.filter((r) => libre(l, S.dia, t, r)) }))
     .filter((x) => x.libres.length);
 
-  function tarjeta(l) {
+  function tarjeta(l, i = 0) {
     const R = RUBROS[l.rubro];
     const turnos = turnosDe(l);
     const precioTxt = l.rubro === "barberia"
@@ -140,7 +180,7 @@
       ? `<ul class="slots" aria-label="Horarios libres de ${esc(l.nombre)}">${turnos.map((x) =>
           `<li><button type="button" class="hora" data-l="${l.id}" data-t="${x.t}"><b>${x.t}</b><small>${x.libres.length} ${x.libres.length === 1 ? R.unidad : R.unidades}</small></button></li>`).join("")}</ul>`
       : `<div class="sin"><p>No le quedan turnos libres ${S.franja ? "en esa franja " : ""}para ${nombreDia(S.dia).toLowerCase()}.</p>${S.dia < 6 ? `<button type="button" class="link" data-dia="${S.dia + 1}">Ver ${nombreDia(S.dia + 1).toLowerCase()}</button>` : ""}</div>`;
-    return `<article class="lugar">
+    return `<article class="lugar" style="--i:${Math.min(i, 8)}">
       <div class="lugar__info">
         <h2 class="lugar__nombre">${esc(l.nombre)}</h2>
         <p class="lugar__zona">${ZONAS[l.zona]} · ${esc(l.detalle)}</p>
@@ -247,7 +287,7 @@
           <p class="field__err" id="rv-wa-err" hidden>Escribí un WhatsApp con código de área (8 números o más).</p>
         </div>
         <div class="rv__acc">
-          <button type="button" class="btn btn--ghost-ink" data-sig="1">Volver</button>
+          <button type="button" class="btn btn--line" data-sig="1">Volver</button>
           <button type="submit" class="btn btn--ink btn--lg">Pagar seña de ${pesos(s)}</button>
         </div>
       </form>`;
@@ -276,7 +316,7 @@
         <p class="mp__nota">En la app real, acá se abre Mercado Pago y la seña va directo a la cuenta del lugar. En esta vista previa no se cobra nada.</p>
       </div>
       <div class="rv__acc">
-        <button type="button" class="btn btn--ghost-ink" data-sig="2">Volver</button>
+        <button type="button" class="btn btn--line" data-sig="2">Volver</button>
         <button type="button" class="btn btn--orange btn--lg" data-pagar>Simular pago aprobado</button>
       </div>`;
   }
@@ -344,6 +384,5 @@
   });
 
   // ---------- Arranque ----------
-  $("#res-t").setAttribute("tabindex", "-1");
-  aplicarAlForm(); guardar(); pintar();
+  guardar(); mostrar();
 })();

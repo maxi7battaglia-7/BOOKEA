@@ -313,3 +313,48 @@ textos que se entiendan en cada cuadro.
 - Equipo de Bookea: vista **Solicitudes** (link "Solicitudes de negocios" con contador al pie del costado, y en Cuenta desde el celular).
   Dos tarjetas: "Esperan tu respuesta" y "Ya revisados". Cada fila: nombre, rubro, quién lo pidió con su email y fecha,
   chip de estado (los mismos `.estado` de la agenda) y botones Aprobar / Rechazar / Quitar acceso. Rechazar y quitar acceso piden un segundo toque.
+
+## Revisión general: un solo sistema para el sitio, las reservas y el panel (16/11, pedido del dueño)
+Pedido: "que no quede nada raro ni nada que no funcione" y "que todo tenga una correlación: colores, animaciones, tipo de letra".
+**Regla nueva: lo que comparten las tres páginas vive en `styles.css` y `toque.js`. No se redefine en `app.css` ni en `admin.css`.**
+
+- **Colores:** una sola familia de neutros, la del panel (gris con un paso hacia el verde agua). Tokens en `:root`:
+  `--raised #eef3f1`, `--raised-2 #e2eae7`, `--fondo-app #f4f7f6`, `--ui-line #e1e8e6`, `--control #c5d0cd`,
+  la escalera del verde agua (`--teal-pale`, `--teal-tint`, `--teal-200`, `--teal`, `--teal-deep`) y `--orange-ink` para errores.
+  El panel usa esos mismos tokens con su nombre corto (`--v50`, `--borde`, etc.). Ya no hay grises cálidos ni bordes beige
+  (`#f2f1ee`, `#cfccc4`). El beige queda solo donde imita a WhatsApp.
+- **Botón principal:** noche con el barrido verde agua al pasar el cursor, igual en el inicio ("Buscar turnos", "Crear mi cuenta"),
+  las reservas ("Continuar") y el panel. Secundario: blanco con borde (`.btn--line`); chico: `.mini` ("Cambiar", "Copiar").
+- **Campos:** un solo estilo (borde `--control`, radio 6, foco con borde verde agua y aro pálido, rótulo de 14px en negrita).
+  Los desplegables llevan la misma flecha en todos lados (la del sistema cambia en cada navegador).
+- **Toque en pantallas táctiles:** `toque.js` lo pone en las tres páginas (antes había una copia en `script.js` y otra en `admin.js`,
+  y la página de reservas no tenía). Los botones anchos y las fotos se mueven menos (0,98 / 1,02) para no salirse de su caja.
+  En el celular ningún control mide menos de 44px, tampoco en el panel.
+- **Tiempos:** el panel usa `--t-press` y `--t-ui` del sitio. Las tarjetas de reservas llegan desde abajo en escalera, como el panel.
+- **Reservas (`reservar.html`):** misma barra de arriba que el inicio (logo, links con barrido, "Ingresar", "Sumá tu negocio"),
+  fondo y cajas del panel, y los horarios libres en el verde pálido de los huecos libres de la agenda.
+
+## Buscador en dos pasos, con una foto por rubro (16/11, pedido del dueño)
+- **Paso 1, "¿Qué querés reservar?":** cuatro fotos (pádel, fútbol 5, tenis, barbería), a color: la banda de arriba es neutra y el
+  color vivo queda para el contenido. Son recortes de las mismas fotos del mosaico (`assets/r-*.webp`, 600 px).
+  En computadora van las cuatro en fila; en el celular, de a dos. Al pasar el cursor, el verde barre el nombre y la foto se acerca.
+- **Paso 2:** al tocar un rubro aparece arriba la foto chica con su nombre y "Cambiar", y recién ahí Dónde, Cuándo, Hora y
+  "Buscar turnos". La caja acompaña el cambio de alto y lo nuevo entra desde el costado. El foco pasa al nombre del rubro;
+  "Cambiar" lo devuelve a la foto que tenías.
+- **En `reservar.html` es igual:** sin rubro en la dirección se ven las fotos; con rubro, el filtro compacto y los turnos.
+  El botón "atrás" del navegador vuelve a las fotos. "Reservar turno" del menú llega siempre a las fotos.
+- Sin JavaScript, cada foto lleva directo a los turnos de ese rubro.
+
+## "Sumá tu negocio" es el primer paso del registro (16/11)
+- Antes el formulario mostraba "¡Listo! Te escribimos por WhatsApp hoy mismo" y no mandaba nada a ningún lado.
+- Ahora pide nombre, negocio y rubro y lleva al panel (`admin.html?alta=1…`), que abre "Creá la cuenta de tu negocio" con
+  esos datos cargados; ahí se eligen el email y la contraseña y la cuenta se crea de verdad (queda pendiente hasta que Bookea la apruebe).
+- Los tres pasos de al lado cuentan eso: creás tu cuenta, revisamos tu negocio, armás tu agenda.
+
+## Arreglos de la revisión (16/11)
+- Panel en computadora: "Salir" quedaba cortado ("Sa") cuando el email era largo. Ahora el email se corta con "…".
+- Panel en celular: botones de 34px ("Día / Semana", períodos, "Copiar", "Agregar") pasan a 44px.
+- Finanzas en celular: la ayuda del gráfico dice "Tocá una barra" en lugar de "Pasá el cursor".
+- El color de la barra del navegador (`theme-color`) es noche en las tres páginas.
+- "Cualquier hora" pasó a "Todo el día" (en el celular se cortaba).
+
