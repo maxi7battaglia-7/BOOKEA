@@ -1,20 +1,26 @@
-<!-- Plantilla de Supabase (Authentication → Emails → Templates). {{ .ConfirmationURL }} lo completa Supabase. -->
-<div style="background:#f4f7f6;padding:32px 16px;font-family:Arial,Helvetica,sans-serif;color:#11151c">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;margin:0 auto;background:#ffffff;border:1px solid #e1e8e6;border-radius:8px">
-    <tr><td style="padding:28px 28px 8px">
-      <img src="https://bookea.ar/marca/isotipo-64.png" width="32" height="32" alt="" style="vertical-align:middle;border-radius:6px">
-      <span style="font-size:20px;font-weight:bold;vertical-align:middle;margin-left:8px">Bookea</span>
+<!-- Plantilla de Supabase (Authentication → Emails → Templates). {{ .ConfirmationURL }} lo completa Supabase. Colores de la marca: noche #11151c, verde agua #1fa08c, naranja #e4572e, crema #f5ecd7. -->
+<div style="background:#f5ecd7;padding:32px 16px;font-family:Arial,Helvetica,sans-serif;color:#11151c">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#ffffff" style="max-width:480px;margin:0 auto;background:#ffffff;border-radius:10px;overflow:hidden;border-collapse:separate">
+    <tr><td bgcolor="#11151c" style="background:#11151c;padding:22px 28px">
+      <img src="https://bookea.ar/marca/isotipo-192.png" width="36" height="36" alt="" style="vertical-align:middle;border:0">
+      <span style="font-size:22px;font-weight:bold;letter-spacing:-0.3px;vertical-align:middle;margin-left:10px;color:#f5ecd7">Bookea</span>
     </td></tr>
-    <tr><td style="padding:16px 28px 8px">
-      <h1 style="margin:0 0 12px;font-size:22px;line-height:1.25">Confirmá tu email</h1>
-      <p style="margin:0 0 20px;font-size:15px;line-height:1.55;color:#4b5260">Creaste una cuenta en Bookea con este email. Tocá el botón para confirmarlo. Después revisamos tu negocio y, cuando esté aprobado, entrás al panel con tu email y tu contraseña.</p>
-      <a href="{{ .ConfirmationURL }}" style="display:inline-block;background:#11151c;color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;padding:14px 22px;border-radius:6px">Confirmar mi email</a>
-      <p style="margin:20px 0 0;font-size:13px;line-height:1.5;color:#4b5260">Si no creaste una cuenta en Bookea, ignorá este mail: sin confirmar, la cuenta no se activa.</p>
+    <tr><td style="padding:0;line-height:0;font-size:0">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+        <td width="62%" height="6" bgcolor="#1fa08c" style="background:#1fa08c;height:6px;line-height:6px;font-size:0">&nbsp;</td>
+        <td width="38%" height="6" bgcolor="#e4572e" style="background:#e4572e;height:6px;line-height:6px;font-size:0">&nbsp;</td>
+      </tr></table>
     </td></tr>
-    <tr><td style="padding:20px 28px 28px;font-size:12px;line-height:1.5;color:#8b919c">
-      Si el botón no funciona, copiá este link en el navegador:<br>
-      <a href="{{ .ConfirmationURL }}" style="color:#0f5e52;word-break:break-all">{{ .ConfirmationURL }}</a>
+    <tr><td style="padding:30px 28px 8px">
+      <h1 style="margin:0 0 12px;font-size:24px;line-height:1.2;color:#11151c">Confirmá tu email</h1>
+      <p style="margin:0 0 24px;font-size:15px;line-height:1.55;color:#3d4350">Creaste una cuenta en Bookea con este email. Tocá el botón para confirmarlo. Después revisamos tu negocio y, cuando esté aprobado, entrás al panel con tu email y tu contraseña.</p>
+      <a href="{{ .ConfirmationURL }}" style="display:inline-block;background:#1fa08c;color:#11151c;text-decoration:none;font-weight:bold;font-size:15px;padding:14px 24px;border-radius:6px">Confirmar mi email</a>
+      <p style="margin:24px 0 0;font-size:13px;line-height:1.5;color:#5b6170">Si no creaste una cuenta en Bookea, ignorá este mail: sin confirmar, la cuenta no se activa.</p>
+    </td></tr>
+    <tr><td style="padding:20px 28px 28px;font-size:12px;line-height:1.5;color:#7b818d">
+      <div style="border-top:1px solid #eee5d1;padding-top:16px">Si el botón no funciona, copiá este link en el navegador:<br>
+      <a href="{{ .ConfirmationURL }}" style="color:#0f5e52;word-break:break-all">{{ .ConfirmationURL }}</a></div>
     </td></tr>
   </table>
-  <p style="max-width:480px;margin:16px auto 0;font-size:12px;color:#8b919c;text-align:center">Bookea · Turnos online con seña para negocios que trabajan con reservas.</p>
+  <p style="max-width:480px;margin:16px auto 0;font-size:12px;line-height:1.5;color:#6f6656;text-align:center"><b style="color:#11151c">Bookea</b> · Turnos online con seña para negocios que trabajan con reservas.<br><a href="https://bookea.ar" style="color:#6f6656">bookea.ar</a></p>
 </div>
