@@ -68,6 +68,37 @@ panel), `../config.js` (adónde conectarse) y `pruebas/` (pruebas del esquema y 
    `select vault.create_secret('Bookea <avisos@tudominio.com>', 'resend_remitente');` y al aprobar un negocio
    también le llega un mail a su dueño.
 
+## Mails de verdad, para abrirlo a negocios reales
+
+Sin esto, Supabase solo manda mails (confirmar la cuenta, contraseña nueva) a los emails de tu equipo en Supabase y
+muy pocos por hora: un negocio de afuera no puede registrarse. Hace falta un **dominio propio** y **Resend**.
+
+1. **Dominio.** Comprá uno (por ejemplo `bookea.com.ar` en [nic.ar](https://nic.ar), con tu clave fiscal, o un `.com`).
+   Los mails van a salir de ahí (`no-responder@tudominio`).
+2. **Resend.** En [resend.com](https://resend.com) → **Domains → Add domain**, poné `tudominio` y elegí la región São Paulo
+   (`sa-east-1`). Resend te muestra unos registros DNS (TXT y MX): cargalos en el lugar donde compraste el dominio
+   (en nic.ar, en "Delegar" a un DNS como Cloudflare, que es gratis). Esperá a que diga **Verified**.
+3. **Clave.** En Resend → **API Keys → Create API key**, con permiso **Sending access**. Copiala (empieza con `re_`).
+   Es secreta: no va en la página ni en el repo.
+4. **Supabase manda por Resend.** En **Authentication → Emails → SMTP Settings** prendé **Enable custom SMTP**:
+   - Sender email: `no-responder@tudominio` · Sender name: `Bookea`
+   - Host: `smtp.resend.com` · Port: `465` · Username: `resend` · Password: la clave `re_…`
+5. **Límite de mails.** En **Authentication → Rate Limits**, subí "emails por hora" (por ejemplo a 100).
+6. **Mails en castellano.** En **Authentication → Emails → Templates**:
+   - **Confirm signup**: asunto `Confirmá tu email en Bookea`, cuerpo: todo `mails/confirmar-cuenta.html`.
+   - **Reset password**: asunto `Elegí una contraseña nueva en Bookea`, cuerpo: todo `mails/contrasena-nueva.html`.
+7. **Avisos (vos y los negocios).** En el **SQL Editor**, una vez:
+
+       select vault.create_secret('re_TU_API_KEY', 'resend_api_key');
+       select vault.create_secret('tu@email.com', 'aviso_bookea_email');
+       select vault.create_secret('Bookea <no-responder@tudominio>', 'resend_remitente');
+
+   y corré todo `avisos-por-mail.sql`. Desde ahí te llega un mail cuando alguien se registra, y al negocio cuando lo aprobás.
+8. **Probar:** registrá una cuenta con un email que no sea del equipo (en una ventana de incógnito). Tiene que llegar
+   "Confirmá tu email en Bookea" de `no-responder@tudominio`, y a vos el aviso de negocio nuevo.
+
+Resend gratis alcanza para empezar (3.000 mails por mes, 100 por día).
+
 **Si ya tenías corrido `esquema.sql`:** volvé a correrlo entero (se puede correr más de una vez). Agrega la
 aprobación sin borrar nada; los negocios que ya existían quedan pendientes hasta que los apruebes.
 
