@@ -42,6 +42,45 @@ begin
   assert e.body ->> 'html' like '%Hola, Sin:%', 'saludo: ' || (e.body ->> 'html');
   raise notice 'OK  con dominio propio: al aprobarlo, al dueño le llega "Tu negocio ya está aprobado"';
 end $$;
+-- con la cara de Bookea: franja noche, línea verde agua y naranja, lema nuevo
+do $$
+declare e record;
+begin
+  select * into e from net.enviados order by id desc limit 1;
+  assert e.body ->> 'html' like '%#11151c%' and e.body ->> 'html' like '%#1fa08c%' and e.body ->> 'html' like '%#e4572e%' and e.body ->> 'html' like '%#f5ecd7%', 'sin los colores de la marca';
+  assert e.body ->> 'html' like '%Reservá turnos en segundos.%', 'sin el lema';
+  assert e.body ->> 'html' like '%Entrar al panel%', 'sin el botón';
+  raise notice 'OK  los avisos salen con los colores de Bookea, el botón y el lema';
+end $$;
+-- rechazar una solicitud: le llega "no fue aprobada"
+insert into auth.users (email, raw_user_meta_data) values ('re@prueba.com', '{"nombre":"Re Gómez","negocio":"Cancha <i>Re</i>"}');
+update public.negocios set estado = 'rechazado' where email_dueno = 're@prueba.com';
+do $$
+declare e record;
+begin
+  select * into e from net.enviados order by id desc limit 1;
+  assert e.body -> 'to' ->> 0 = 're@prueba.com', 'rechazo, para: ' || (e.body ->> 'to');
+  assert e.body ->> 'subject' = 'Tu solicitud en Bookea no fue aprobada', 'asunto: ' || (e.body ->> 'subject');
+  assert e.body ->> 'html' like '%Hola, Re:%' and e.body ->> 'html' like '%Cancha &lt;i&gt;Re&lt;/i&gt;%' and e.body ->> 'html' like '%hola@bookea.ar%', 'rechazo html: ' || (e.body ->> 'html');
+  raise notice 'OK  rechazar: al dueño le llega "Tu solicitud no fue aprobada", con a quién escribir';
+end $$;
+-- quitarle el acceso a uno aprobado: el texto cambia
+update public.negocios set estado = 'rechazado' where email_dueno = 'sin@prueba.com';
+do $$
+declare e record;
+begin
+  select * into e from net.enviados order by id desc limit 1;
+  assert e.body -> 'to' ->> 0 = 'sin@prueba.com' and e.body ->> 'subject' = 'Se pausó el acceso de tu negocio a Bookea', 'quitar acceso: ' || e.body::text;
+  raise notice 'OK  quitarle el acceso a un negocio aprobado: le llega "Se pausó el acceso"';
+end $$;
+-- volver a guardar el mismo estado no manda otro mail
+update public.negocios set estado = 'rechazado' where email_dueno = 'sin@prueba.com';
+do $$
+declare n int := (select count(*) from net.enviados where body -> 'to' ->> 0 = 'sin@prueba.com');
+begin
+  assert n = 2, 'mandó de más: ' || n;
+  raise notice 'OK  sin cambio de estado no se repite el mail';
+end $$;
 -- si pg_net falla, registrarse sigue funcionando
 create or replace function net.http_post(url text, body jsonb default '{}', params jsonb default '{}',
   headers jsonb default '{}', timeout_milliseconds int default 5000) returns bigint

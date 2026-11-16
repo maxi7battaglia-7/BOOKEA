@@ -67,7 +67,7 @@ panel), `../config.js` (adónde conectarse) y `pruebas/` (pruebas del esquema y 
 
    y corré todo `supabase/avisos-por-mail.sql`. Mientras no verifiques un dominio propio en Resend, el aviso
    solo puede llegarte a vos (al email de tu cuenta de Resend). Con dominio propio, sumá
-   `select vault.create_secret('Bookea <avisos@tudominio.com>', 'resend_remitente');` y al aprobar un negocio
+   `select vault.create_secret('Bookea <no-responder@bookea.ar>', 'resend_remitente');` y al aprobar o rechazar un negocio
    también le llega un mail a su dueño.
 
 ## Mails de verdad, para abrirlo a negocios reales
@@ -93,9 +93,10 @@ muy pocos por hora: un negocio de afuera no puede registrarse. Hace falta un **d
 
        select vault.create_secret('re_TU_API_KEY', 'resend_api_key');
        select vault.create_secret('tu@email.com', 'aviso_bookea_email');
-       select vault.create_secret('Bookea <no-responder@tudominio>', 'resend_remitente');
+       select vault.create_secret('Bookea <no-responder@bookea.ar>', 'resend_remitente');
 
-   y corré todo `avisos-por-mail.sql`. Desde ahí te llega un mail cuando alguien se registra, y al negocio cuando lo aprobás.
+   y corré todo `avisos-por-mail.sql`. Desde ahí te llega un mail cuando alguien se registra, y al negocio cuando lo aprobás o lo rechazás
+   (o le quitás el acceso). Todos con la misma cara que los mails de `mails/`.
 8. **Probar:** registrá una cuenta con un email que no sea del equipo (en una ventana de incógnito). Tiene que llegar
    "Confirmá tu email en Bookea" de `no-responder@tudominio`, y a vos el aviso de negocio nuevo.
 
