@@ -10,6 +10,7 @@
   - "Sumá tu negocio" (inicio) es el primer paso del registro: lleva a `admin.html?alta=1&nombre=…&negocio=…&rubro=…`, que abre el registro con esos datos.
 - **Antes de cualquier cambio visual, leer `DESIGN.md`.** Es la dirección elegida por el dueño: Stripe + Figma + Trello, con los colores de la camiseta del Venezia.
 - Vista previa publicada: https://claude.ai/artifact/EPAeEsx11Px3yKWRQBkgpL. Se regenera con `python3 scripts/preview.py` y se republica con `dist/bookea.html`, más `dist/reservar.html` como archivo aparte (`reservar.html`).
+- Copia para usar sin internet: `python3 scripts/sin-internet.py` arma `dist/bookea-sin-internet.zip` (las tres páginas con todo adentro, panel en modo de prueba). Necesita `pip install fonttools brotli`.
 - Marca en `marca/`: isotipo B (SVG y PNG), lámina de construcción y filosofía "Franja Exacta".
 - Textos en castellano rioplatense (voseo).
 - Rubros del MVP: pádel, fútbol, tenis y barberías. Mercado inicial: Mendoza (Valle de Uco, San Rafael, Gran Mendoza).
