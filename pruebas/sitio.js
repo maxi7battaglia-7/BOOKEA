@@ -1,15 +1,18 @@
-// Prueba del sitio en el navegador (Playwright), en modo de prueba (sin base):
-//   - buscador del inicio en dos pasos (foto del rubro → dónde y cuándo) y llegada a reservar.html
-//   - reservar.html: fotos, filtros, botón atrás, "Cambiar" y una reserva completa
-//   - "Sumá tu negocio" → registro del panel con los datos cargados → cuenta creada
-//   - panel con la cuenta de prueba: las cinco vistas
+// Prueba del frente (index.html) y del registro en el navegador (Playwright), en modo de prueba (sin base):
+//   - inicio: rubros con foto, dónde/cuándo/hora y "Buscar turnos"; "Libres ahora" con su switch; lugares
+//   - resultados: rubro, día, franja y zona; horarios rápidos; "Solo techadas"
+//   - ficha del lugar: día, horario, cancha o barbero, "Reservar turno" (y la barra de abajo en el celular)
+//   - carrito: avisos al lado de cada campo, pago simulado → Mis turnos → cancelar con su diálogo
+//   - parte para negocios: botones de la franja, copiar link, reglas de cancelación, preguntas, "Sumá tu negocio"
+//   - "Sumá tu negocio" → registro del panel con los datos cargados → cuenta creada → panel (las cinco vistas)
+//   - links viejos: reservar.html?rubro=…, reservar.html, index.html#sumate
 //   - teclado, movimiento reducido, sin JavaScript
 //   - en todos los anchos: nada cortado ni salido de la ventana, toques de 40px o más, consola sin errores
 // Uso: node pruebas/sitio.js     (necesita Node y Playwright con Chromium)
 const { chromium } = require('playwright');
 const http = require('http'), fs = require('fs'), path = require('path');
 const RAIZ = path.resolve(__dirname, '..');
-const TIPOS = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'application/javascript', '.svg': 'image/svg+xml', '.png': 'image/png', '.webp': 'image/webp', '.json': 'application/json' };
+const TIPOS = { '.html': 'text/html; charset=utf-8', '.css': 'text/css', '.js': 'application/javascript', '.svg': 'image/svg+xml', '.png': 'image/png', '.webp': 'image/webp', '.json': 'application/json', '.woff2': 'font/woff2' };
 let fallas = 0, hechas = 0;
 const ok = (c, m) => { hechas++; if (!c) fallas++; console.log((c ? 'OK    ' : 'FALLA ') + m); };
 
@@ -21,7 +24,7 @@ const medir = () => {
   document.querySelectorAll('body *').forEach((el) => {
     const r = el.getBoundingClientRect(), cs = getComputedStyle(el);
     if (!r.width || !r.height || cs.visibility === 'hidden' || cs.opacity === '0') return;
-    if (el.closest('[aria-hidden="true"], .sr-only, .skip, svg, .mosaico, .splash, .bienv')) return;
+    if (el.closest('[aria-hidden="true"], .sr-only, .skip, svg, .toast')) return;
     const texto = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim());
     if (texto && !el.matches('.brand__word')) {
       if ((r.right > vw + 1 || r.left < -1) && !seDesplaza(el)) res.push(`fuera de la ventana: ${nombre(el)}`);
@@ -32,7 +35,7 @@ const medir = () => {
       }
       if ((cs.overflowX === 'hidden' || cs.overflowX === 'clip') && el.scrollWidth > el.clientWidth + 1 && cs.textOverflow !== 'ellipsis') res.push(`texto cortado sin "…": ${nombre(el)}`);
     }
-    if (vw < 500 && el.matches('a[href], button, select, input:not([type=hidden]), summary') && cs.position !== 'absolute' && !el.closest('.foot__credits p, .app-foot__fotos p, .frag, .ex__demo')) {
+    if (vw < 500 && el.matches('a[href], button, select, input:not([type=hidden]), summary') && cs.position !== 'absolute' && !el.closest('.foot__bottom details p, .frag, .ex__demo')) {
       const h = Math.max(r.height, el.closest('label') ? el.closest('label').getBoundingClientRect().height : 0);
       if (h < 40) res.push(`toque chico (${Math.round(h)}px): ${nombre(el)} "${(el.textContent || '').trim().slice(0, 20)}"`);
     }
@@ -60,130 +63,174 @@ const medir = () => {
     p.on('response', (r) => { if (r.status() >= 400) p.errs.push(r.status() + ' ' + r.url()); });
     p.toca = (s) => (w < 900 ? p.tap(s) : p.click(s));
     p.limpio = async (donde) => { const l = await p.evaluate(medir); ok(l.length === 0, `${w} ${donde}: nada cortado, salido ni chico para el dedo ${l.join(' | ')}`); };
+    p.pagina = () => p.evaluate(() => (document.querySelector('.page:not([hidden])') || {}).dataset?.page);
     return p;
   };
+  const espera = (p, ms = 450) => p.waitForTimeout(ms);
 
   try {
     for (const [w, h] of [[1440, 900], [1024, 768], [820, 1180], [390, 844], [360, 740]]) {
       const p = await abrir(w, h);
+      const cel = w <= 820;
 
-      // ---------- Inicio: el buscador en dos pasos ----------
-      await p.goto(B + 'index.html', { waitUntil: 'load' }); await p.waitForTimeout(3400);
-      const pantalla = await p.evaluate(() => ({ foto: Math.round([...document.querySelectorAll('#finder .rubro')].pop().getBoundingClientRect().bottom), alto: innerHeight }));
-      ok(await p.isVisible('#finder-1') && !(await p.isVisible('#finder-2')), `${w} inicio: se ven las fotos de los rubros y todavía no los campos`);
-      if (h >= 768) ok(pantalla.foto <= pantalla.alto, `${w} inicio: las cuatro fotos entran en el primer pantallazo (${pantalla.foto} de ${pantalla.alto})`);
-      await p.evaluate(() => document.querySelectorAll('.rise').forEach((e) => e.classList.add('is-in'))); await p.waitForTimeout(900);
+      // ---------- Inicio ----------
+      await p.goto(B, { waitUntil: 'load' }); await espera(p, 700);
+      ok((await p.pagina()) === 'home' && (await p.locator('#f-rubros .rubro').count()) === 4, `${w} inicio: los cuatro rubros con foto`);
+      ok(await p.evaluate(() => [...document.fonts].some((f) => f.family.includes('Inter Tight') && f.status === 'loaded')), `${w} inicio: la letra Inter Tight cargó desde bookea.ar`);
+      ok(await p.evaluate(() => [...document.images].every((i) => !i.complete || i.naturalWidth > 0)), `${w} inicio: ninguna foto rota`);
       await p.limpio('inicio');
-      await p.toca('#finder .rubro[value="futbol"]'); await p.waitForTimeout(700);
-      ok(await p.isVisible('#finder-2') && !(await p.isVisible('#finder-1')) && (await p.textContent('#el-n')) === 'Fútbol 5', `${w} inicio: al tocar Fútbol 5 aparece dónde y cuándo`);
-      const boton = await p.evaluate(() => Math.round(document.querySelector('.finder__go').getBoundingClientRect().bottom));
-      if (h >= 768) ok(boton <= h, `${w} inicio: "Buscar turnos" entra en el primer pantallazo (${boton} de ${h})`);
-      await p.limpio('inicio, paso 2');
-      await p.toca('#el-cambiar'); await p.waitForTimeout(700);
-      ok(await p.isVisible('#finder-1') && await p.evaluate(() => document.activeElement.value === 'futbol'), `${w} inicio: Cambiar vuelve a las fotos, con el foco en la que tenías`);
-      await p.toca('#finder .rubro[value="padel"]'); await p.waitForTimeout(700);
-      await p.selectOption('#fz', 'godoy-cruz'); await p.selectOption('#fh', 'noche');
-      await Promise.all([p.waitForURL('**/reservar.html?**'), p.toca('.finder__go')]); await p.waitForTimeout(700);
-      ok((await p.textContent('#res-t')) === 'Pádel en Godoy Cruz' && (await p.inputValue('#bh')) === 'noche', `${w} llega a reservas con rubro, zona y hora`);
+      await p.toca('#f-rubros .rubro[data-k="futbol"]'); await espera(p, 200);
+      ok((await p.getAttribute('#f-rubros .rubro[data-k="futbol"]', 'aria-pressed')) === 'true' && (await p.getAttribute('#f-rubros .rubro[data-k="padel"]', 'aria-pressed')) === 'false', `${w} inicio: tocar Fútbol 5 lo marca`);
+      await p.selectOption('#f-zona', 'tunuyan'); await p.selectOption('#f-dia', '1'); await p.selectOption('#f-franja', 'noche');
+      await p.toca('#finder button[type=submit]'); await espera(p);
+      ok((await p.pagina()) === 'resultados' && (await p.textContent('#r-t')) === 'Turnos de fútbol 5 en Tunuyán' && /mañana/i.test(await p.textContent('#r-s')) && /noche/.test(await p.textContent('#r-s')), `${w} buscar: resultados de fútbol 5 en Tunuyán, mañana a la noche`);
+      await p.limpio('resultados');
+      await p.goBack(); await espera(p);
+      ok((await p.pagina()) === 'home', `${w} resultados: "atrás" del navegador vuelve al inicio`);
 
-      // ---------- Reservas ----------
-      await p.goto(B + 'reservar.html', { waitUntil: 'load' }); await p.waitForTimeout(700);
-      ok(await p.isVisible('#elegir') && !(await p.isVisible('#buscar')) && (await p.locator('#elegir .rubro').count()) === 4, `${w} reservas sin rubro: las cuatro fotos`);
-      await p.limpio('reservas, fotos');
-      await p.toca('#elegir .rubro[value="tenis"]'); await p.waitForTimeout(900);
-      ok(await p.isVisible('#buscar') && (await p.textContent('#el-n')) === 'Tenis' && p.url().includes('rubro=tenis') && (await p.locator('.lugar').count()) === 3, `${w} reservas: Tenis muestra sus tres lugares`);
-      await p.selectOption('#bz', 'tunuyan'); await p.waitForTimeout(200);
-      ok((await p.textContent('#res-t')) === 'Tenis en Tunuyán', `${w} reservas: filtro por zona`);
-      await p.goBack(); await p.waitForTimeout(300);
-      ok(await p.isVisible('#elegir'), `${w} reservas: "atrás" vuelve a las fotos`);
-      await p.goForward(); await p.waitForTimeout(300);
-      ok(await p.isVisible('#buscar') && (await p.inputValue('#bz')) === 'tunuyan', `${w} reservas: "adelante" vuelve a los turnos con el filtro`);
-      await p.toca('#el-cambiar'); await p.waitForTimeout(700);
-      ok(await p.isVisible('#elegir') && await p.evaluate(() => document.activeElement.value === 'tenis'), `${w} reservas: Cambiar vuelve a las fotos`);
-      await p.toca('#elegir .rubro[value="barberia"]'); await p.waitForTimeout(900);
-      await p.selectOption('#bz', ''); await p.selectOption('#bd', '1'); await p.waitForTimeout(900);
-      await p.limpio('reservas, turnos');
-      await p.toca('.hora >> nth=0'); await p.waitForTimeout(500);
-      ok(await p.isVisible('#reserva[open]'), `${w} reservas: se abre la reserva`);
-      await p.limpio('reservas, elegí tu turno');
-      await p.toca('[data-sig="2"]'); await p.waitForTimeout(200);
-      await p.toca('#rv-datos button[type="submit"]'); await p.waitForTimeout(200);
-      ok(await p.isVisible('#rv-nombre-err') && await p.isVisible('#rv-wa-err'), `${w} reservas: sin datos, avisa al lado de cada campo`);
-      await p.fill('#rv-nombre', 'Ana Prueba'); await p.fill('#rv-wa', '2622 15 123456'); await p.waitForTimeout(700);
-      await p.limpio('reservas, tus datos');
-      await p.toca('#rv-datos button[type="submit"]'); await p.waitForTimeout(200);
-      await p.toca('[data-pagar]'); await p.waitForTimeout(1300);
-      ok((await p.textContent('#rv-t')).includes('Ana'), `${w} reservas: seña simulada y turno confirmado`);
-      await p.toca('.reserva [data-cerrar].btn'); await p.waitForTimeout(300);
-      ok(!(await p.isVisible('#reserva[open]')), `${w} reservas: se cierra`);
+      // Libres ahora y lugares
+      await p.toca('#hs-switch .pill[data-k="barberia"]'); await espera(p, 200);
+      ok((await p.textContent('#dest-t')) === 'Barbería: para reservar hoy' && (await p.locator('#grid-dest .vcard').count()) === 3, `${w} inicio: el switch cambia "Libres ahora" y los lugares a Barbería`);
+      ok((await p.locator('#rail-now .now').count()) > 0, `${w} inicio: hay turnos en "Libres ahora"`);
+      await p.toca('#rail-now .now >> nth=0'); await espera(p);
+      ok((await p.pagina()) === 'ficha' && (await p.locator('#book .slot.is-on').count()) === 1, `${w} "Libres ahora": abre el lugar con ese horario elegido`);
+      await p.toca('.back'); await espera(p);
+      ok((await p.pagina()) === 'home', `${w} ficha: "Volver" vuelve al inicio`);
+      await p.toca('#grid-dest .vcard >> nth=0'); await espera(p);
+      ok((await p.pagina()) === 'ficha' && (await p.textContent('.ficha h1')).length > 2 && !(await p.textContent('#page-ficha')).match(/reseña/i), `${w} lugares: abre la ficha (sin reseñas inventadas)`);
+      await p.limpio('ficha');
+
+      // ---------- Resultados: filtros ----------
+      await p.goto(B + 'reservar.html?rubro=tenis&zona=tunuyan&dia=1&franja=', { waitUntil: 'load' }); await espera(p, 700);
+      ok((await p.pagina()) === 'resultados' && (await p.textContent('#r-t')) === 'Turnos de tenis en Tunuyán', `${w} link viejo reservar.html?rubro=tenis: abre los resultados de tenis en Tunuyán`);
+      await p.toca('#r-rubros .pill[data-k="padel"]'); await espera(p, 200);
+      await p.selectOption('#r-zona', ''); await espera(p, 200);
+      ok((await p.textContent('#r-t')) === 'Turnos de pádel' && (await p.locator('.rcard').count()) === 4, `${w} resultados: Pádel en todas las zonas, cuatro lugares`);
+      await p.toca('#r-dias .day[data-i="2"]'); await espera(p, 200);
+      ok((await p.getAttribute('#r-dias .day[data-i="2"]', 'aria-pressed')) === 'true', `${w} resultados: cambia el día`);
+      await p.toca('#r-franjas .pill[data-k="noche"]'); await espera(p, 200);
+      ok(/noche/.test(await p.textContent('#r-s')), `${w} resultados: filtra a la noche`);
+      await p.toca('#r-rubros .pill[data-act="techada-h"]'); await espera(p, 200);
+      ok((await p.locator('.rcard').count()) === 3, `${w} resultados: "Solo techadas" deja los lugares con cancha techada`);
+      await p.toca('#r-rubros .pill[data-act="techada-h"]'); await espera(p, 200);
+      await p.toca('#r-franjas .pill[data-k=""]'); await espera(p, 200);
+      await p.limpio('resultados con filtros');
+      await p.toca('.qslot >> nth=0'); await espera(p);
+      ok((await p.pagina()) === 'ficha' && (await p.locator('#book .slot.is-on').count()) === 1 && !(await p.isDisabled('#book [data-act="reservar"]')), `${w} resultados: el horario rápido abre la ficha listo para reservar`);
+      if (cel) ok(await p.isVisible('#mbar [data-act="reservar"]'), `${w} ficha: en el celular, la barra de abajo tiene "Reservar"`);
+
+      // ---------- Ficha: elegir y reservar ----------
+      await p.toca('#book .day[data-i="3"]'); await espera(p, 200);
+      ok((await p.getAttribute('#book .day[data-i="3"]', 'aria-pressed')) === 'true' && (await p.locator('#book .day.is-on').count()) === 1, `${w} ficha: cambia el día`);
+      await p.toca('#book .slot:not([disabled]) >> nth=0'); await espera(p, 200);
+      if (await p.locator('#book .unit').count()) { await p.toca('#book .unit >> nth=1'); await espera(p, 150); }
+      ok(/Seña ahora/.test(await p.textContent('#book .sum')), `${w} ficha: muestra la seña y lo que se paga en el lugar`);
+      await p.limpio('ficha con horario');
+      await p.toca('#book [data-act="reservar"]'); await espera(p);
+      ok((await p.pagina()) === 'carrito' && (await p.locator('#carrito-root .item').count()) === 1, `${w} reservar: el turno va al carrito`);
+      ok(await p.evaluate(() => [...document.querySelectorAll('[data-count="carrito"]')].some((b) => b.textContent === '1')), `${w} carrito: el contador marca 1`);
+      await p.limpio('carrito');
+
+      // ---------- Carrito → pago simulado → Mis turnos ----------
+      await p.toca('[data-act="pay"]'); await espera(p, 200);
+      ok(await p.isVisible('#c-nombre-e') && await p.isVisible('#c-wa-e'), `${w} carrito: sin datos, avisa al lado de cada campo`);
+      await p.fill('#c-nombre', 'Ana Prueba'); await p.fill('#c-wa', '2622 15 123456');
+      await p.toca('[data-act="pay"]'); await espera(p, 300);
+      ok(await p.isVisible('.mpov'), `${w} carrito: aparece el pago simulado`);
+      await p.waitForSelector('#page-turnos:not([hidden]) .tcard', { timeout: 6000 }); await espera(p);
+      ok((await p.pagina()) === 'turnos' && (await p.locator('#turnos-root .tcard').count()) === 1 && /BK-/.test(await p.textContent('.tcard .code')), `${w} pago: el turno queda en Mis turnos con su código`);
+      ok(/demo/i.test(await p.textContent('#toast')), `${w} pago: avisa que es una demo`);
+      await p.limpio('Mis turnos');
+      await p.toca('[data-act="cancel"]'); await espera(p, 300);
+      ok(await p.isVisible('#dlg[open]'), `${w} Mis turnos: "Cancelar" pregunta antes`);
+      await p.toca('#dlg-no'); await espera(p, 200);
+      ok(!(await p.isVisible('#dlg[open]')) && (await p.locator('.tcard').count()) === 1, `${w} Mis turnos: "Volver" no cancela`);
+      await p.toca('[data-act="cancel"]'); await espera(p, 300); await p.toca('#dlg-si'); await espera(p);
+      ok((await p.locator('.tcard').count()) === 0 && /Todavía no tenés turnos/.test(await p.textContent('#turnos-root')), `${w} Mis turnos: cancelar lo saca`);
+      if (cel) {
+        await p.toca('.tabbar [data-tab="carrito"]'); await espera(p);
+        ok((await p.pagina()) === 'carrito' && /vacío/.test(await p.textContent('#carrito-root')), `${w} barra de abajo: Carrito`);
+        await p.toca('.tabbar [data-tab="home"]'); await espera(p);
+        ok((await p.pagina()) === 'home', `${w} barra de abajo: Reservar`);
+      }
+
+      // ---------- Para negocios ----------
+      await p.goto(B, { waitUntil: 'load' }); await espera(p, 600);
+      await p.toca(cel ? '.tabbar [data-tab="negocios"]' : '.top__neg'); await espera(p);
+      ok((await p.pagina()) === 'negocios' && await p.isVisible('.band h1'), `${w} "Sumá tu negocio"/"Negocios": abre la parte para negocios`);
+      await p.limpio('negocios');
+      await p.toca('.band [data-scroll="como-funciona"]'); await espera(p, 900);
+      ok(await p.evaluate(() => Math.abs(document.querySelector('#como-funciona').getBoundingClientRect().top) < 140), `${w} negocios: "Cómo funciona" baja a esa parte`);
+      await p.locator('#como-funciona .copy').scrollIntoViewIfNeeded(); await espera(p, 600);
+      await p.toca('#como-funciona .copy'); await espera(p, 300);
+      ok(/Copiado|Seleccionado/.test(await p.textContent('#como-funciona .copy')), `${w} negocios: "Copiar" el link responde`);
+      await p.toca('[data-step="1"]'); await espera(p, 100);
+      ok((await p.textContent('#hrs')) === '7 h', `${w} negocios: + suma una hora a la regla de cancelación`);
+      await p.toca('.switch'); await espera(p, 100);
+      ok((await p.getAttribute('.switch', 'aria-checked')) === 'false' && /queda para vos/.test(await p.textContent('#rule-note')), `${w} negocios: el interruptor cambia la regla`);
+      await p.toca('#preguntas details:nth-of-type(2) summary'); await espera(p, 200);
+      ok(await p.evaluate(() => document.querySelectorAll('#preguntas details')[1].open), `${w} negocios: las preguntas se abren`);
+      await p.toca('.band [data-scroll="sumate"]'); await espera(p, 900);
 
       // ---------- "Sumá tu negocio" → registro → panel ----------
-      await p.goto(B + 'index.html', { waitUntil: 'load' }); await p.waitForTimeout(3400);
-      await p.evaluate(() => document.querySelector('#sumate').scrollIntoView({ block: 'start', behavior: 'instant' })); await p.waitForTimeout(1000);
-      await p.toca('#form-sumate button[type="submit"]'); await p.waitForTimeout(300);
-      ok(p.url().includes('index.html') && (await p.textContent('#form-sumate .form__msg')).includes('3 campos'), `${w} sumate: vacío no sigue y avisa`);
+      await p.toca('#form-sumate button[type="submit"]'); await espera(p, 300);
+      ok(!p.url().includes('admin.html') && /3 campos/.test(await p.textContent('#form-sumate .form__msg')) && await p.isVisible('#f-nombre-err'), `${w} sumate: vacío no sigue y avisa`);
       await p.fill('#f-nombre', 'Julia Méndez'); await p.fill('#f-negocio', 'Pádel & Co. Tunuyán'); await p.fill('#f-rubro', 'Pádel');
-      await Promise.all([p.waitForURL('**/admin.html**'), p.toca('#form-sumate button[type="submit"]')]); await p.waitForTimeout(900);
-      ok(await p.isVisible('#f-registro') && (await p.inputValue('#r-nombre')) === 'Julia Méndez' && (await p.inputValue('#r-negocio')) === 'Pádel & Co. Tunuyán' && (await p.inputValue('#r-rubro')) === 'Pádel', `${w} sumate: abre el registro con los tres datos cargados`);
+      await Promise.all([p.waitForURL('**/admin.html**'), p.toca('#form-sumate button[type="submit"]')]); await espera(p, 900);
+      ok(await p.isVisible('#f-registro') && (await p.inputValue('#r-nombre')) === 'Julia Méndez' && (await p.inputValue('#r-negocio')) === 'Pádel & Co. Tunuyán' && (await p.inputValue('#r-rubro')) === 'Pádel', `${w} sumate: abre el registro del panel con los tres datos cargados`);
       ok(!p.url().includes('alta=') && await p.evaluate(() => document.activeElement.id === 'r-email'), `${w} sumate: dirección limpia y foco en el email`);
       await p.limpio('panel, registro');
       await p.fill('#r-email', `julia${w}@example.com`); await p.fill('#r-clave', 'clave-segura-1'); await p.fill('#r-clave2', 'clave-segura-1');
-      await p.toca('#f-registro button[type="submit"]'); await p.waitForTimeout(4200);
+      await p.toca('#f-registro button[type="submit"]'); await espera(p, 4200);
       ok(await p.isVisible('#panel') && (await p.textContent('#panel')).includes('Pádel & Co. Tunuyán'), `${w} sumate: la cuenta se crea y entra al panel de su negocio`);
-      await p.reload({ waitUntil: 'load' }); await p.waitForTimeout(800);
+      await p.reload({ waitUntil: 'load' }); await espera(p, 800);
       ok(await p.isVisible('#f-ingresar'), `${w} panel: al recargar pide ingresar (no repite el registro)`);
-      await p.limpio('panel, ingresar');
 
       // ---------- Panel con la cuenta de prueba ----------
       await p.fill('#i-email', 'demo@example.com'); await p.fill('#i-clave', 'bookea2026');
-      await p.toca('#f-ingresar button[type="submit"]'); await p.waitForTimeout(4200);
+      await p.toca('#f-ingresar button[type="submit"]'); await espera(p, 4200);
       ok(await p.isVisible('#panel'), `${w} panel: entra con la cuenta de prueba`);
       for (const v of ['agenda', 'finanzas', 'clientes', 'negocio', 'cuenta']) {
-        await p.toca(`.menu__i[data-vista="${v}"]`); await p.waitForTimeout(700);
+        await p.toca(`.menu__i[data-vista="${v}"]`); await espera(p, 700);
         await p.limpio(`panel, ${v}`);
       }
-      if (w >= 901) ok(await p.evaluate(() => document.querySelector('.lado__salir').getBoundingClientRect().right <= document.querySelector('.lado').getBoundingClientRect().right), `${w} panel: "Salir" entra entero en el costado`);
+
+      // ---------- Links viejos ----------
+      await p.goto(B + 'index.html#sumate', { waitUntil: 'load' }); await espera(p, 1000);
+      ok((await p.pagina()) === 'negocios' && await p.evaluate(() => Math.abs(document.querySelector('#sumate').getBoundingClientRect().top) < 160), `${w} link viejo index.html#sumate: abre el formulario`);
+      await p.goto(B + 'reservar.html', { waitUntil: 'load' }); await espera(p, 800);
+      ok((await p.pagina()) === 'home' && /\/$|index\.html$/.test(new URL(p.url()).pathname), `${w} link viejo reservar.html: abre el buscador del inicio`);
+      ok((await p.getAttribute('.top a.btn--ink', 'href')) === 'admin.html', `${w} "Ingresar" lleva al panel`);
       ok((await p.evaluate(() => document.documentElement.scrollWidth)) <= w, `${w}: sin desplazamiento horizontal`);
       ok(p.errs.length === 0, `${w}: sin errores en la consola ni archivos que falten ${p.errs.join(' | ')}`);
       await p.context().close();
     }
 
-    // ---------- Cursor y teclado ----------
+    // ---------- Teclado ----------
     let p = await abrir(1440, 900);
-    await p.goto(B + 'index.html', { waitUntil: 'load' }); await p.waitForTimeout(3600);
-    await p.hover('#finder .rubro[value="tenis"]'); await p.waitForTimeout(700);
-    ok(/^inset\(0/.test(await p.evaluate(() => getComputedStyle(document.querySelector('#finder .rubro[value="tenis"] .rubro__n'), '::before').clipPath)), 'cursor sobre un rubro: el verde agua barre el nombre');
-    const t = await p.evaluate(() => { const r = document.querySelector('#finder .rubro[value="tenis"]'); const o = document.querySelector('#finder .rubro[value="padel"]');
-      return { escala: getComputedStyle(r).scale, tinte: getComputedStyle(r.querySelector('.rubro__foto'), '::after').backgroundColor, otro: getComputedStyle(o.querySelector('.rubro__foto'), '::after').backgroundColor, gris: getComputedStyle(o.querySelector('img')).filter }; });
-    ok(t.escala === '1.04' && t.tinte === 'rgb(31, 160, 140)' && /grayscale\(1\)/.test(t.gris) && t.otro === 'rgba(31, 160, 140, 0)', `cursor sobre un rubro: la tarjeta se agranda y la foto pasa de gris a verde agua, como el mosaico (${JSON.stringify(t)})`);
-    const fotos = await p.evaluate(() => { const m = new Set([...document.querySelectorAll('.mosaico img')].map((i) => i.getAttribute('src'))); return [...document.querySelectorAll('.rubro img')].filter((i) => m.has(i.getAttribute('src'))).length; });
-    ok(fotos === 0, 'las fotos de los rubros no repiten las del mosaico');
-    await p.click('#finder .rubro[value="tenis"]'); await p.waitForTimeout(700);
-    await p.hover('.finder__go'); await p.waitForTimeout(600);
-    const b = await p.evaluate(() => { const x = document.querySelector('.finder__go'); return [getComputedStyle(x, '::before').clipPath, getComputedStyle(x).color]; });
-    ok(/^inset\(0/.test(b[0]) && b[1] === 'rgb(17, 21, 28)', 'cursor sobre "Buscar turnos": barrido verde agua y texto noche');
-    await p.reload({ waitUntil: 'load' }); await p.waitForTimeout(3600);
-    await p.focus('#finder .rubro[value="padel"]'); await p.keyboard.press('Tab'); await p.keyboard.press('Enter'); await p.waitForTimeout(600);
-    ok((await p.textContent('#el-n')) === 'Fútbol 5' && await p.evaluate(() => document.activeElement.id === 'el-n'), 'teclado: Tab + Enter elige Fútbol 5 y el foco pasa al paso 2');
-    await p.keyboard.press('Tab'); await p.keyboard.press('Enter'); await p.waitForTimeout(600);
-    ok(await p.evaluate(() => document.activeElement.value === 'futbol'), 'teclado: "Cambiar" devuelve el foco a Fútbol 5');
+    await p.goto(B, { waitUntil: 'load' }); await espera(p, 600);
+    await p.focus('#f-rubros .rubro[data-k="padel"]'); await p.keyboard.press('Tab'); await p.keyboard.press('Enter'); await espera(p, 200);
+    ok((await p.getAttribute('#f-rubros .rubro[data-k="futbol"]', 'aria-pressed')) === 'true', 'teclado: Tab + Enter elige Fútbol 5');
+    await p.focus('#finder button[type=submit]'); await p.keyboard.press('Enter'); await espera(p);
+    ok((await p.pagina()) === 'resultados', 'teclado: Enter en "Buscar turnos" muestra los resultados');
+    await p.keyboard.press('Tab');
+    ok(await p.evaluate(() => getComputedStyle(document.activeElement).outlineStyle !== 'none'), 'teclado: el foco se ve');
     await p.context().close();
 
     // ---------- Movimiento reducido ----------
     p = await abrir(390, 844, { reducedMotion: 'reduce' });
-    await p.goto(B + 'index.html', { waitUntil: 'load' }); await p.waitForTimeout(1600);
-    await p.tap('#finder .rubro[value="barberia"]'); await p.waitForTimeout(200);
-    ok(await p.isVisible('#finder-2') && !(await p.isVisible('#finder-1')), 'movimiento reducido: el paso cambia al instante');
-    await Promise.all([p.waitForURL('**/reservar.html?**'), p.tap('.finder__go')]); await p.waitForTimeout(400);
-    ok((await p.locator('.lugar').count()) > 0 && p.errs.length === 0, 'movimiento reducido: llega a los turnos, sin errores');
+    await p.goto(B + 'reservar.html?rubro=barberia&dia=1', { waitUntil: 'load' }); await espera(p, 500);
+    await p.tap('.qslot >> nth=0'); await espera(p, 200);
+    await p.tap('#book [data-act="reservar"]'); await espera(p, 200);
+    await p.fill('#c-nombre', 'Leo'); await p.fill('#c-wa', '261 555 1234');
+    await p.tap('[data-act="pay"]'); await p.waitForSelector('#page-turnos:not([hidden]) .tcard', { timeout: 3000 });
+    ok(p.errs.length === 0, 'movimiento reducido: reserva completa y rápida, sin errores');
     await p.context().close();
 
     // ---------- Sin JavaScript ----------
     p = await abrir(1440, 900, { javaScriptEnabled: false });
-    await p.goto(B + 'index.html', { waitUntil: 'load' });
-    ok(await p.isVisible('#finder-1') && await p.isVisible('#finder-2') && !(await p.isVisible('.elegido')) && !(await p.isVisible('.splash')), 'sin JavaScript: fotos y campos a la vista, sin pantalla de carga');
-    await Promise.all([p.waitForURL('**/reservar.html?**'), p.click('#finder .rubro[value="tenis"]')]);
-    ok(p.url().includes('rubro=tenis'), 'sin JavaScript: la foto lleva a reservar.html?rubro=tenis');
+    await p.goto(B, { waitUntil: 'load' });
+    ok(/activá JavaScript/.test(await p.textContent('#finder')) && (await p.getAttribute('.top a.btn--ink', 'href')) === 'admin.html', 'sin JavaScript: avisa que hace falta y "Ingresar" sigue andando');
     await p.context().close();
   } catch (e) {
     fallas++; console.log('FALLA (excepción)', e.message);

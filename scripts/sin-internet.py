@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Arma Bookea para usar sin internet: dist/bookea-sin-internet.zip.
 
-Adentro van index.html, reservar.html y admin.html, cada una con todo metido adentro
-(CSS, JS, fotos, logo y la letra Archivo), así que funcionan abriendo el archivo en el
-navegador, sin conexión. El panel va en modo de prueba (config.js vacío): los datos quedan
+Adentro van index.html (el frente: buscar, reservar, carrito, Mis turnos y la parte para negocios),
+admin.html (el panel) y reservar.html (solo redirige al inicio, para los links viejos). Cada una lleva
+todo adentro (CSS, JS, fotos, logo y letras: Inter Tight y JetBrains Mono en el frente, Archivo en el
+panel), así que funcionan abriendo el archivo en el navegador, sin conexión. El panel va en modo de prueba (config.js vacío): los datos quedan
 guardados solo en ese navegador. Cuenta de prueba: demo@example.com / bookea2026.
 
 Necesita fonttools y brotli (pip install fonttools brotli) para achicar la letra.
@@ -17,6 +18,7 @@ from armado import ROOT as root, adentro, pagina
 salida = root / "dist" / "sin-internet"
 salida.mkdir(parents=True, exist_ok=True)
 mimetypes.add_type("image/webp", ".webp")
+mimetypes.add_type("font/woff2", ".woff2")
 
 
 def data_uri(ruta):
@@ -25,7 +27,7 @@ def data_uri(ruta):
     return f"data:{tipo};base64,{base64.b64encode(p.read_bytes()).decode()}"
 
 
-# La letra: Archivo variable (ancho y peso), solo con los caracteres del castellano, en woff2
+# La letra del panel: Archivo variable (ancho y peso), solo con los caracteres del castellano, en woff2
 def letra():
     f = TTFont(root / "marca/fuentes/Archivo-Variable.ttf")
     op = subset.Options()
@@ -49,7 +51,7 @@ LETRA = f"""<style>
 </style>"""
 
 
-RUTA = r"(?:assets|marca)/[\w.-]+\.(?:webp|png|svg|jpg)"
+RUTA = r"(?:assets|marca)/(?:fuentes/)?[\w.-]+\.(?:webp|png|svg|jpg|woff2)"
 VACIA = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
 # Una foto que aparece en varios <img> va adentro una sola vez: las demás copian su src al cargar
 COPIAS = """<script>
@@ -65,6 +67,7 @@ def armar(nombre, archivos):
     # la letra de Google Fonts se cambia por la de adentro
     html = re.sub(r'\s*<link rel="preconnect"[^>]*>', "", html)
     html = re.sub(r'<link href="https://fonts.googleapis.com[^>]+>', LETRA, html)
+    html = re.sub(r'\s*<link rel="preload"[^>]*>', "", html)  # la letra ya va adentro del CSS
     for a in archivos:
         html = adentro(html, a, "window.BOOKEA_CONFIG = {};" if a == "config.js" else None)
     # fotos repetidas en <img>: la primera lleva la foto, las otras la copian
@@ -97,15 +100,17 @@ def armar(nombre, archivos):
     print("OK ->", salida / nombre, f"({len(html)//1024} KB)")
 
 
-armar("index.html", ["styles.css", "script.js", "toque.js"])
-armar("reservar.html", ["styles.css", "app.css", "reservar.js", "toque.js"])
+armar("index.html", ["sitio.css", "sitio.js"])
+# reservar.html redirige a "./", que sin servidor abre la carpeta: acá va a index.html
+(salida / "reservar.html").write_text(pagina("reservar.html").replace('"./"', '"index.html"').replace("url=./", "url=index.html"), encoding="utf-8")
 armar("admin.html", ["styles.css", "admin.css", "config.js", "nube.js", "admin.js", "toque.js"])
 
 LEEME = """Bookea sin internet
 ===================
 
 1. Descomprimí este archivo (clic derecho > Extraer todo).
-2. Abrí index.html con el navegador (doble clic). Desde ahí navegás a reservas y al panel.
+2. Abrí index.html con el navegador (doble clic). Desde ahí buscás y reservás turnos (de ejemplo)
+   y entrás al panel con "Ingresar".
 
 El panel funciona en modo de prueba: lo que cargues queda guardado solo en ese navegador.
 Para entrar: email demo@example.com y contraseña bookea2026.

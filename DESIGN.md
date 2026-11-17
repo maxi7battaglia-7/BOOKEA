@@ -379,3 +379,16 @@ Pedido: "que no quede nada raro ni nada que no funcione" y "que todo tenga una c
 - **Lo hace cumplir la base** (`supabase/esquema.sql`): cargar, cambiar o borrar turnos pide el permiso "turnos"; cambiar el negocio, "negocio";
   invitar, cambiar permisos y sacar gente, ser el dueño. Ver Finanzas y Clientes lo controla el panel (los datos salen de los mismos turnos).
 
+
+## Frente nuevo (17/11, pedido del dueño)
+
+El dueño mandó una página de referencia ("mirá lo limpia que se ve, así quiero que se vea") y pidió ese estilo para todo el frente, con nuestros colores y con todos los botones funcionando, porque la misión principal es sacar turnos.
+
+- **Archivos:** `index.html` + `sitio.css` + `sitio.js` (una sola página con pantallas: inicio, resultados, ficha, carrito, Mis turnos y negocios). Reemplazan a `script.js`, `app.css` y `reservar.js`. `reservar.html` solo redirige al inicio.
+- **Estilo:** fondo blanco, mucho aire, bordes finos `--ink-200`, radios 12/20/28 px, sombras suaves solo en lo que flota (buscador, tarjeta de reserva, resumen del carrito).
+- **Letras:** Inter Tight para todo y JetBrains Mono para horarios, precios, códigos y etiquetas chicas en mayúscula. Se sirven desde `assets/fuentes/` (licencia OFL, al lado de cada archivo), sin depender de Google Fonts. El panel sigue con Archivo.
+- **Colores de Bookea:** `--ink-900` noche `#11151c`, `--accent` naranja `#e4572e` (botón principal, horario elegido, la segunda línea del título), `--ok` verde agua `#1fa08c` (lugares libres, confirmado), crema `#f5ecd7` de fondo en "Sumá tu negocio" (como los mails).
+- **Fotos a color:** las de `assets/` (las mismas de antes). Ya no van en gris.
+- **Lo que no se copió de la referencia:** las reseñas y los puntajes con estrellas (serían opiniones inventadas: CLAUDE.md lo prohíbe), "Turnos · Valle de Uco" (Bookea no se limita a una zona) y la zona por defecto "Valle de Uco" (ahora "Todas las zonas", agrupadas por región).
+- **Celular:** barra de abajo (Reservar, Carrito, Mis turnos, Negocios), barra fija con "Reservar" en la ficha, y todo lo que se toca mide 44 px o más en pantallas táctiles.
+- **Honestidad del demo:** el pago dice "Es una demo: no se cobró nada" y el pie aclara que los negocios son ejemplos.

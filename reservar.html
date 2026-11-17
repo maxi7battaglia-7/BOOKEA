@@ -1,136 +1,18 @@
 <!doctype html>
-<html lang="es-AR" class="js is-ready nav-lista">
+<html lang="es-AR">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Bookea · Reservar</title>
-  <meta name="description" content="Turnos libres de los negocios que usan Bookea. Elegí horario y reservá con seña." />
-  <meta name="theme-color" content="#11151c" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Archivo:ital,wdth,wght@0,62..125,100..900;1,62..125,100..900&display=swap" rel="stylesheet" />
-  <link rel="icon" href="marca/isotipo.svg" type="image/svg+xml" />
-  <link rel="icon" href="marca/isotipo-32.png" sizes="32x32" type="image/png" />
-  <link rel="apple-touch-icon" href="marca/isotipo-192.png" />
-  <link rel="stylesheet" href="styles.css?v=6" />
-  <link rel="stylesheet" href="app.css?v=6" />
+  <meta name="robots" content="noindex" />
+  <link rel="canonical" href="https://bookea.ar/" />
+  <!-- Las reservas ahora viven en el inicio (index.html). Esta página queda para que los links viejos
+       sigan andando: reservar.html?rubro=padel&zona=&dia=0&franja= abre los resultados de ese rubro,
+       y reservar.html solo abre el buscador. -->
+  <script>location.replace("./" + (location.search || "#pick"));</script>
+  <noscript><meta http-equiv="refresh" content="0; url=./" /></noscript>
 </head>
-<body class="app">
-  <a class="skip" href="#main">Saltar al contenido</a>
-
-  <!-- La misma barra del inicio, sobre noche -->
-  <header class="nav nav--app frame">
-    <a href="index.html" class="brand" aria-label="Bookea, volver al inicio">
-      <svg class="brand__mark" viewBox="0 0 1000 1000" aria-hidden="true">
-        <defs>
-          <mask id="ap-panzas" maskUnits="userSpaceOnUse" x="0" y="0" width="1000" height="1000">
-            <path d="M391,180 H520 A175,175 0 0 1 520,530 H391 Z" fill="#fff"/><path d="M391,426 H545 A197,197 0 0 1 545,820 H391 Z" fill="#fff"/>
-            <path d="M391,284 H520 A71,71 0 0 1 520,426 H391 Z" fill="#000"/><path d="M391,530 H545 A93,93 0 0 1 545,716 H391 Z" fill="#000"/>
-          </mask>
-        </defs>
-        <rect width="1000" height="1000" rx="200" fill="#11151c"/>
-        <g transform="translate(8,0)">
-          <g mask="url(#ap-panzas)">
-            <polygon points="0,0 1000,0 1000,553.38 0,377.06" fill="#1fa08c"/>
-            <polygon points="0,377.06 1000,553.38 1000,1000 0,1000" fill="#e4572e"/>
-          </g>
-          <rect x="255" y="180" width="136" height="640" fill="#f5ecd7"/>
-        </g>
-      </svg>
-      <span class="brand__word">Bookea</span>
-    </a>
-    <nav class="nav__links" aria-label="Principal">
-      <a href="index.html">Inicio</a>
-      <a href="index.html#como-funciona">Para negocios</a>
-      <a href="admin.html" class="nav__ingresar">Ingresar</a>
-    </nav>
-    <a href="index.html#sumate" class="btn btn--ink nav__cta">Sumá tu negocio</a>
-  </header>
-
-  <main id="main">
-    <!-- Paso 1: qué querés reservar (una foto por rubro) -->
-    <section class="elegir" id="elegir" aria-labelledby="elegir-t" hidden>
-      <div class="elegir__in frame">
-        <h1 id="elegir-t" class="elegir__t" tabindex="-1">¿Qué querés reservar?</h1>
-        <p class="elegir__sub">Elegí qué buscás y te mostramos los turnos libres de cada lugar.</p>
-        <ul class="rubros rubros--g">
-          <li><button type="button" class="rubro" value="padel"><span class="rubro__foto"><img src="assets/r-padel.webp" alt="" width="600" height="600" /></span><span class="rubro__n">Pádel</span></button></li>
-          <li><button type="button" class="rubro" value="futbol"><span class="rubro__foto"><img src="assets/r-futbol.webp" alt="" width="600" height="600" /></span><span class="rubro__n">Fútbol 5</span></button></li>
-          <li><button type="button" class="rubro" value="tenis"><span class="rubro__foto"><img src="assets/r-tenis.webp" alt="" width="600" height="600" /></span><span class="rubro__n">Tenis</span></button></li>
-          <li><button type="button" class="rubro" value="barberia"><span class="rubro__foto"><img src="assets/r-barberia.webp" alt="" width="600" height="600" /></span><span class="rubro__n">Barbería</span></button></li>
-        </ul>
-      </div>
-    </section>
-
-    <!-- Paso 2: el rubro elegido, dónde y cuándo, y los turnos. Cada cambio actualiza la lista. -->
-    <div id="buscar" hidden>
-      <section class="busq" aria-label="Buscar turnos">
-        <form class="busq__form frame" id="busq" data-ui>
-          <div class="elegido">
-            <span class="elegido__foto"><img id="el-foto" src="assets/r-padel.webp" alt="" width="600" height="600" /></span>
-            <p class="elegido__txt"><span class="elegido__k">Vas a reservar</span><strong class="elegido__n" id="el-n">Pádel</strong></p>
-            <button type="button" class="mini" id="el-cambiar">Cambiar</button>
-          </div>
-          <div class="ff">
-            <label for="bz">Dónde</label>
-            <select id="bz" name="zona">
-              <option value="">Todas las zonas</option>
-              <optgroup label="Valle de Uco">
-                <option value="tunuyan">Tunuyán</option>
-                <option value="tupungato">Tupungato</option>
-                <option value="san-carlos">San Carlos</option>
-              </optgroup>
-              <optgroup label="Sur">
-                <option value="san-rafael">San Rafael</option>
-              </optgroup>
-              <optgroup label="Gran Mendoza">
-                <option value="capital">Ciudad de Mendoza</option>
-                <option value="godoy-cruz">Godoy Cruz</option>
-                <option value="guaymallen">Guaymallén</option>
-                <option value="las-heras">Las Heras</option>
-                <option value="lujan">Luján de Cuyo</option>
-                <option value="maipu">Maipú</option>
-              </optgroup>
-            </select>
-          </div>
-          <div class="ff">
-            <label for="bd">Cuándo</label>
-            <select id="bd" name="dia"><option value="0">Hoy</option></select>
-          </div>
-          <div class="ff">
-            <label for="bh">Hora</label>
-            <select id="bh" name="franja">
-              <option value="">Todo el día</option>
-              <option value="manana">A la mañana</option>
-              <option value="tarde">A la tarde</option>
-              <option value="noche">A la noche</option>
-            </select>
-          </div>
-        </form>
-      </section>
-
-      <section class="res frame" id="resultados" aria-labelledby="res-t">
-        <p class="demo">Vista previa: los negocios, horarios y precios son de ejemplo y no se cobra nada.</p>
-        <div class="res__head">
-          <h1 id="res-t" class="res__title" tabindex="-1">Turnos de pádel</h1>
-          <p class="res__meta" id="res-meta" role="status" aria-live="polite"></p>
-        </div>
-        <div id="lista" class="lista"></div>
-      </section>
-    </div>
-  </main>
-
-  <footer class="app-foot frame">
-    <p>Bookea · Reservá turnos en segundos.</p>
-    <details class="app-foot__fotos"><summary>Créditos de las fotos</summary><p><a href="https://commons.wikimedia.org/wiki/File:Padel_Tennis_Arena_ISPO_2014.jpg">“Padel Tennis Arena ISPO 2014”</a>, Ordercrazy, CC0; <a href="https://commons.wikimedia.org/wiki/File:Futsal_indoor.jpg">“Futsal indoor”</a>, Christopherjeffrey04, CC BY-SA 4.0; <a href="https://commons.wikimedia.org/wiki/File:Young_tennis_player_-_DPLA_-_94b67fb8726019dfb9e3bced2eb256b8.jpg">“Young tennis player”</a>, David E. Lucas, dominio público; <a href="https://commons.wikimedia.org/wiki/File:Barbershop_in_Cancun.jpg">“Barbershop in Cancun”</a>, Ekaterina Kvelidze, CC BY-SA 4.0. Vía Wikimedia Commons, en blanco y negro.</p></details>
-  </footer>
-
-  <!-- Reserva: elegir, tus datos, seña y confirmación -->
-  <dialog class="reserva" id="reserva" aria-labelledby="rv-t">
-    <div class="reserva__in" id="rv"></div>
-  </dialog>
-
-  <script src="reservar.js?v=6"></script>
-  <script src="toque.js?v=6"></script>
+<body>
+  <p>Las reservas ahora están en el inicio de Bookea: <a href="./">ir a reservar</a>.</p>
 </body>
 </html>

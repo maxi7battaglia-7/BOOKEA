@@ -4,6 +4,8 @@
 - dist/bookea.html: la landing. claude.ai le agrega el esqueleto (<!doctype>, <head>, <body>).
 - dist/reservar.html y dist/admin.html: se publican como archivos aparte, así que llevan su
   documento completo. Sus links a la landing apuntan a "./", la raíz de la página publicada.
+  reservar.html solo redirige al inicio, donde ahora están las reservas.
+- Las fotos (assets/*.webp) y las letras (assets/fuentes/*.woff2) se publican como archivos aparte.
 
 Las páginas piden sus archivos con ?v=N (para que el navegador no use una versión vieja).
 Acá ese número se saca antes de meter cada archivo adentro, así que no hay que tocar nada al subirlo.
@@ -20,43 +22,28 @@ def sin_iconos(html):
     return re.sub(r'\s*<link rel="(?:icon|apple-touch-icon)"[^>]*>', "", html)  # el ícono lo pone claude.ai
 
 
-# ---------- Landing ----------
+# ---------- Inicio (el frente: buscar, resultados, ficha, carrito, Mis turnos y la parte para negocios) ----------
 html = pagina("index.html")
-fonts = re.search(r'<link href="https://fonts.googleapis.com[^>]+>', html).group(0)
-head_js = re.search(r"<head>.*?<script>(.*?)</script>", html, re.S).group(1)
 body = re.search(r"<body>(.*)</body>", html, re.S).group(1)
-for js in ("script.js", "toque.js"):
-    assert f'<script src="{js}"></script>' in body, js
-    body = body.replace(f'<script src="{js}"></script>', "")
-
-landing = f"""<title>Bookea</title>
+assert '<script src="sitio.js"></script>' in body
+body = body.replace('<script src="sitio.js"></script>', "")
+# Las letras (assets/fuentes/) y las fotos (assets/) se publican como archivos al lado de la página
+landing = f"""<title>Bookea · Reservá turnos en segundos</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<script>{head_js}</script>
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-{fonts}
 <style>
-{leer("styles.css")}
+{leer("sitio.css")}
 </style>
 {body.strip()}
 <script>
-{leer("script.js")}
-</script>
-<script>
-{leer("toque.js")}
+{leer("sitio.js")}
 </script>
 """
 (dist / "bookea.html").write_text(landing, encoding="utf-8")
 print("OK ->", dist / "bookea.html", f"({len(landing)//1024} KB)")
 
-# ---------- Reservas ----------
-res = pagina("reservar.html")
-for archivo in ("styles.css", "app.css", "reservar.js", "toque.js"):
-    res = adentro(res, archivo)
-res = sin_iconos(res)
-res = res.replace('href="index.html#', 'href="./#').replace('href="index.html"', 'href="./"')
-(dist / "reservar.html").write_text(res, encoding="utf-8")
-print("OK ->", dist / "reservar.html", f"({len(res)//1024} KB)")
+# ---------- reservar.html: solo redirige al inicio (links viejos) ----------
+(dist / "reservar.html").write_text(leer("reservar.html"), encoding="utf-8")
+print("OK ->", dist / "reservar.html")
 
 # ---------- Panel del negocio ----------
 adm = pagina("admin.html")

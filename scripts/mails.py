@@ -6,7 +6,7 @@ y el lema al pie):
   - supabase/mails/confirmar-cuenta.html y contrasena-nueva.html (plantillas de Supabase Auth);
   - la función mail_bookea() de supabase/avisos-por-mail.sql (avisos desde la base), entre las
     marcas "generado por scripts/mails.py".
-Y revisa que el lema sea el mismo en el inicio y en reservas.
+Y revisa que el lema sea el mismo en el pie del inicio (index.html).
 
 Para cambiar colores, logo o lema: tocá este archivo y corré `python3 scripts/mails.py`.
 """
@@ -113,12 +113,11 @@ if __name__ == "__main__":
         "supabase/avisos-por-mail.sql": sql[:a] + MAIL_BOOKEA + sql[b:],
     }
     distintos = [n for n, t in archivos.items() if leer(n) != t]
-    for pag in ("index.html", "reservar.html"):
-        assert LEMA in leer(pag), f"{pag} no tiene el lema «{LEMA}»"
+    assert f'<p class="foot__tag">{LEMA}</p>' in leer("index.html"), f"el pie de index.html no tiene el lema «{LEMA}»"
     if revisar:
         assert not distintos, f"desactualizados (corré python3 scripts/mails.py): {distintos}"
-        print("OK  los mails coinciden con scripts/mails.py y el lema es el mismo en todo el sitio")
+        print("OK  los mails coinciden con scripts/mails.py y el lema es el mismo que en el pie del inicio")
     else:
         for n in distintos:
             (ROOT / n).write_text(archivos[n], encoding="utf-8")
-        print("OK -> mails de Supabase y mail_bookea() al día; lema revisado en el inicio y en reservas")
+        print("OK -> mails de Supabase y mail_bookea() al día; lema revisado en el pie del inicio")
