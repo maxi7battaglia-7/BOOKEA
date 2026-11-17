@@ -50,6 +50,7 @@ begin
   assert e.body ->> 'html' like '%#11151c%' and e.body ->> 'html' like '%#1fa08c%' and e.body ->> 'html' like '%#e4572e%' and e.body ->> 'html' like '%#f5ecd7%', 'sin los colores de la marca';
   assert e.body ->> 'html' like '%Reservá turnos en segundos.%', 'sin el lema';
   assert e.body ->> 'html' like '%Entrar al panel%', 'sin el botón';
+  assert e.body ->> 'html' not like '%recibir reservas%', 'promete reservas online que todavía no están';
   raise notice 'OK  los avisos salen con los colores de Bookea, el botón y el lema';
 end $$;
 -- rechazar una solicitud: le llega "no fue aprobada"
@@ -80,6 +81,13 @@ declare n int := (select count(*) from net.enviados where body -> 'to' ->> 0 = '
 begin
   assert n = 2, 'mandó de más: ' || n;
   raise notice 'OK  sin cambio de estado no se repite el mail';
+end $$;
+-- las piezas de los mails no quedan como /rpc/ públicas
+do $$ begin
+  assert not has_function_privilege('anon', 'public.mail_bookea(text,text,text,text,text)', 'execute'), 'anon puede llamar mail_bookea';
+  assert not has_function_privilege('authenticated', 'public.saludo(text)', 'execute'), 'authenticated puede llamar saludo';
+  assert not has_function_privilege('anon', 'public.html_seguro(text)', 'execute'), 'anon puede llamar html_seguro';
+  raise notice 'OK  mail_bookea, saludo y html_seguro no se pueden llamar desde la página';
 end $$;
 -- si pg_net falla, registrarse sigue funcionando
 create or replace function net.http_post(url text, body jsonb default '{}', params jsonb default '{}',

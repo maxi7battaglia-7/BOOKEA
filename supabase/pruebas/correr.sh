@@ -19,3 +19,4 @@ q -d ${BASE}_avisos -f avisos-simulado.sql >/dev/null
 q -d ${BASE}_avisos -f ../esquema.sql >/dev/null
 grep -v '^create extension' ../avisos-por-mail.sql | q -d ${BASE}_avisos -f - >/dev/null
 PGOPTIONS= psql -X -q -v ON_ERROR_STOP=1 -d ${BASE}_avisos -f pruebas-avisos.sql 2>&1 | sed 's/^psql:[^ ]* NOTICE:  //'
+(cd ../.. && python3 scripts/mails.py --revisar)

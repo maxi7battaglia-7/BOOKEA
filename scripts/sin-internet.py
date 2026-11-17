@@ -9,12 +9,11 @@ guardados solo en ese navegador. Cuenta de prueba: demo@example.com / bookea2026
 Necesita fonttools y brotli (pip install fonttools brotli) para achicar la letra.
 """
 import base64, io, mimetypes, re, zipfile
-from pathlib import Path
 from fontTools import subset
 from fontTools.ttLib import TTFont
 
-root = Path(__file__).resolve().parent.parent
-leer = lambda n: (root / n).read_text(encoding="utf-8")
+from armado import ROOT as root, adentro, pagina
+
 salida = root / "dist" / "sin-internet"
 salida.mkdir(parents=True, exist_ok=True)
 mimetypes.add_type("image/webp", ".webp")
@@ -50,23 +49,49 @@ LETRA = f"""<style>
 </style>"""
 
 
-def armar(nombre, archivos, config=None):
-    html = re.sub(r"(\.(?:css|js))\?v=\d+", r"\1", leer(nombre))
+RUTA = r"(?:assets|marca)/[\w.-]+\.(?:webp|png|svg|jpg)"
+VACIA = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+# Una foto que aparece en varios <img> va adentro una sola vez: las demás copian su src al cargar
+COPIAS = """<script>
+document.querySelectorAll("img[data-copia]").forEach(function (i) {
+  var o = document.querySelector('img[data-orig="' + i.getAttribute("data-copia") + '"]');
+  if (o) i.src = o.src;
+});
+</script>"""
+
+
+def armar(nombre, archivos):
+    html = pagina(nombre)
     # la letra de Google Fonts se cambia por la de adentro
     html = re.sub(r'\s*<link rel="preconnect"[^>]*>', "", html)
     html = re.sub(r'<link href="https://fonts.googleapis.com[^>]+>', LETRA, html)
     for a in archivos:
-        cont = ("window.BOOKEA_CONFIG = {};" if a == "config.js" else leer(a))
-        if a.endswith(".css"):
-            pedido, puesto = f'<link rel="stylesheet" href="{a}" />', f"<style>\n{cont}\n</style>"
-        else:
-            pedido, puesto = f'<script src="{a}"></script>', f"<script>\n{cont}\n</script>"
-        assert pedido in html, f"{nombre}: no encontré {pedido}"
-        html = html.replace(pedido, puesto)
-    # fotos, logo e íconos: adentro, también los que arma el JS ("assets/r-padel.webp")
-    for ruta in sorted(set(re.findall(r"(?:assets|marca)/[\w.-]+\.(?:webp|png|svg|jpg)", html))):
-        if (root / ruta).exists():
-            html = html.replace(ruta, data_uri(ruta))
+        html = adentro(html, a, "window.BOOKEA_CONFIG = {};" if a == "config.js" else None)
+    # fotos repetidas en <img>: la primera lleva la foto, las otras la copian
+    vistas, repetidas = set(), False
+    def img(m):
+        nonlocal repetidas
+        ruta = m.group(2)
+        clave = ruta.rsplit("/", 1)[1]
+        if ruta in vistas:
+            repetidas = True
+            return f'{m.group(1)}src="{VACIA}" data-copia="{clave}"'
+        vistas.add(ruta)
+        return f'{m.group(1)}data-orig="{clave}" src="{ruta}"'
+    html = re.sub(rf'(<img\b[^>]*?\s)src="({RUTA})"', lambda m: img(m), html)
+    if repetidas:
+        html = html.replace("</body>", COPIAS + "\n</body>")
+    # el resto (las primeras, íconos y las que arma el JS, como "assets/r-padel.webp"): adentro
+    #    solo entre comillas o en url(...): una ruta nombrada en un comentario queda como texto
+    uris = {}
+    def poner(m):
+        ruta = m.group(2)
+        if not (root / ruta).exists():
+            return m.group(0)
+        if ruta not in uris:
+            uris[ruta] = data_uri(ruta)
+        return m.group(1) + uris[ruta]
+    html = re.sub(rf"""(["'(])({RUTA})""", poner, html)
     assert "fonts.googleapis" not in html and "?v=" not in html, nombre
     (salida / nombre).write_text(html, encoding="utf-8")
     print("OK ->", salida / nombre, f"({len(html)//1024} KB)")

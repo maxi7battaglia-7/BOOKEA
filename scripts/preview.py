@@ -9,24 +9,11 @@ Las páginas piden sus archivos con ?v=N (para que el navegador no use una versi
 Acá ese número se saca antes de meter cada archivo adentro, así que no hay que tocar nada al subirlo.
 """
 import re
-from pathlib import Path
 
-root = Path(__file__).resolve().parent.parent
-leer = lambda n: (root / n).read_text(encoding="utf-8")
-pagina = lambda n: re.sub(r"(\.(?:css|js))\?v=\d+", r"\1", leer(n))  # la página, sin los ?v=N
+from armado import ROOT as root, adentro, leer, pagina
+
 dist = root / "dist"
 dist.mkdir(exist_ok=True)
-
-
-def adentro(html, archivo, contenido=None):
-    """Cambia el <link> o el <script> que pide `archivo` por su contenido."""
-    contenido = leer(archivo) if contenido is None else contenido
-    if archivo.endswith(".css"):
-        pedido, puesto = f'<link rel="stylesheet" href="{archivo}" />', f"<style>\n{contenido}\n</style>"
-    else:
-        pedido, puesto = f'<script src="{archivo}"></script>', f"<script>\n{contenido}\n</script>"
-    assert pedido in html, f"no encontré {pedido}"
-    return html.replace(pedido, puesto)
 
 
 def sin_iconos(html):

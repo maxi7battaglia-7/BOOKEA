@@ -1,4 +1,4 @@
-<!-- Plantilla de Supabase (Authentication → Emails → Templates). {{ .ConfirmationURL }} lo completa Supabase. Colores de la marca: noche #11151c, verde agua #1fa08c, naranja #e4572e, crema #f5ecd7. -->
+<!-- Generado por scripts/mails.py: no editar a mano. Plantilla de Supabase (Authentication → Emails → Templates). -->
 <div style="background:#f5ecd7;padding:32px 16px;font-family:Arial,Helvetica,sans-serif;color:#11151c">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#ffffff" style="max-width:480px;margin:0 auto;background:#ffffff;border-radius:10px;overflow:hidden;border-collapse:separate">
     <tr><td bgcolor="#11151c" style="background:#11151c;padding:22px 28px">
@@ -13,7 +13,7 @@
     </td></tr>
     <tr><td style="padding:30px 28px 8px">
       <h1 style="margin:0 0 12px;font-size:24px;line-height:1.2;color:#11151c">Confirmá tu email</h1>
-      <p style="margin:0 0 24px;font-size:15px;line-height:1.55;color:#3d4350">Creaste una cuenta en Bookea con este email. Tocá el botón para confirmarlo. Después revisamos tu negocio y, cuando esté aprobado, entrás al panel con tu email y tu contraseña.</p>
+      <p style="margin:0 0 24px;font-size:15px;line-height:1.55;color:#3d4350">{{ if .Data.invitacion }}Te sumaron al equipo de un negocio en Bookea. Tocá el botón para confirmar tu email y después entrás al panel con tu email y tu contraseña.{{ else }}Creaste una cuenta en Bookea con este email. Tocá el botón para confirmarlo. Después revisamos tu negocio y, cuando esté aprobado, entrás al panel con tu email y tu contraseña.{{ end }}</p>
       <a href="{{ .ConfirmationURL }}" style="display:inline-block;background:#1fa08c;color:#11151c;text-decoration:none;font-weight:bold;font-size:15px;padding:14px 24px;border-radius:6px">Confirmar mi email</a>
       <p style="margin:24px 0 0;font-size:13px;line-height:1.5;color:#5b6170">Si no creaste una cuenta en Bookea, ignorá este mail: sin confirmar, la cuenta no se activa.</p>
     </td></tr>

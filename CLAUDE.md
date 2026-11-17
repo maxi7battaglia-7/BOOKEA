@@ -10,6 +10,7 @@
   - "Sumá tu negocio" (inicio) es el primer paso del registro: lleva a `admin.html?alta=1&nombre=…&negocio=…&rubro=…`, que abre el registro con esos datos.
 - **Antes de cualquier cambio visual, leer `DESIGN.md`.** Es la dirección elegida por el dueño: Stripe + Figma + Trello, con los colores de la camiseta del Venezia.
 - Vista previa publicada: https://claude.ai/artifact/EPAeEsx11Px3yKWRQBkgpL. Se regenera con `python3 scripts/preview.py` y se republica con `dist/bookea.html`, más `dist/reservar.html` como archivo aparte (`reservar.html`).
+- `scripts/armado.py` tiene lo que comparten `preview.py` y `sin-internet.py` (leer, sacar `?v=N`, meter CSS/JS adentro).
 - Copia para usar sin internet: `python3 scripts/sin-internet.py` arma `dist/bookea-sin-internet.zip` (las tres páginas con todo adentro, panel en modo de prueba). Necesita `pip install fonttools brotli`.
 - Marca en `marca/`: isotipo B (SVG y PNG), lámina de construcción y filosofía "Franja Exacta".
 - Textos en castellano rioplatense (voseo).
@@ -26,6 +27,7 @@
   - `config.js` ya apunta al proyecto real (`vpxzuutavdjwglglbvdt.supabase.co`, clave publishable). Abrir `admin.html` local o en GitHub Pages usa la base real.
   - Sitio publicado en GitHub Pages con dominio propio: https://bookea.ar/ (archivo `CNAME`; DNS en Cloudflare, registros en "Solo DNS"). Repo `maxi7battaglia-7/BOOKEA`, rama `main`. La dirección vieja (`maxi7battaglia-7.github.io/BOOKEA/`) redirige sola.
   - Mails: Resend con el dominio `bookea.ar` (remitente `no-responder@bookea.ar`), cargado como SMTP en Supabase. Ver "Mails de verdad" en `supabase/LEEME.md`.
+  - La cara de los mails (plantillas de `supabase/mails/` y `mail_bookea()` de `avisos-por-mail.sql`) y el lema salen de `scripts/mails.py`: se cambian ahí y se corre `python3 scripts/mails.py` (`--revisar` lo chequea y corre en `correr.sh`). `hola@bookea.ar` recibe solo si está el reenvío de Cloudflare (Email Routing).
   - La vista previa del artifact (`scripts/preview.py`) siempre va en modo de prueba: una cuenta real no entra ahí (el panel de la vista previa lo avisa y lleva al publicado).
   - Aprobación: los negocios nuevos quedan `pendiente` (pantalla "Tu negocio está en revisión") hasta que el equipo de Bookea (`admins_bookea`) los aprueba en la vista **Solicitudes** (`revisar_negocio`). Aviso por mail opcional: `supabase/avisos-por-mail.sql` (pg_net + Resend, claves en Vault).
   - `admin.html` pide `styles.css`, `admin.css`, `config.js`, `nube.js`, `admin.js` y `toque.js` con `?v=N` para que el navegador no use una versión vieja: al cambiarlos, subir N en las tres páginas (`index.html` y `reservar.html` piden los suyos igual; `scripts/preview.py` lo saca solo). Hoy N = 6.

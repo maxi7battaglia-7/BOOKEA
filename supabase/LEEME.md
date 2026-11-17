@@ -97,7 +97,10 @@ muy pocos por hora: un negocio de afuera no puede registrarse. Hace falta un **d
 
    y corré todo `avisos-por-mail.sql`. Desde ahí te llega un mail cuando alguien se registra, y al negocio cuando lo aprobás o lo rechazás
    (o le quitás el acceso). Todos con la misma cara que los mails de `mails/`.
-8. **Probar:** registrá una cuenta con un email que no sea del equipo (en una ventana de incógnito). Tiene que llegar
+8. **Que `hola@bookea.ar` reciba.** Los mails de rechazo y el pie de la página dicen "escribinos a hola@bookea.ar".
+   En Cloudflare: bookea.ar → **Email** → **Email Routing** → activalo (agrega solo los registros MX) →
+   **Routing rules** → **Create address**: `hola` → reenviar a tu mail personal (te llega un mail para confirmarlo).
+9. **Probar:** registrá una cuenta con un email que no sea del equipo (en una ventana de incógnito). Tiene que llegar
    "Confirmá tu email en Bookea" de `no-responder@tudominio`, y a vos el aviso de negocio nuevo.
 
 Resend gratis alcanza para empezar (3.000 mails por mes, 100 por día).

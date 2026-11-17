@@ -59,33 +59,31 @@ exception when others then
 end $$;
 revoke all on function public.mandar_mail(text, text, text) from public, anon, authenticated;
 
+-- (generado por scripts/mails.py: inicio; no editar a mano)
 -- La cara de todos los avisos: la misma de supabase/mails/. "cuerpo" ya viene escapado.
 create or replace function public.mail_bookea(titulo text, cuerpo text, boton text default null,
   url text default null, nota text default null) returns text language sql immutable as $$
-  select '<div style="background:#f5ecd7;padding:32px 16px;font-family:Arial,Helvetica,sans-serif;color:#11151c">'
-    || '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#ffffff" style="max-width:480px;margin:0 auto;background:#ffffff;border-radius:10px;overflow:hidden;border-collapse:separate">'
-    || '<tr><td bgcolor="#11151c" style="background:#11151c;padding:22px 28px">'
-    || '<img src="https://bookea.ar/marca/isotipo-192.png" width="36" height="36" alt="" style="vertical-align:middle;border:0">'
-    || '<span style="font-size:22px;font-weight:bold;letter-spacing:-0.3px;vertical-align:middle;margin-left:10px;color:#f5ecd7">Bookea</span>'
-    || '</td></tr>'
-    || '<tr><td style="padding:0;line-height:0;font-size:0"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>'
-    || '<td width="62%" height="6" bgcolor="#1fa08c" style="background:#1fa08c;height:6px;line-height:6px;font-size:0">&nbsp;</td>'
-    || '<td width="38%" height="6" bgcolor="#e4572e" style="background:#e4572e;height:6px;line-height:6px;font-size:0">&nbsp;</td>'
-    || '</tr></table></td></tr>'
+  select '<div style="background:#f5ecd7;padding:32px 16px;font-family:Arial,Helvetica,sans-serif;color:#11151c"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#ffffff" style="max-width:480px;margin:0 auto;background:#ffffff;border-radius:10px;overflow:hidden;border-collapse:separate"><tr><td bgcolor="#11151c" style="background:#11151c;padding:22px 28px"><img src="https://bookea.ar/marca/isotipo-192.png" width="36" height="36" alt="" style="vertical-align:middle;border:0"><span style="font-size:22px;font-weight:bold;letter-spacing:-0.3px;vertical-align:middle;margin-left:10px;color:#f5ecd7">Bookea</span></td></tr><tr><td style="padding:0;line-height:0;font-size:0"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td width="62%" height="6" bgcolor="#1fa08c" style="background:#1fa08c;height:6px;line-height:6px;font-size:0">&nbsp;</td><td width="38%" height="6" bgcolor="#e4572e" style="background:#e4572e;height:6px;line-height:6px;font-size:0">&nbsp;</td></tr></table></td></tr>'
     || '<tr><td style="padding:30px 28px 30px">'
     || '<h1 style="margin:0 0 12px;font-size:24px;line-height:1.2;color:#11151c">' || titulo || '</h1>'
     || '<div style="font-size:15px;line-height:1.55;color:#3d4350">' || cuerpo || '</div>'
     || coalesce('<a href="' || url || '" style="display:inline-block;margin-top:12px;background:#1fa08c;color:#11151c;text-decoration:none;font-weight:bold;font-size:15px;padding:14px 24px;border-radius:6px">' || boton || '</a>', '')
     || coalesce('<p style="margin:24px 0 0;font-size:13px;line-height:1.5;color:#5b6170">' || nota || '</p>', '')
-    || '</td></tr></table>'
-    || '<p style="max-width:480px;margin:16px auto 0;font-size:12px;line-height:1.5;color:#6f6656;text-align:center"><b style="color:#11151c">Bookea</b> · Reservá turnos en segundos.<br><a href="https://bookea.ar" style="color:#6f6656">bookea.ar</a></p>'
-    || '</div>'
+    || '</td></tr>'
+    || '</table><p style="max-width:480px;margin:16px auto 0;font-size:12px;line-height:1.5;color:#6f6656;text-align:center"><b style="color:#11151c">Bookea</b> · Reservá turnos en segundos.<br><a href="https://bookea.ar" style="color:#6f6656">bookea.ar</a></p></div>'
 $$;
+-- (generado por scripts/mails.py: fin)
 
 -- "Hola, Lu:" con el primer nombre, o "Hola:" si no hay
 create or replace function public.saludo(nombre text) returns text language sql immutable as $$
   select '<p style="margin:0 0 12px">Hola' || coalesce(', ' || nullif(public.html_seguro(split_part(btrim(coalesce(nombre, '')), ' ', 1)), ''), '') || ':</p>'
 $$;
+
+-- Las piezas de los mails son solo para los avisos: no quedan como /rpc/ públicas
+revoke all on function public.mail_bookea(text, text, text, text, text) from public, anon, authenticated;
+revoke all on function public.saludo(text) from public, anon, authenticated;
+revoke all on function public.html_seguro(text) from public, anon, authenticated;
+revoke all on function public.bookea_url_panel() from public, anon, authenticated;
 
 -- 1. Negocio nuevo → aviso al equipo de Bookea
 create or replace function public.avisar_negocio_nuevo() returns trigger
@@ -124,7 +122,7 @@ begin
     public.mail_bookea(
       'Tu negocio ya está aprobado',
       public.saludo(new.nombre_dueno)
-      || '<p style="margin:0 0 12px"><b style="color:#11151c">' || public.html_seguro(new.nombre) || '</b> ya está aprobado en Bookea. Desde ahora podés entrar al panel con tu email y tu contraseña, cargar tus horarios y empezar a recibir reservas.</p>',
+      || '<p style="margin:0 0 12px"><b style="color:#11151c">' || public.html_seguro(new.nombre) || '</b> ya está aprobado en Bookea. Desde ahora podés entrar al panel con tu email y tu contraseña y armar tu agenda: tus horarios, tus turnos y tus clientes.</p>',
       'Entrar al panel', public.bookea_url_panel(),
       'Si no te acordás la contraseña, en la pantalla de ingreso tocá "¿Te olvidaste la contraseña?".')
   );
