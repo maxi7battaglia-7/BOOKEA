@@ -100,7 +100,7 @@ def armar(nombre, archivos):
     print("OK ->", salida / nombre, f"({len(html)//1024} KB)")
 
 
-armar("index.html", ["sitio.css", "sitio.js"])
+armar("index.html", ["sitio.css", "sitio.js", "toque.js"])
 # reservar.html redirige a "./", que sin servidor abre la carpeta: acá va a index.html
 (salida / "reservar.html").write_text(pagina("reservar.html").replace('"./"', '"index.html"').replace("url=./", "url=index.html"), encoding="utf-8")
 armar("admin.html", ["styles.css", "admin.css", "config.js", "nube.js", "admin.js", "toque.js"])

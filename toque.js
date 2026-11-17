@@ -1,13 +1,13 @@
-// Bookea — el toque en pantallas táctiles, igual en el sitio, las reservas y el panel.
+// Bookea — el toque en pantallas táctiles, igual en el frente (index.html) y en el panel (admin.html).
 // Mientras el dedo apoya, el botón se aprieta (.is-apreta); al soltar se agranda un poco y el color
-// queda un momento (.is-suelta) antes de apagarse despacio. Los estilos están en styles.css y admin.css.
+// queda un momento (.is-suelta) antes de apagarse despacio. Los estilos están en sitio.css y en styles.css + admin.css.
 // Solo con dedo, no con mouse. Si el dedo arrastra para hacer scroll, no queda marcado.
 (() => {
   const tactil = window.matchMedia("(hover: none), (pointer: coarse)");
   const SEL = [
-    ".brand", ".nav__links a", ".btn", ".mini", ".call__copy", ".foot__copy", // sitio
-    ".rubro", ".hora",                                                          // buscador y reservas
-    ".menu__i", ".slot", ".nav-fecha button", ".lado__salir",                   // panel
+    ".brand", ".btn", ".tlink", ".copy", ".pill", ".day", ".qslot", ".unit", ".cupo", // frente
+    ".rubro", ".now", ".vcard", ".tabbar button", ".back", ".link", ".item__x", ".stepper button",
+    ".mini", ".menu__i", ".slot", ".nav-fecha button", ".lado__salir",                  // panel (y .slot del frente)
   ].join(", ");
   const QUEDA = 450; // ms que el color queda prendido después de soltar
   let apretado = null;

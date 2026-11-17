@@ -6,6 +6,7 @@
 //   - parte para negocios: botones de la franja, copiar link, reglas de cancelación, preguntas, "Sumá tu negocio"
 //   - "Sumá tu negocio" → registro del panel con los datos cargados → cuenta creada → panel (las cinco vistas)
 //   - links viejos: reservar.html?rubro=…, reservar.html, index.html#sumate
+//   - movimiento: pantalla de carga con la B, entrada del título, tarjetas que suben, barrido verde agua, toque con el dedo
 //   - teclado, movimiento reducido, sin JavaScript
 //   - en todos los anchos: nada cortado ni salido de la ventana, toques de 40px o más, consola sin errores
 // Uso: node pruebas/sitio.js     (necesita Node y Playwright con Chromium)
@@ -62,8 +63,14 @@ const medir = () => {
     p.on('console', (m) => { if (m.type() === 'error') p.errs.push(m.text()); });
     p.on('response', (r) => { if (r.status() >= 400) p.errs.push(r.status() + ' ' + r.url()); });
     p.toca = (s) => (w < 900 ? p.tap(s) : p.click(s));
-    p.limpio = async (donde) => { const l = await p.evaluate(medir); ok(l.length === 0, `${w} ${donde}: nada cortado, salido ni chico para el dedo ${l.join(' | ')}`); };
+    p.limpio = async (donde) => { await p.waitForTimeout(250); const l = await p.evaluate(medir); ok(l.length === 0, `${w} ${donde}: nada cortado, salido ni chico para el dedo ${l.join(' | ')}`); };
     p.pagina = () => p.evaluate(() => (document.querySelector('.page:not([hidden])') || {}).dataset?.page);
+    // abre una página del frente y espera a que suba la pantalla de carga (y que termine la entrada)
+    p.ir = async (url) => {
+      await p.goto(url, { waitUntil: 'load' });
+      await p.waitForFunction(() => document.documentElement.classList.contains('is-ready') && !document.querySelector('.splash'), null, { timeout: 8000 });
+      await p.waitForTimeout(500);
+    };
     return p;
   };
   const espera = (p, ms = 450) => p.waitForTimeout(ms);
@@ -74,7 +81,7 @@ const medir = () => {
       const cel = w <= 820;
 
       // ---------- Inicio ----------
-      await p.goto(B, { waitUntil: 'load' }); await espera(p, 700);
+      await p.ir(B);
       ok((await p.pagina()) === 'home' && (await p.locator('#f-rubros .rubro').count()) === 4, `${w} inicio: los cuatro rubros con foto`);
       ok(await p.evaluate(() => [...document.fonts].some((f) => f.family.includes('Inter Tight') && f.status === 'loaded')), `${w} inicio: la letra Inter Tight cargó desde bookea.ar`);
       ok(await p.evaluate(() => [...document.images].every((i) => !i.complete || i.naturalWidth > 0)), `${w} inicio: ninguna foto rota`);
@@ -101,7 +108,7 @@ const medir = () => {
       await p.limpio('ficha');
 
       // ---------- Resultados: filtros ----------
-      await p.goto(B + 'reservar.html?rubro=tenis&zona=tunuyan&dia=1&franja=', { waitUntil: 'load' }); await espera(p, 700);
+      await p.ir(B + 'reservar.html?rubro=tenis&zona=tunuyan&dia=1&franja=');
       ok((await p.pagina()) === 'resultados' && (await p.textContent('#r-t')) === 'Turnos de tenis en Tunuyán', `${w} link viejo reservar.html?rubro=tenis: abre los resultados de tenis en Tunuyán`);
       await p.toca('#r-rubros .pill[data-k="padel"]'); await espera(p, 200);
       await p.selectOption('#r-zona', ''); await espera(p, 200);
@@ -155,7 +162,7 @@ const medir = () => {
       }
 
       // ---------- Para negocios ----------
-      await p.goto(B, { waitUntil: 'load' }); await espera(p, 600);
+      await p.ir(B);
       await p.toca(cel ? '.tabbar [data-tab="negocios"]' : '.top__neg'); await espera(p);
       ok((await p.pagina()) === 'negocios' && await p.isVisible('.band h1'), `${w} "Sumá tu negocio"/"Negocios": abre la parte para negocios`);
       await p.limpio('negocios');
@@ -196,12 +203,12 @@ const medir = () => {
       }
 
       // ---------- Links viejos ----------
-      await p.goto(B + 'index.html#sumate', { waitUntil: 'load' }); await espera(p, 1000);
+      await p.ir(B + 'index.html#sumate');
       ok((await p.pagina()) === 'negocios' && await p.evaluate(() => Math.abs(document.querySelector('#sumate').getBoundingClientRect().top) < 160), `${w} link viejo index.html#sumate: abre el formulario`);
       await p.evaluate(() => { window.__sinRecargar = 1; }); await p.toca('.tabbar [data-tab="home"], .top .brand'); await espera(p);
       await p.goto(B + 'index.html#preguntas'); await espera(p, 900);
       ok((await p.pagina()) === 'negocios' && await p.evaluate(() => window.__sinRecargar === 1 && (() => { const r = document.querySelector('#preguntas').getBoundingClientRect(); return r.top >= -2 && r.top < innerHeight - 100; })()), `${w} link #preguntas con la página ya abierta: va a las preguntas sin recargar`);
-      await p.goto(B + 'reservar.html', { waitUntil: 'load' }); await espera(p, 800);
+      await p.ir(B + 'reservar.html');
       ok((await p.pagina()) === 'home' && /\/$|index\.html$/.test(new URL(p.url()).pathname), `${w} link viejo reservar.html: abre el buscador del inicio`);
       ok((await p.getAttribute('.top a.btn--ink', 'href')) === 'admin.html', `${w} "Ingresar" lleva al panel`);
       ok((await p.evaluate(() => document.documentElement.scrollWidth)) <= w, `${w}: sin desplazamiento horizontal`);
@@ -209,9 +216,44 @@ const medir = () => {
       await p.context().close();
     }
 
+    // ---------- Movimiento ----------
+    {
+      const q = await abrir(1440, 900);
+      await q.goto(B, { waitUntil: 'domcontentloaded' });
+      const alAbrir = await q.evaluate(() => ({ splash: !!document.querySelector('.splash') && getComputedStyle(document.querySelector('.splash')).display !== 'none', listo: document.documentElement.classList.contains('is-ready') }));
+      ok(alAbrir.splash && !alAbrir.listo, 'movimiento: al abrir aparece la pantalla de carga con la B');
+      ok(await q.evaluate(() => getComputedStyle(document.querySelector('.sp-asta')).animationName === 'sp-asta' && getComputedStyle(document.querySelector('.sp-naranja')).animationName === 'sp-naranja'), 'movimiento: la B se arma (asta, verde y naranja)');
+      const t0 = Date.now();
+      await q.waitForFunction(() => document.documentElement.classList.contains('is-ready'), null, { timeout: 6000 });
+      const espero = Date.now() - t0;
+      ok(espero >= 700 && espero < 4500, `movimiento: la pantalla de carga sube después de ~1,5 s (${espero} ms desde que se vio)`);
+      await q.waitForTimeout(1400);
+      ok(!(await q.$('.splash')) && await q.evaluate(() => getComputedStyle(document.querySelector('.hero h1 .ln > span')).transform === 'none' && getComputedStyle(document.querySelector('.finder')).opacity === '1'), 'movimiento: después entra el título renglón por renglón y el buscador');
+      const antes = await q.evaluate(() => { const el = document.querySelector('#grid-dest .vcard'); return el.classList.contains('rise') && !el.classList.contains('is-in'); });
+      await q.evaluate(() => document.querySelector('#grid-dest').scrollIntoView({ block: 'center', behavior: 'instant' })); await q.waitForTimeout(1300);
+      ok(antes && await q.evaluate(() => !document.querySelector('#grid-dest .vcard.rise')), 'movimiento: al bajar, los lugares suben a su lugar (y después quedan quietos)');
+      await q.evaluate(() => window.scrollTo(0, 0)); await q.waitForTimeout(300);
+      await q.hover('.top a.btn--ink'); await q.waitForTimeout(500);
+      ok(await q.evaluate(() => { const b = document.querySelector('.top a.btn--ink'); return getComputedStyle(b, '::before').clipPath === 'inset(0px)' && getComputedStyle(b).color === 'rgb(17, 21, 28)'; }), 'movimiento: con el mouse, "Ingresar" se llena de verde agua de izquierda a derecha');
+      await q.hover('#finder button[type=submit]'); await q.waitForTimeout(500);
+      ok(await q.evaluate(() => getComputedStyle(document.querySelector('#finder button[type=submit]'), '::before').clipPath === 'inset(0px)'), 'movimiento: "Buscar turnos" también barre en verde agua');
+      await q.click('#f-rubros .rubro[data-k="tenis"]');
+      ok(await q.evaluate(() => getComputedStyle(document.querySelector('#f-rubros .rubro[aria-pressed="true"]'), '::before').animationName === 'pop'), 'movimiento: el rubro elegido hace un saltito');
+      ok(q.errs.length === 0, 'movimiento: sin errores ' + q.errs.join(' | '));
+      await q.context().close();
+      const c = await abrir(390, 844);
+      await c.ir(B);
+      await c.dispatchEvent('#finder button[type=submit]', 'pointerdown', { pointerType: 'touch', isPrimary: true });
+      const apreta = await c.evaluate(() => document.querySelector('#finder button[type=submit]').classList.contains('is-apreta'));
+      await c.dispatchEvent('#finder button[type=submit]', 'pointerup', { pointerType: 'touch', isPrimary: true });
+      const suelta = await c.evaluate(() => document.querySelector('#finder button[type=submit]').classList.contains('is-suelta'));
+      ok(apreta && suelta, 'movimiento: con el dedo, el botón se aprieta y rebota al soltar');
+      await c.context().close();
+    }
+
     // ---------- Teclado ----------
     let p = await abrir(1440, 900);
-    await p.goto(B, { waitUntil: 'load' }); await espera(p, 600);
+    await p.ir(B);
     await p.focus('#f-rubros .rubro[data-k="padel"]'); await p.keyboard.press('Tab'); await p.keyboard.press('Enter'); await espera(p, 200);
     ok((await p.getAttribute('#f-rubros .rubro[data-k="futbol"]', 'aria-pressed')) === 'true', 'teclado: Tab + Enter elige Fútbol 5');
     await p.focus('#finder button[type=submit]'); await p.keyboard.press('Enter'); await espera(p);
@@ -222,18 +264,21 @@ const medir = () => {
 
     // ---------- Movimiento reducido ----------
     p = await abrir(390, 844, { reducedMotion: 'reduce' });
-    await p.goto(B + 'reservar.html?rubro=barberia&dia=1', { waitUntil: 'load' }); await espera(p, 500);
+    await p.ir(B + 'reservar.html?rubro=barberia&dia=1');
     await p.tap('.qslot >> nth=0'); await espera(p, 200);
     await p.tap('#book [data-act="reservar"]'); await espera(p, 200);
     await p.fill('#c-nombre', 'Leo'); await p.fill('#c-wa', '261 555 1234');
     await p.tap('[data-act="pay"]'); await p.waitForSelector('#page-turnos:not([hidden]) .tcard', { timeout: 3000 });
     ok(p.errs.length === 0, 'movimiento reducido: reserva completa y rápida, sin errores');
+    await p.ir(B);
+    ok(await p.evaluate(() => !document.querySelector('.rise')), 'movimiento reducido: nada sube ni barre, todo quieto');
     await p.context().close();
 
     // ---------- Sin JavaScript ----------
     p = await abrir(1440, 900, { javaScriptEnabled: false });
     await p.goto(B, { waitUntil: 'load' });
     ok(/activá JavaScript/.test(await p.textContent('#finder')) && (await p.getAttribute('.top a.btn--ink', 'href')) === 'admin.html', 'sin JavaScript: avisa que hace falta y "Ingresar" sigue andando');
+    ok(!(await p.isVisible('.splash')) && await p.isVisible('.hero h1'), 'sin JavaScript: sin pantalla de carga, el título a la vista');
     await p.context().close();
   } catch (e) {
     fallas++; console.log('FALLA (excepción)', e.message);

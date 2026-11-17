@@ -12,6 +12,29 @@
   const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
   const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+  // ---------- Movimiento: tarjetas y secciones suben a su lugar al aparecer (clase .rise, en sitio.css) ----------
+  // Espera a que suba la pantalla de carga; con "reducir movimiento" no hace nada.
+  const SUBEN = [".sec__head", ".now", ".vcard", ".rcard", ".ex", ".cell", ".join", ".faq h2", ".faq details", ".blk", ".item", ".tcard", ".panel", ".band", ".foot__top > *", ".empty"].join(", ");
+  let listoMov = false; const pendientes = [];
+  const io = !reduce && "IntersectionObserver" in window ? new IntersectionObserver((ents) => ents.forEach((en) => {
+    if (!en.isIntersecting) return;
+    const el = en.target; io.unobserve(el); el.classList.add("is-in");
+    // al terminar se saca la clase, así el cursor vuelve a mover la tarjeta (hover)
+    setTimeout(() => el.classList.remove("rise", "is-in"), 900 + (parseInt(el.style.getPropertyValue("--d"), 10) || 0));
+  }), { rootMargin: "0px 0px -6% 0px", threshold: 0.01 }) : null;
+  function revelar(root) {
+    if (!io || !root) return;
+    if (!listoMov) { pendientes.push(root); return; }
+    const orden = new Map(); // la escalera cuenta por contenedor
+    $$(SUBEN, root).forEach((el) => {
+      if (el.dataset.subio) return;
+      el.dataset.subio = "1";
+      const i = orden.get(el.parentElement) || 0; orden.set(el.parentElement, i + 1);
+      el.style.setProperty("--d", `${Math.min(i, 6) * 70}ms`);
+      el.classList.add("rise"); io.observe(el);
+    });
+  }
+
   // ---------- Fotos (assets/) ----------
   // Rutas enteras (no armadas): así la copia sin internet (scripts/sin-internet.py) las encuentra y las mete adentro
   const IMG = { padel: "assets/r-padel.webp", futbol: "assets/r-futbol.webp", tenis: "assets/r-tenis.webp", barberia: "assets/r-barberia.webp",
@@ -153,6 +176,7 @@
     $$(".page").forEach((el) => (el.hidden = el.dataset.page !== page));
     ({ home: renderHome, resultados: renderResultados, ficha: renderFicha, carrito: renderCarrito, turnos: renderTurnos, negocios: () => {} })[page](st);
     const el = $("#page-" + page); el.classList.remove("is-in"); void el.offsetWidth; el.classList.add("is-in");
+    revelar(el);
     $$(".tabbar [data-tab]").forEach((b) => b.classList.toggle("is-on", b.dataset.tab === (page === "resultados" ? "home" : page)));
     document.title = TITLES[page];
     if (!st.keepScroll) window.scrollTo(0, st.restore ? S.ys[page] || 0 : 0);
@@ -190,6 +214,7 @@
     $("#rail-now").innerHTML = cand.map(slotCard).join("") || `<p style="color:var(--ink-500)">Por ahora no quedan turnos de ${R.n.toLowerCase()}. Probá con otro día en el buscador.</p>`;
     $("#dest-t").textContent = `${R.n}: para reservar hoy`;
     $("#grid-dest").innerHTML = vs.map(cardV).join("");
+    revelar($("#page-home"));
   }
   function renderHome() { renderBuscador(); renderDestacados(); }
   const franjasHTML = (rubro) => btnx("franja-h", 'data-k=""', S.franja === "", "Todo el día") + franjasDe(rubro).map((f) => btnx("franja-h", `data-k="${f}"`, S.franja === f, FRANJAS[f])).join("");
@@ -205,7 +230,8 @@
   };
 
   // ---------- Resultados: lugares con preview de horarios ----------
-  function renderResultados() {
+  function renderResultados() { listaResultados(); revelar($("#r-list")); }
+  function listaResultados() {
     const R = RUBROS[S.rubro], vs0 = VENUES.filter((v) => v.rubro === S.rubro);
     $("#r-rubros").innerHTML = Object.entries(RUBROS).map(([k, r]) => `<button type="button" class="pill" data-act="tile" data-k="${k}" aria-pressed="${k === S.rubro}">${r.n}</button>`).join("")
       + (extraHTML() ? `<span class="sep" aria-hidden="true"></span>${extraHTML().replace(/chipx/g, "pill")}` : "");
@@ -401,7 +427,11 @@
   // ---------- Detalles ----------
   function badges() {
     const upcoming = S.turnos.filter((t) => cuando(t).getTime() + 3600e3 >= Date.now()).length, nc = S.carrito.length;
-    $$("[data-count]").forEach((b) => { const n = b.dataset.count === "carrito" ? nc : upcoming; b.textContent = n; if (b.closest(".tabbar")) b.hidden = !n; });
+    $$("[data-count]").forEach((b) => {
+      const n = b.dataset.count === "carrito" ? nc : upcoming;
+      if (b.textContent !== String(n) && n > 0) { b.classList.remove("is-sube"); void b.offsetWidth; b.classList.add("is-sube"); }
+      b.textContent = n; if (b.closest(".tabbar")) b.hidden = !n;
+    });
     $("#t-turnos").hidden = !upcoming; $("#t-carrito").hidden = !nc; // el header solo muestra lo que tiene algo
   }
   let tt;
@@ -480,6 +510,21 @@
   }
 
   // ---------- Arranque ----------
+  // Pantalla de carga: se ve al menos 1,5 s (0,6 s con "reducir movimiento"), espera la carga y tiene un tope de 4 s
+  const splash = $(".splash");
+  const arrancar = () => {
+    if (listoMov) return;
+    listoMov = true;
+    document.documentElement.classList.add("is-ready");
+    if (splash) { splash.classList.add("is-out"); setTimeout(() => splash.remove(), 1000); }
+    pendientes.splice(0).forEach(revelar);
+  };
+  if (splash) {
+    const minimo = new Promise((ok) => setTimeout(ok, Math.max(0, (reduce ? 600 : 1500) - performance.now())));
+    const cargada = new Promise((ok) => (document.readyState === "complete" ? ok() : addEventListener("load", ok, { once: true })));
+    Promise.all([minimo, cargada]).then(arrancar);
+    setTimeout(arrancar, Math.max(0, 4000 - performance.now()));
+  } else arrancar();
   $("#year").textContent = new Date().getFullYear();
   badges();
   // En pantallas táctiles, que :active (el apretado de botones y tarjetas) funcione también en iPhone

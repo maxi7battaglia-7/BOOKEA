@@ -25,8 +25,9 @@ def sin_iconos(html):
 # ---------- Inicio (el frente: buscar, resultados, ficha, carrito, Mis turnos y la parte para negocios) ----------
 html = pagina("index.html")
 body = re.search(r"<body>(.*)</body>", html, re.S).group(1)
-assert '<script src="sitio.js"></script>' in body
-body = body.replace('<script src="sitio.js"></script>', "")
+for js in ("sitio.js", "toque.js"):
+    assert f'<script src="{js}"></script>' in body, js
+    body = body.replace(f'<script src="{js}"></script>', "")
 # Las letras (assets/fuentes/) y las fotos (assets/) se publican como archivos al lado de la página
 landing = f"""<title>Bookea · Reservá turnos en segundos</title>
 <meta name="claude:viewport-fit-sides" content="cover">
@@ -36,6 +37,9 @@ landing = f"""<title>Bookea · Reservá turnos en segundos</title>
 {body.strip()}
 <script>
 {leer("sitio.js")}
+</script>
+<script>
+{leer("toque.js")}
 </script>
 """
 (dist / "bookea.html").write_text(landing, encoding="utf-8")

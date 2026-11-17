@@ -392,3 +392,10 @@ El dueño mandó una página de referencia ("mirá lo limpia que se ve, así qui
 - **Lo que no se copió de la referencia:** las reseñas y los puntajes con estrellas (serían opiniones inventadas: CLAUDE.md lo prohíbe), "Turnos · Valle de Uco" (Bookea no se limita a una zona) y la zona por defecto "Valle de Uco" (ahora "Todas las zonas", agrupadas por región).
 - **Celular:** barra de abajo (Reservar, Carrito, Mis turnos, Negocios), barra fija con "Reservar" en la ficha, y todo lo que se toca mide 44 px o más en pantallas táctiles.
 - **Honestidad del demo:** el pago dice "Es una demo: no se cobró nada" y el pie aclara que los negocios son ejemplos.
+- **Movimiento (pedido del dueño, 17/11: "no está haciendo las animaciones"):** el frente nuevo recupera el movimiento de Bookea, adaptado al estilo limpio:
+  - **Pantalla de carga:** la B se arma (asta crema, baja el verde agua, sube el naranja) sobre noche y sube como persiana; mínimo 1,5 s, tope 4 s. Con "reducir movimiento" aparece quieta y se desvanece a los 0,6 s; sin JavaScript no está.
+  - **Entrada:** baja la barra de arriba, el título sube renglón por renglón desde una ranura, después el texto y el buscador; las tres fotos se destapan de izquierda a derecha y se asientan (escala 1,12 → 1).
+  - **Al bajar:** encabezados, tarjetas de "Libres ahora", lugares, resultados, pasos, funciones, preguntas y bloques de la ficha suben a su lugar en escalera (70 ms entre una y otra). Al cambiar de rubro o de filtro, las tarjetas nuevas vuelven a subir.
+  - **Con mouse:** el verde agua barre de izquierda a derecha en "Ingresar", "Sumá tu negocio", los links de arriba y los botones principales (380 ms), y el texto pasa a noche.
+  - **Con el dedo:** `toque.js` (el mismo del panel) aprieta botones y tarjetas al tocar y rebotan al soltar; los botones se ponen verde agua un momento.
+  - **Detalles:** el rubro elegido y el horario elegido hacen un saltito, y el contador del carrito salta cuando suma un turno.

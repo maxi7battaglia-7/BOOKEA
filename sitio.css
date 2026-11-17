@@ -35,6 +35,11 @@
   --wrap: 1200px;
   --pad: clamp(16px, 3vw, 32px);
   --ease: cubic-bezier(.22, 1, .36, 1);
+  --ease-expo: cubic-bezier(.16, 1, .3, 1);
+  --ease-soft: cubic-bezier(.25, .8, .25, 1);
+  --ease-in-out: cubic-bezier(.76, 0, .24, 1);
+  --ease-rebote: cubic-bezier(.34, 1.56, .64, 1);
+  --t-press: 140ms;
   --header-h: 68px;
   color-scheme: light;
 }
@@ -441,7 +446,6 @@ dialog .row { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wr
   .item { grid-template-columns: 68px 1fr; gap: 12px; } .item__ph { width: 68px; height: 68px; }
   .gal { grid-template-columns: 1fr; grid-template-rows: 1fr; } .gal figure:not(:first-child) { display: none; } .gal figure:first-child { border-radius: var(--r-l); }
 }
-@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; } }
 
 /* ---- Perfil del lugar ---- */
 .cupos { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; max-width: 560px; }
@@ -491,3 +495,98 @@ dialog .row { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wr
   .foot__col { gap: 0; }
   .foot__bottom summary, .foot__col .copy { min-height: 44px; display: inline-flex; align-items: center; }
 }
+
+/* =========================================================
+   Movimiento de Bookea (DESIGN.md: "Pantalla de carga", "Barrido verde", toque en pantallas táctiles)
+   Todo respeta "reducir movimiento": ahí no hay barrido ni entradas, y la pantalla de carga se desvanece.
+   ========================================================= */
+
+/* ---------- Pantalla de carga: la B se arma y sube como una persiana ---------- */
+.splash { display: none; }
+.js .splash { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; background: var(--ink-900); color: var(--crema); clip-path: inset(0 0 0 0); }
+.js:not(.is-ready) body { overflow: hidden; }
+.splash__logo { display: grid; justify-items: center; gap: 18px; }
+.splash__b { width: clamp(96px, 12vw, 132px); height: auto; overflow: hidden; }
+.splash__word { font-size: clamp(28px, 3vw, 36px); font-weight: 700; letter-spacing: -.04em; line-height: 1; }
+.sp-asta, .sp-verde, .sp-naranja { transform-box: fill-box; }
+.splash.is-out { opacity: 0; visibility: hidden; transition: opacity 300ms ease, visibility 0s linear 300ms; }
+
+/* ---------- La B del logo, hasta el verde agua del barrido ---------- */
+@media (prefers-reduced-motion: no-preference) {
+  /* 1) crece el asta  2) baja el verde y sube el naranja hasta la diagonal  3) aparece el nombre */
+  .sp-asta { transform-origin: 50% 100%; animation: sp-asta 520ms var(--ease-expo) both; }
+  .sp-verde { animation: sp-verde 640ms var(--ease-expo) 260ms both; }
+  .sp-naranja { animation: sp-naranja 640ms var(--ease-expo) 360ms both; }
+  .splash__word { animation: sp-word 600ms var(--ease-expo) 720ms both; }
+  @keyframes sp-asta { from { transform: scaleY(0); } to { transform: none; } }
+  @keyframes sp-verde { from { transform: translateY(-100%); } to { transform: none; } }
+  @keyframes sp-naranja { from { transform: translateY(100%); } to { transform: none; } }
+  @keyframes sp-word { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+  .splash.is-out { opacity: 1; visibility: hidden; clip-path: inset(0 0 100% 0); transition: clip-path 760ms var(--ease-in-out), visibility 0s linear 760ms; }
+
+  /* ---------- Entrada del primer pantallazo, mientras sube la persiana ---------- */
+  /* baja la barra de arriba */
+  .js .top__in > * { opacity: .001; transform: translateY(-10px); transition: opacity 600ms var(--ease), transform 600ms var(--ease); }
+  .js .top__in > :nth-child(2) { transition-delay: 90ms; }
+  .js.is-ready .top__in > * { opacity: 1; transform: none; }
+  /* el título sube renglón por renglón desde una ranura */
+  .js .hero h1 .ln { display: block; overflow: hidden; padding-bottom: .08em; margin-bottom: -.08em; }
+  .js .hero h1 .ln > * { display: inline-block; transform: translateY(110%); transition: transform 900ms var(--ease-expo); transition-delay: calc(260ms + var(--i, 0) * 110ms); }
+  .js.is-ready .hero h1 .ln > * { transform: none; }
+  /* rótulo, texto y buscador */
+  .js .hero .eyebrow, .js .hero__lead, .js .finder { opacity: .001; transform: translateY(18px); transition: opacity 800ms var(--ease-expo), transform 800ms var(--ease-expo); }
+  .js .hero .eyebrow { transition-delay: 160ms; }
+  .js .hero__lead { transition-delay: 480ms; }
+  .js .finder { transition-delay: 580ms; }
+  .js.is-ready .hero .eyebrow, .js.is-ready .hero__lead, .js.is-ready .finder { opacity: 1; transform: none; }
+  /* las fotos se destapan de izquierda a derecha y se asientan */
+  .js .collage figure { clip-path: inset(0 0 100% 0); transition: clip-path 1000ms var(--ease-expo); }
+  .js .collage figure:nth-child(1) { transition-delay: 320ms; }
+  .js .collage figure:nth-child(2) { transition-delay: 420ms; }
+  .js .collage figure:nth-child(3) { transition-delay: 520ms; }
+  .js.is-ready .collage figure { clip-path: inset(0); }
+  .collage img { animation: asentar 2200ms var(--ease-soft) both; }
+  .collage figure:nth-child(2) img { animation-delay: 100ms; } .collage figure:nth-child(3) img { animation-delay: 200ms; }
+  .js:not(.is-ready) .collage img { animation-play-state: paused; }
+  @keyframes asentar { from { transform: scale(1.12); } to { transform: none; } }
+
+  /* ---------- Al bajar: tarjetas y secciones suben a su lugar, en escalera ---------- */
+  .js .rise { opacity: .001; transform: translateY(24px); transition: opacity 760ms var(--ease-expo), transform 760ms var(--ease-expo); transition-delay: var(--d, 0ms); }
+  .js .rise.is-in { opacity: 1; transform: none; }
+
+  /* ---------- Lo que se elige hace un pequeño salto ---------- */
+  .rubro[aria-pressed="true"]::before { animation: pop 420ms var(--ease-rebote) both; }
+  .slot.is-on, .cupo.is-on { animation: elegido 360ms var(--ease-rebote); }
+  .badge.is-sube { animation: pop 420ms var(--ease-rebote); }
+  @keyframes elegido { from { transform: scale(.92); } to { transform: none; } }
+  .rubro { transition: transform .25s var(--ease), border-color .18s; }
+}
+
+/* ---------- Con mouse: el verde agua barre de izquierda a derecha (como el logo) ---------- */
+@media (hover: hover) and (pointer: fine) {
+  .btn--primary, .btn--ink, .top__neg, .tlink, .band__cta .btn { position: relative; isolation: isolate; overflow: hidden; }
+  .btn--primary::before, .btn--ink::before, .top__neg::before, .tlink::before {
+    content: ""; position: absolute; inset: 0; z-index: -1; background: var(--ok);
+    clip-path: inset(0 100% 0 0); transition: clip-path 380ms var(--ease);
+  }
+  .btn--primary:hover:not(:disabled)::before, .btn--ink:hover::before, .top__neg:hover::before, .tlink:hover::before { clip-path: inset(0); }
+  .btn--primary:hover:not(:disabled), .btn--ink:hover, .top__neg:hover, .tlink:hover { color: var(--ink-900); border-color: var(--ok); }
+  .tlink:hover { background: transparent; }
+  .rubro:hover { transform: translateY(-2px); }
+}
+
+/* ---------- Con el dedo: se aprieta al tocar y rebota al soltar (toque.js) ---------- */
+@media (hover: none), (pointer: coarse) {
+  .btn, .tlink, .copy, .pill, .day, .slot, .qslot, .unit, .cupo, .rubro, .now, .vcard, .tabbar button, .back, .link, .brand, .item__x, .stepper button {
+    transition: transform var(--t-press) var(--ease), background-color .2s ease, border-color .2s ease, color .2s ease;
+  }
+  .btn.is-apreta, .copy.is-apreta, .pill.is-apreta, .day.is-apreta, .slot.is-apreta, .qslot.is-apreta, .unit.is-apreta, .tlink.is-apreta, .stepper button.is-apreta, .tabbar button.is-apreta { transform: scale(.94); }
+  .rubro.is-apreta, .now.is-apreta, .vcard.is-apreta, .cupo.is-apreta, .back.is-apreta, .link.is-apreta, .brand.is-apreta, .item__x.is-apreta { transform: scale(.97); }
+  .is-suelta { transform: scale(1.04) translateY(-2px); transition: transform 360ms var(--ease-rebote), background-color .36s ease, color .36s ease; }
+  .btn--block.is-suelta, .rubro.is-suelta, .now.is-suelta, .vcard.is-suelta { transform: scale(1.02) translateY(-1px); }
+  /* el verde agua del barrido, de una, mientras el dedo apoya y un momento después */
+  .btn:is(.is-apreta, .is-suelta), .copy:is(.is-apreta, .is-suelta), .tlink:is(.is-apreta, .is-suelta) { background: var(--ok); border-color: var(--ok); color: var(--ink-900); }
+  .tabbar button:is(.is-apreta, .is-suelta) { color: var(--ok-ink); }
+}
+
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; } }

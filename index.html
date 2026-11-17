@@ -10,10 +10,36 @@
   <link rel="icon" href="marca/isotipo-32.png" sizes="32x32" type="image/png" />
   <link rel="apple-touch-icon" href="marca/isotipo-192.png" />
   <link rel="preload" href="assets/fuentes/inter-tight.woff2" as="font" type="font/woff2" crossorigin />
-  <link rel="stylesheet" href="sitio.css?v=8" />
+  <link rel="stylesheet" href="sitio.css?v=9" />
 </head>
 <body>
+  <script>document.documentElement.classList.add("js");</script>
   <a class="skip" href="#main">Saltar al contenido</a>
+
+  <!-- Pantalla de carga: la B se arma según su construcción (asta crema, verde agua, naranja) y sube como una persiana.
+       Sin JavaScript no se muestra; con "reducir movimiento" aparece quieta y se desvanece. -->
+  <div class="splash" aria-hidden="true">
+    <div class="splash__logo">
+      <svg class="splash__b" viewBox="0 0 1000 1000">
+        <defs>
+          <mask id="sp-panzas" maskUnits="userSpaceOnUse" x="0" y="0" width="1000" height="1000">
+            <path d="M391,180 H520 A175,175 0 0 1 520,530 H391 Z" fill="#fff"/>
+            <path d="M391,426 H545 A197,197 0 0 1 545,820 H391 Z" fill="#fff"/>
+            <path d="M391,284 H520 A71,71 0 0 1 520,426 H391 Z" fill="#000"/>
+            <path d="M391,530 H545 A93,93 0 0 1 545,716 H391 Z" fill="#000"/>
+          </mask>
+        </defs>
+        <g transform="translate(8,0)">
+          <g mask="url(#sp-panzas)">
+            <polygon class="sp-verde" points="0,0 1000,0 1000,553.38 0,377.06" fill="#1fa08c"/>
+            <polygon class="sp-naranja" points="0,377.06 1000,553.38 1000,1000 0,1000" fill="#e4572e"/>
+          </g>
+          <rect class="sp-asta" x="255" y="180" width="136" height="640" fill="#f5ecd7"/>
+        </g>
+      </svg>
+      <p class="splash__word">Bookea</p>
+    </div>
+  </div>
 
   <!-- Sprite: isotipo Bookea + iconos -->
   <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
@@ -68,7 +94,7 @@
         <div class="hero__grid">
           <div>
             <p class="eyebrow">Turnos online</p>
-            <h1>Reservá turnos <em>en segundos.</em></h1>
+            <h1><span class="ln"><span style="--i:0">Reservá turnos</span></span> <span class="ln"><em style="--i:1">en segundos.</em></span></h1>
             <p class="hero__lead">Los horarios libres de canchas, barberías y otros negocios con turnos, en un solo lugar. Elegís, pagás la seña y listo: sin llamar, sin esperar respuesta.</p>
 
             <form class="finder" id="finder" aria-label="Buscar turnos">
@@ -313,6 +339,7 @@
   <dialog id="dlg"><h2 id="dlg-t"></h2><p id="dlg-p"></p><div class="row"><button class="btn btn--line" type="button" id="dlg-no">Volver</button><button class="btn btn--primary" type="button" id="dlg-si">Confirmar</button></div></dialog>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-  <script src="sitio.js?v=8"></script>
+  <script src="sitio.js?v=9"></script>
+  <script src="toque.js?v=9"></script>
 </body>
 </html>
