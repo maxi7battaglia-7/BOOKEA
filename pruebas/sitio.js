@@ -198,6 +198,9 @@ const medir = () => {
       // ---------- Links viejos ----------
       await p.goto(B + 'index.html#sumate', { waitUntil: 'load' }); await espera(p, 1000);
       ok((await p.pagina()) === 'negocios' && await p.evaluate(() => Math.abs(document.querySelector('#sumate').getBoundingClientRect().top) < 160), `${w} link viejo index.html#sumate: abre el formulario`);
+      await p.evaluate(() => { window.__sinRecargar = 1; }); await p.toca('.tabbar [data-tab="home"], .top .brand'); await espera(p);
+      await p.goto(B + 'index.html#preguntas'); await espera(p, 900);
+      ok((await p.pagina()) === 'negocios' && await p.evaluate(() => window.__sinRecargar === 1 && (() => { const r = document.querySelector('#preguntas').getBoundingClientRect(); return r.top >= -2 && r.top < innerHeight - 100; })()), `${w} link #preguntas con la página ya abierta: va a las preguntas sin recargar`);
       await p.goto(B + 'reservar.html', { waitUntil: 'load' }); await espera(p, 800);
       ok((await p.pagina()) === 'home' && /\/$|index\.html$/.test(new URL(p.url()).pathname), `${w} link viejo reservar.html: abre el buscador del inicio`);
       ok((await p.getAttribute('.top a.btn--ink', 'href')) === 'admin.html', `${w} "Ingresar" lleva al panel`);

@@ -501,4 +501,13 @@
   try { history.scrollRestoration = "manual"; history.replaceState({ page: inicial.page }, "", location.pathname); } catch {}
   show({ page: inicial.page });
   if (inicial.ir) requestAnimationFrame(() => scrollTo(inicial.ir));
+  // Un link con # a la misma página (por ejemplo bookea.ar/#sumate con el sitio ya abierto) no recarga:
+  // se resuelve acá, reemplazando la entrada del historial para que "atrás" no quede en el mismo lugar
+  window.addEventListener("hashchange", () => {
+    const h = location.hash.slice(1);
+    const page = ["sumate", "como-funciona", "funciones", "preguntas"].includes(h) ? "negocios" : h === "pick" || h === "reservar" ? "home" : "";
+    if (!page) return;
+    go(page, {}, true);
+    requestAnimationFrame(() => scrollTo(h === "reservar" ? "pick" : h));
+  });
 })();
