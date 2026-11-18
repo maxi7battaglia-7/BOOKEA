@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Arma Bookea para usar sin internet: dist/bookea-sin-internet.zip.
 
-Adentro van index.html (el frente: buscar, reservar, carrito, Mis turnos y la parte para negocios),
+Adentro van index.html (el frente: buscar, reservar, pagar la seña, Mis turnos y la parte para negocios),
 admin.html (el panel) y reservar.html (solo redirige al inicio, para los links viejos). Cada una lleva
 todo adentro (CSS, JS, fotos, logo y letras: Inter Tight y JetBrains Mono en el frente, Archivo en el
 panel), así que funcionan abriendo el archivo en el navegador, sin conexión. El panel va en modo de prueba (config.js vacío): los datos quedan

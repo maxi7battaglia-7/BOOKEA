@@ -1,4 +1,4 @@
-// Bookea — frente público: buscar → resultados → ficha del lugar → carrito con seña → Mis turnos,
+// Bookea — frente público: buscar → resultados → ficha del lugar → pagar la seña (el turno queda guardado 10 minutos) → Mis turnos,
 // y la parte para negocios ("Sumá tu negocio" sigue en admin.html?alta=1, el registro del panel).
 // Sin frameworks. Los negocios son ejemplos y el pago con Mercado Pago está simulado: no se cobra nada.
 // Links que siguen andando: index.html?rubro=padel&zona=&dia=0&franja= (y reservar.html, que redirige acá)
@@ -8,13 +8,14 @@
   const $ = (s, el = document) => el.querySelector(s);
   const $$ = (s, el = document) => [...el.querySelectorAll(s)];
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-  const money = (n) => "$ " + String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  // espacio que no se corta (\u00a0): el "$" nunca queda solo al final de un renglón
+  const money = (n) => "$\u00a0" + String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
   const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
   const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   // ---------- Movimiento: tarjetas y secciones suben a su lugar al aparecer (clase .rise, en sitio.css) ----------
   // Espera a que suba la pantalla de carga; con "reducir movimiento" no hace nada.
-  const SUBEN = [".sec__head", ".now", ".vcard", ".rcard", ".ex", ".cell", ".join", ".faq h2", ".faq details", ".blk", ".item", ".tcard", ".panel", ".band", ".foot__top > *", ".empty"].join(", ");
+  const SUBEN = [".sec__head", ".now", ".vcard", ".rcard", ".ex", ".cell", ".join", ".faq h2", ".faq details", ".blk", ".chk__turno", ".pasos li", ".okban", ".tcard", ".panel", ".band", ".foot__top > *", ".empty"].join(", ");
   let listoMov = false; const pendientes = [];
   const io = !reduce && "IntersectionObserver" in window ? new IntersectionObserver((ents) => ents.forEach((en) => {
     if (!en.isIntersecting) return;
@@ -116,18 +117,22 @@
 
 
   // ---------- Estado ----------
-  const S = { page: "home", hs: "padel", rubro: "padel", zona: "", dia: 0, franja: "", techada: false, svc: "", nav: 0, ys: {}, f: null, carrito: store.get("carrito", []), turnos: store.get("turnos", []) };
+  // res: el turno que se está por pagar (uno solo). Queda guardado HOLD (10 minutos) mientras se paga la seña.
+  // vencida: el último que se venció sin pagar (para ofrecer volver a reservarlo).
+  const HOLD = 10 * 60e3;
+  const S = { page: "home", hs: "padel", rubro: "padel", zona: "", dia: 0, franja: "", techada: false, svc: "", nav: 0, ys: {}, f: null, res: store.get("reserva", null), vencida: null, turnos: store.get("turnos", []) };
   const hoyKey = () => dayInfo(0).key;
-  const limpiar = () => { // saca lo que ya pasó
-    const n = nowM();
-    S.carrito = S.carrito.filter((it) => it.key >= hoyKey() && !(it.key === hoyKey() && toMin(it.t) <= n.min));
-  };
-  limpiar();
-  const guardar = () => { store.set("carrito", S.carrito); store.set("turnos", S.turnos); badges(); };
+  const diaDe = (key) => Math.round((Date.parse(key) - Date.parse(hoyKey())) / 864e5); // 0 = hoy
+  const vigente = () => (S.res && S.res.vence > Date.now() ? S.res : null);
+  if (S.res && !vigente()) S.res = null; // se venció con la página cerrada
+  try { localStorage.removeItem("bookea:carrito"); } catch {} // ya no hay carrito: cada turno se paga al reservarlo
+  const guardar = () => { store.set("reserva", S.res); store.set("turnos", S.turnos); badges(); };
 
   // ---------- Disponibilidad (cada turno tiene su propia capacidad) ----------
   const hash = (s) => { let x = 2166136261; for (let i = 0; i < s.length; i++) { x ^= s.charCodeAt(i); x = Math.imul(x, 16777619); } return x >>> 0; };
-  const usado = (vid, key, t, unit) => S.carrito.concat(S.turnos).some((x) => x.vid === vid && x.key === key && x.t === t && x.unit === unit);
+  // El turno guardado no se descuenta acá: en este demo solo lo ve quien lo guardó, y si lo vuelve a elegir
+  // sigue con el mismo (reservar() lo reconoce). En la versión real, la base lo bloquea para los demás.
+  const usado = (vid, key, t, unit) => S.turnos.some((x) => x.vid === vid && x.key === key && x.t === t && x.unit === unit);
   const slotsFor = (v, dayI) => {
     const di = dayInfo(dayI), now = nowM(), out = [];
     v.bloques.forEach(([a, b]) => {
@@ -157,7 +162,7 @@
   const turnosHoy = (rubro) => VENUES.filter((v) => v.rubro === rubro).reduce((a, v) => a + slotsFor(v, 0).filter((s) => s.libres.length).length, 0);
 
   // ---------- Navegación ----------
-  const TITLES = { home: "Bookea · Reservá turnos en segundos", ficha: "Reservar · Bookea", carrito: "Carrito · Bookea", turnos: "Mis turnos · Bookea", resultados: "Turnos disponibles · Bookea", negocios: "Sumá tu negocio · Bookea" };
+  const TITLES = { home: "Bookea · Reservá turnos en segundos", ficha: "Reservar · Bookea", pago: "Pagá la seña · Bookea", turnos: "Mis turnos · Bookea", resultados: "Turnos disponibles · Bookea", negocios: "Sumá tu negocio · Bookea" };
   function go(page, p = {}, replace = false) {
     S.ys[S.page] = window.scrollY;
     const st = { page, ...p };
@@ -165,7 +170,8 @@
     show(st);
   }
   function show(st) {
-    const page = st.page || "home";
+    let page = st.page === "carrito" ? "pago" : st.page || "home"; // "carrito": historial de antes del 18/11
+    if (!TITLES[page]) page = "home";
     if (page === "ficha") {
       const v = venue(st.v); if (!v) return go("home", {}, true);
       const svc0 = v.svcs.find((s) => s.id === S.svc) || v.svcs[0];
@@ -174,7 +180,8 @@
     }
     S.page = page;
     $$(".page").forEach((el) => (el.hidden = el.dataset.page !== page));
-    ({ home: renderHome, resultados: renderResultados, ficha: renderFicha, carrito: renderCarrito, turnos: renderTurnos, negocios: () => {} })[page](st);
+    ({ home: renderHome, resultados: renderResultados, ficha: renderFicha, pago: renderPago, turnos: renderTurnos, negocios: () => {} })[page](st);
+    pintarHold();
     const el = $("#page-" + page); el.classList.remove("is-in"); void el.offsetWidth; el.classList.add("is-in");
     revelar(el);
     $$(".tabbar [data-tab]").forEach((b) => b.classList.toggle("is-on", b.dataset.tab === (page === "resultados" ? "home" : page)));
@@ -208,15 +215,28 @@
   function renderDestacados() {
     const k = S.hs, R = RUBROS[k];
     $("#hs-switch").innerHTML = Object.entries(RUBROS).map(([key, r]) => `<button type="button" class="pill" data-act="hs" data-k="${key}" aria-pressed="${key === k}">${r.n}</button>`).join("");
-    const vs = VENUES.filter((v) => v.rubro === k), cand = [];
-    for (let d = 0; d < 3 && cand.length < 10; d++) vs.forEach((v) => { const s = slotsFor(v, d).find((x) => x.libres.length); if (s && !cand.some((c) => c.v === v)) cand.push({ v, s, d }); });
-    cand.sort((a, b) => a.d - b.d || a.s.start - b.s.start);
-    $("#rail-now").innerHTML = cand.map(slotCard).join("") || `<p style="color:var(--ink-500)">Por ahora no quedan turnos de ${R.n.toLowerCase()}. Probá con otro día en el buscador.</p>`;
+    const vs = VENUES.filter((v) => v.rubro === k);
+    $("#rail-now").innerHTML = proximos(k).map(slotCard).join("") || `<p style="color:var(--ink-500)">Por ahora no quedan turnos de ${R.n.toLowerCase()}. Probá con otro día en el buscador.</p>`;
     $("#dest-t").textContent = `${R.n}: para reservar hoy`;
     $("#grid-dest").innerHTML = vs.map(cardV).join("");
     revelar($("#page-home"));
   }
   function renderHome() { renderBuscador(); renderDestacados(); }
+  // El próximo turno libre de cada lugar de un rubro (hoy y los dos días que siguen), del más cercano al más lejano
+  // (porLugar: cuántos horarios de cada lugar; "Libres ahora" del inicio usa uno, las otras pantallas dos para llenar el ancho)
+  function proximos(rubro, porLugar = 1) {
+    const cand = [];
+    for (let d = 0; d < 3 && cand.length < 10; d++) VENUES.filter((v) => v.rubro === rubro).forEach((v) => {
+      const ya = cand.filter((c) => c.v === v).length;
+      slotsFor(v, d).filter((x) => x.libres.length).slice(0, porLugar - ya).forEach((s) => cand.push({ v, s, d }));
+    });
+    return cand.sort((a, b) => a.d - b.d || a.s.start - b.s.start).slice(0, 10);
+  }
+  // "Libres ahora" para las pantallas que quedarían vacías (pagar sin turno guardado, Mis turnos): siempre hay turnos a la vista
+  const masLibres = (rubro, titulo) => {
+    const c = proximos(rubro, 2); if (!c.length) return "";
+    return `<div class="mas"><div class="sec__head"><div><p class="eyebrow">En vivo</p><h2>${titulo}</h2></div><button type="button" class="link" data-go="home" data-focus="pick">Buscar otro día u hora</button></div><div class="rail">${c.map(slotCard).join("")}</div></div>`;
+  };
   const franjasHTML = (rubro) => btnx("franja-h", 'data-k=""', S.franja === "", "Todo el día") + franjasDe(rubro).map((f) => btnx("franja-h", `data-k="${f}"`, S.franja === f, FRANJAS[f])).join("");
   const extraHTML = () => S.rubro === "padel" ? btnx("techada-h", "", S.techada, "Solo techadas")
     : S.rubro === "barberia" ? btnx("svc-h", 'data-k=""', S.svc === "", "Cualquier servicio") + Object.entries(SVCS).map(([k, n]) => btnx("svc-h", `data-k="${k}"`, S.svc === k, n)).join("") : "";
@@ -336,54 +356,126 @@
     renderCupos();
   }
   function reservar() {
-    const v = venue(S.f.v), f = S.f, di = dayInfo(f.dia), svc = curSvc();
+    const v = venue(S.f.v), f = S.f, di = dayInfo(f.dia), svc = curSvc(), r = vigente();
+    // si ya tenía guardado este mismo horario, sigue con ese y con el tiempo que le queda
+    if (r && r.vid === v.id && r.key === di.key && r.t === f.t && r.svc === svc.id && (f.unit === "any" || f.unit === r.unit)) return go("pago");
     const s = slotsFor(v, f.dia).find((x) => x.t === f.t);
     if (!s || !s.libres.length) { toast("Ese horario se acaba de ocupar"); return renderBook(); }
     const unit = f.unit !== "any" && s.libres.includes(f.unit) ? f.unit : s.libres[0];
     const precio = precioDe(svc, di, s.start), sena = senaDe(precio);
-    S.carrito.push({ id: "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), vid: v.id, svc: svc.id, key: di.key, t: s.t, end: s.end, unit, precio, sena, cancel: v.cancel });
-    guardar();
-    go("carrito");
+    S.res = { id: "t" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), vid: v.id, svc: svc.id, key: di.key, t: s.t, end: s.end, unit, precio, sena, cancel: v.cancel, vence: Date.now() + HOLD };
+    S.vencida = null;
+    guardar(); reloj();
+    go("pago");
+    if (r) toast("Cambiaste de turno: el anterior quedó libre");
   }
 
-  // ---------- Carrito ----------
-  const itemHTML = (it, acciones) => {
-    const v = venue(it.vid), R = RUBROS[v.rubro], svc = v.svcs.find((s) => s.id === it.svc) || v.svcs[0];
-    return `<li class="item"><div class="item__ph">${img(v.fotos[0], "")}</div><div>
-      <h3>${esc(v.name)}</h3><p>${R.n}${v.rubro === "barberia" ? " · " + svc.n : ""} · ${esc(it.unit)}</p>
-      <div class="item__row"><span class="item__when">${keyLabel(it.key)} · ${it.t}–${it.end}</span><span class="item__p"><b>${money(it.precio)}</b>seña ${money(it.sena)}</span></div>
-      ${acciones}</div></li>`;
-  };
-  function renderCarrito() {
-    limpiar();
-    const root = $("#carrito-root"), c = S.carrito;
-    if (!c.length) { root.innerHTML = `<h1>Carrito</h1><p class="sub">Todavía no elegiste ningún turno.</p><div class="empty"><h3>Tu carrito está vacío</h3><p>Buscá un turno y agregalo para pagar la seña.</p><button type="button" class="btn btn--primary" data-go="home" data-focus="pick">Buscar turnos</button></div>`; return; }
-    const total = c.reduce((a, i) => a + i.precio, 0), sena = c.reduce((a, i) => a + i.sena, 0), minCancel = Math.max(...c.map((i) => i.cancel));
-    const u = store.get("contacto", { nombre: "", wa: "" });
-    root.innerHTML = `<h1>Carrito</h1><p class="sub">Revisá tus turnos antes de pagar la seña.</p>
-      <div class="two"><div>
-        <ul class="items">${c.map((it) => itemHTML(it, `<button type="button" class="item__x" data-act="rm" data-id="${it.id}" style="margin-top:8px">Quitar</button>`)).join("")}</ul>
-        <div class="panel"><h2>Tus datos</h2><div class="fields">
+  // ---------- Pagar la seña: un solo turno, guardado 10 minutos ----------
+  const mmss = (ms) => { const s = Math.max(0, Math.ceil(ms / 1000)); return String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0"); };
+  let tic = null;
+  // Un solo reloj para todo: la pantalla de pago, su barra de abajo y el aviso "Pagar" de arriba
+  function reloj() {
+    clearInterval(tic); tic = null;
+    if (vigente()) {
+      const paso = () => {
+        const r = vigente();
+        if (!r) return vencer();
+        const falta = r.vence - Date.now();
+        $$("[data-reloj]").forEach((el) => (el.textContent = mmss(falta)));
+        $$(".reloj, .hold").forEach((el) => el.classList.toggle("is-poco", falta <= 120e3));
+      };
+      paso(); tic = setInterval(paso, 1000);
+    }
+    pintarHold();
+  }
+  function vencer() {
+    clearInterval(tic); tic = null;
+    if (!S.res) return pintarHold();
+    S.vencida = S.res; S.res = null; guardar(); pintarHold();
+    if (S.page === "pago") renderPago(); else toast("Se terminó el tiempo: el turno que tenías guardado quedó libre");
+  }
+  // Mientras hay un turno guardado: "Pagar" con el tiempo que queda, arriba en la compu y en una barra en el celular
+  // (no en la pantalla de pago, que ya lo muestra, ni en la ficha del celular, que tiene su propia barra)
+  function pintarHold() {
+    const hay = !!vigente();
+    $("#t-pago").hidden = !hay || S.page === "pago";
+    const barra = hay && S.page !== "pago" && S.page !== "ficha";
+    $("#hold-bar").hidden = !barra;
+    document.body.classList.toggle("con-hold", barra);
+  }
+  function renderPago() {
+    const root = $("#pago-root"), r = vigente();
+    if (!r) return sinTurno(root);
+    const v = venue(r.vid), R = RUBROS[v.rubro], svc = v.svcs.find((s) => s.id === r.svc) || v.svcs[0], u = store.get("contacto", { nombre: "", wa: "" });
+    const quien = v.rubro === "barberia" ? `Con ${esc(r.unit)}` : esc(r.unit);
+    root.innerHTML = `
+      <a class="back" href="#" data-act="back"><svg class="icon"><use href="#i-back"/></svg>Volver</a>
+      <div class="chk">
+        <div class="chk__head">
+          <div><p class="eyebrow">Último paso</p><h1>Confirmá tu turno</h1></div>
+          <p class="reloj" role="timer"><svg class="icon" aria-hidden="true"><use href="#i-clock"/></svg><span>Te guardamos el turno</span><b data-reloj>${mmss(r.vence - Date.now())}</b></p>
+        </div>
+        <article class="chk__turno">
+          <div class="chk__ph">${img(v.fotos[0], "")}<span class="tag">${R.n}</span></div>
+          <div class="chk__b">
+            <h2>${esc(v.name)}</h2>
+            <p class="chk__when"><span>${keyLabel(r.key)} ·</span> <span>${r.t}–${r.end}</span></p>
+            <ul class="chk__facts">
+              <li><svg class="icon" aria-hidden="true"><use href="#i-pin"/></svg>${ZONAS[v.zona]}</li>
+              <li><svg class="icon" aria-hidden="true"><use href="#i-clock"/></svg>${v.rubro === "barberia" ? esc(svc.n) + " · " : ""}${svc.min} min</li>
+              <li><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>${quien}</li>
+            </ul>
+            <button type="button" class="link" data-act="cambiar">Cambiar horario</button>
+          </div>
+        </article>
+        <div class="panel chk__datos"><h2>Tus datos</h2><div class="fields">
           <label class="field"><span>Nombre</span><input id="c-nombre" autocomplete="name" value="${esc(u.nombre)}" aria-describedby="c-nombre-e" /><p class="err" id="c-nombre-e" hidden>Escribí tu nombre.</p></label>
           <label class="field"><span>WhatsApp</span><input id="c-wa" type="tel" inputmode="tel" autocomplete="tel" placeholder="261 555 1234" value="${esc(u.wa)}" aria-describedby="c-wa-e" /><p class="err" id="c-wa-e" hidden>Escribí un número de WhatsApp válido.</p></label>
         </div><p class="note">Te mandamos la confirmación y el recordatorio por WhatsApp.</p></div>
+        <aside class="chk__side"><div class="panel panel--sum"><h2>Resumen</h2><div class="pay">
+          <div><span>Turno</span><b>${money(r.precio)}</b></div>
+          <div><span>En el lugar</span><b>${money(r.precio - r.sena)}</b></div>
+          <div class="big"><span>Seña ahora (${Math.round(SENA * 100)} %)</span><b>${money(r.sena)}</b></div></div>
+          <button type="button" class="btn btn--primary btn--lg btn--block" data-act="pay" style="margin-top:18px"><span class="mp">Pagar seña con Mercado Pago</span></button>
+          <p class="note note--ok"><svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg><span>Podés cancelar hasta ${r.cancel} h antes y la seña se devuelve.</span></p>
+          <p class="note">Demo: los negocios son de ejemplo y no se cobra nada. En la versión real, acá se abre el pago de Mercado Pago.</p></div>
+          <div class="panel chk__mapa"><h2>Dónde queda</h2><div class="mapbox">${mapSVG(v.id)}<div class="mapbox__t"><b>${ZONAS[v.zona]}</b>Valle de Uco, Mendoza</div></div><p class="mapnote">La dirección exacta te llega por WhatsApp al confirmar.</p></div></aside>
+        <div class="pasos"><h2>Cómo sigue</h2><ol>
+          <li><span class="pasos__n">1</span><b>Pagás la seña</b><span>${money(r.sena)} con Mercado Pago. El turno queda confirmado en el momento.</span></li>
+          <li><span class="pasos__n">2</span><b>Te llega por WhatsApp</b><span>La confirmación con la dirección exacta y un recordatorio antes del turno.</span></li>
+          <li><span class="pasos__n">3</span><b>El resto, en el lugar</b><span>${money(r.precio - r.sena)} el día del turno. Llegá 10 minutos antes.</span></li>
+        </ol></div>
       </div>
-      <aside><div class="panel panel--sum"><h2>Resumen</h2><div class="pay">
-        <div><span>${c.length} ${c.length === 1 ? "turno" : "turnos"}</span><b>${money(total)}</b></div>
-        <div><span>En el lugar</span><b>${money(total - sena)}</b></div>
-        <div class="big"><span>Seña ahora</span><b>${money(sena)}</b></div></div>
-        <button type="button" class="btn btn--primary btn--lg btn--block" data-act="pay" style="margin-top:18px"><span class="mp">Pagar seña con Mercado Pago</span></button>
-        <p class="note note--ok"><svg class="icon"><use href="#i-shield"/></svg><span>Podés cancelar hasta ${minCancel} h antes y la seña se devuelve (según cada lugar).</span></p>
-        <p class="note">Demo: los negocios son de ejemplo y no se cobra nada. En la versión real, acá se abre el pago de Mercado Pago.</p>
-        <button type="button" class="link" data-go="home" data-focus="pick" style="margin-top:12px;font-size:14px">Seguir buscando</button></div></aside></div>`;
+      <div class="mbar"><div class="mbar__t"><b>${money(r.sena)} <span style="display:inline;font-weight:400">de seña</span></b><span>Guardado por <b class="mbar__reloj" data-reloj>${mmss(r.vence - Date.now())}</b></span></div><button type="button" class="btn btn--primary" data-act="pay">Pagar seña</button></div>`;
+    reloj();
+  }
+  // Sin turno guardado: se venció el tiempo (y se puede volver a guardar) o se llegó sin elegir ninguno
+  function sinTurno(root) {
+    const x = S.vencida, v = x && venue(x.vid), rubro = v ? v.rubro : S.rubro;
+    root.innerHTML = `<div class="aviso${x ? " aviso--vencio" : ""}">
+        <span class="aviso__ic"><svg class="icon" aria-hidden="true"><use href="#i-clock"/></svg></span>
+        <div><h1>${x ? "Se terminó el tiempo" : "No tenés ningún turno por pagar"}</h1>
+          <p>${x ? `El turno de ${keyLabel(x.key).toLowerCase()} a las ${x.t} en ${esc(v.name)} volvió a quedar libre. Si sigue libre, lo guardamos de nuevo por 10 minutos.` : "Elegí un horario y reservalo: te lo guardamos 10 minutos mientras pagás la seña."}</p>
+          <div class="aviso__acts">${x ? `<button type="button" class="btn btn--primary" data-act="otra-vez">Volver a reservarlo</button>` : ""}<button type="button" class="btn ${x ? "btn--line" : "btn--primary"}" data-go="home" data-focus="pick">Buscar turnos</button></div></div>
+        ${x ? `<div class="aviso__turno"><div class="aviso__ph">${img(v.fotos[0], "")}<span class="tag">${RUBROS[v.rubro].n}</span></div><div class="aviso__b"><b>${esc(v.name)}</b><span class="aviso__when">${keyLabel(x.key)} · ${x.t}–${x.end}</span><span>${esc(x.unit)} · seña ${money(x.sena)}</span></div></div>` : ""}
+      </div>${masLibres(rubro, `Libres ahora: ${RUBROS[rubro].n.toLowerCase()}`)}`;
+  }
+  function otraVez() {
+    const x = S.vencida; if (!x) return;
+    const v = venue(x.vid), dia = diaDe(x.key), s = dia >= 0 && dia < 7 ? slotsFor(v, dia).find((y) => y.t === x.t) : null;
+    if (!s || !s.libres.length) { S.vencida = null; toast("Ese horario ya se ocupó: elegí otro"); return go("ficha", { v: v.id, dia: Math.max(0, Math.min(6, dia)) }, true); }
+    S.res = { ...x, unit: s.libres.includes(x.unit) ? x.unit : s.libres[0], vence: Date.now() + HOLD }; S.vencida = null;
+    guardar(); renderPago(); revelar($("#page-pago")); window.scrollTo(0, 0);
   }
   const valNombre = () => { const f = $("#c-nombre"), bad = f.value.trim().length < 2; f.classList.toggle("is-invalid", bad); $("#c-nombre-e").hidden = !bad; return bad; };
   const valWa = () => { const f = $("#c-wa"), bad = f.value.replace(/\D/g, "").length < 8; f.classList.toggle("is-invalid", bad); $("#c-wa-e").hidden = !bad; return bad; };
   function pagar() {
+    const r = vigente(); if (!r) return vencer();
     const malos = [valNombre(), valWa()].filter(Boolean).length;
     if (malos) { (valNombre() ? $("#c-nombre") : $("#c-wa")).focus(); return; }
     const contacto = { nombre: $("#c-nombre").value.trim(), wa: $("#c-wa").value.trim() };
     store.set("contacto", contacto);
+    clearInterval(tic); tic = null; // ya está pagando: el tiempo no corre más
     const ov = document.createElement("div"); ov.className = "mpov"; ov.setAttribute("role", "alertdialog"); ov.setAttribute("aria-live", "polite");
     ov.innerHTML = `<div class="mpov__in"><div class="spin"></div><h2>Te llevamos a Mercado Pago</h2><p>Un momento, estamos preparando el pago de tu seña.</p></div>`;
     document.body.appendChild(ov);
@@ -391,9 +483,10 @@
     setTimeout(() => {
       ov.innerHTML = `<div class="mpov__in"><div class="okc"><svg class="icon"><use href="#i-check"/></svg></div><h2>¡Turno confirmado!</h2><p>Es una demo: no se cobró nada.</p></div>`;
       setTimeout(() => {
-        const nuevos = S.carrito.map((it) => ({ ...it, code: "BK-" + hash(it.id + Date.now()).toString(36).toUpperCase().slice(0, 4), nombre: contacto.nombre, pagado: true }));
-        S.turnos = S.turnos.concat(nuevos); S.carrito = []; guardar();
-        ov.remove(); go("turnos", { nuevos: nuevos.map((n) => n.id) }); toast("Turno confirmado (demo, sin cobro).");
+        const { vence, ...turno } = r;
+        const nuevo = { ...turno, code: "BK-" + hash(r.id + Date.now()).toString(36).toUpperCase().slice(0, 4), nombre: contacto.nombre, pagado: true };
+        S.turnos = S.turnos.concat(nuevo); S.res = null; S.vencida = null; guardar(); reloj();
+        ov.remove(); go("turnos", { nuevos: [nuevo.id] }); toast("Turno confirmado (demo, sin cobro).");
       }, reduce ? 300 : 1200);
     }, dur);
   }
@@ -402,16 +495,20 @@
   const cuando = (it) => new Date(`${it.key}T${it.t}:00-03:00`);
   function renderTurnos(st = {}) {
     const root = $("#turnos-root"), lista = S.turnos.slice().sort((a, b) => cuando(a) - cuando(b));
-    if (!lista.length) { root.innerHTML = `<h1>Mis turnos</h1><p class="sub">Acá vas a ver tus turnos confirmados.</p><div class="empty"><h3>Todavía no tenés turnos</h3><p>Reservá el primero en segundos.</p><button type="button" class="btn btn--primary" data-go="home" data-focus="pick">Buscar turnos</button></div>`; return; }
+    // abajo, siempre, turnos libres del último rubro reservado: la pantalla no queda vacía
+    const ult = lista.length ? venue(lista[lista.length - 1].vid) : null, rubro = ult ? ult.rubro : S.rubro;
+    const mas = masLibres(rubro, `Reservá otro: ${RUBROS[rubro].n.toLowerCase()}`);
+    if (!lista.length) { root.innerHTML = `<h1>Mis turnos</h1><p class="sub">Acá vas a ver tus turnos confirmados.</p><div class="empty"><h3>Todavía no tenés turnos</h3><p>Reservá el primero en segundos.</p><button type="button" class="btn btn--primary" data-go="home" data-focus="pick">Buscar turnos</button></div>${mas}`; return; }
     const ahora = Date.now();
-    root.innerHTML = `<h1>Mis turnos</h1><p class="sub">Tus turnos confirmados, con la seña ya paga.</p>` + lista.map((it) => {
+    const listo = st.nuevos ? `<div class="okban"><span class="okban__ic"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg></span><div><b>¡Listo, tu turno está confirmado!</b><span>Te mandamos los datos por WhatsApp. El resto lo pagás en el lugar.</span></div><button type="button" class="btn btn--ink btn--s" data-go="home" data-focus="pick">Reservar otro turno</button></div>` : "";
+    root.innerHTML = `<h1>Mis turnos</h1><p class="sub">Tus turnos confirmados, con la seña ya paga.</p>${listo}` + lista.map((it) => {
       const v = venue(it.vid), R = RUBROS[v.rubro], svc = v.svcs.find((s) => s.id === it.svc) || v.svcs[0], pasado = cuando(it).getTime() + 3600e3 < ahora;
       const txt = encodeURIComponent(`Turno en ${v.name}: ${keyLabel(it.key)} ${it.t} hs (${it.unit}). Código ${it.code}.`);
       return `<article class="tcard${st.nuevos && st.nuevos.includes(it.id) ? " is-new" : ""}"><div class="tcard__h"><span class="code">${it.code}</span><span class="status"${pasado ? ' style="color:var(--ink-500);background:var(--ink-100)"' : ""}>${pasado ? "Finalizado" : "Confirmado"}</span></div>
         <div class="tcard__b"><div><h3>${esc(v.name)}</h3><div class="tcard__when">${keyLabel(it.key)} · ${it.t}–${it.end}</div><p>${R.n}${v.rubro === "barberia" ? " · " + svc.n : ""} · ${esc(it.unit)} · ${ZONAS[v.zona]}</p></div>
         <div class="tcard__act"><a class="btn btn--line btn--s" href="https://wa.me/?text=${txt}" target="_blank" rel="noopener"><svg class="icon"><use href="#i-wa"/></svg>Compartir</a>${pasado ? "" : `<button type="button" class="btn btn--line btn--s" data-act="cancel" data-id="${it.id}">Cancelar</button>`}</div></div>
         <div class="tcard__money"><span>Seña pagada <b>${money(it.sena)}</b></span><span>A pagar en el lugar <b>${money(it.precio - it.sena)}</b></span></div></article>`;
-    }).join("");
+    }).join("") + mas;
   }
   function cancelar(id) {
     const it = S.turnos.find((x) => x.id === id); if (!it) return;
@@ -426,13 +523,12 @@
 
   // ---------- Detalles ----------
   function badges() {
-    const upcoming = S.turnos.filter((t) => cuando(t).getTime() + 3600e3 >= Date.now()).length, nc = S.carrito.length;
-    $$("[data-count]").forEach((b) => {
-      const n = b.dataset.count === "carrito" ? nc : upcoming;
+    const n = S.turnos.filter((t) => cuando(t).getTime() + 3600e3 >= Date.now()).length;
+    $$('[data-count="turnos"]').forEach((b) => {
       if (b.textContent !== String(n) && n > 0) { b.classList.remove("is-sube"); void b.offsetWidth; b.classList.add("is-sube"); }
       b.textContent = n; if (b.closest(".tabbar")) b.hidden = !n;
     });
-    $("#t-turnos").hidden = !upcoming; $("#t-carrito").hidden = !nc; // el header solo muestra lo que tiene algo
+    $("#t-turnos").hidden = !n; // el header solo muestra lo que tiene algo
   }
   let tt;
   function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("is-on"); clearTimeout(tt); tt = setTimeout(() => t.classList.remove("is-on"), 2600); }
@@ -461,8 +557,9 @@
         case "f-unit": S.f.unit = d.u; renderBook(); break;
         case "reservar": reservar(); break;
         case "scroll-book": $("#book").scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" }); break;
-        case "rm": S.carrito = S.carrito.filter((x) => x.id !== d.id); guardar(); renderCarrito(); toast("Turno quitado del carrito"); break;
         case "pay": pagar(); break;
+        case "cambiar": { const x = vigente(); if (x) go("ficha", { v: x.vid, dia: diaDe(x.key), t: x.t }); break; }
+        case "otra-vez": otraVez(); break;
         case "cancel": cancelar(d.id); break;
       }
       return;
@@ -526,7 +623,7 @@
     setTimeout(arrancar, Math.max(0, 4000 - performance.now()));
   } else arrancar();
   $("#year").textContent = new Date().getFullYear();
-  badges();
+  badges(); reloj(); // si quedó un turno guardado de antes, sigue corriendo su tiempo
   // En pantallas táctiles, que :active (el apretado de botones y tarjetas) funcione también en iPhone
   document.addEventListener("touchstart", () => {}, { passive: true });
   // Links que llegan con datos: resultados de un rubro, o una sección de la parte para negocios

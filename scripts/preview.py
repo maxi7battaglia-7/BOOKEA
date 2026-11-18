@@ -22,7 +22,7 @@ def sin_iconos(html):
     return re.sub(r'\s*<link rel="(?:icon|apple-touch-icon)"[^>]*>', "", html)  # el ícono lo pone claude.ai
 
 
-# ---------- Inicio (el frente: buscar, resultados, ficha, carrito, Mis turnos y la parte para negocios) ----------
+# ---------- Inicio (el frente: buscar, resultados, ficha, pagar la seña, Mis turnos y la parte para negocios) ----------
 html = pagina("index.html")
 body = re.search(r"<body>(.*)</body>", html, re.S).group(1)
 for js in ("sitio.js", "toque.js"):

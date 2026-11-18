@@ -1,5 +1,5 @@
 /* =========================================================
-   Bookea — frente público (inicio, resultados, ficha del lugar, carrito, Mis turnos y la parte para negocios)
+   Bookea — frente público (inicio, resultados, ficha del lugar, pagar la seña, Mis turnos y la parte para negocios)
    Blanco, limpio, letras Inter Tight + JetBrains Mono (servidas desde assets/fuentes, licencia OFL)
    y los colores de Bookea: noche #11151c, naranja #e4572e, verde agua #1fa08c y crema #f5ecd7.
    El panel (admin.html) sigue con styles.css + admin.css.
@@ -269,24 +269,78 @@ h1, h2, h3 { font-weight: 600; letter-spacing: -.03em; line-height: 1.05; text-w
 }
 @media (max-width: 979px) { .book { box-shadow: none; } #page-ficha .tabbar { display: none; } }
 
-/* ---------- Carrito y Mis turnos ---------- */
+/* ---------- Pagar la seña y Mis turnos ---------- */
 .pg { padding-block: 32px 96px; }
 .pg > h1 { font-size: clamp(30px, 4vw, 46px); letter-spacing: -.04em; margin-bottom: 8px; }
 .pg > .sub { color: var(--ink-500); margin-bottom: 30px; }
-.two { display: grid; gap: 32px; align-items: start; }
-@media (min-width: 940px) { .two { grid-template-columns: minmax(0, 1fr) 380px; gap: 48px; } .two aside { position: sticky; top: calc(var(--header-h) + 18px); } }
-.items { display: grid; gap: 14px; margin-bottom: 28px; }
-.item { display: grid; grid-template-columns: 84px 1fr; gap: 16px; padding: 14px; border: 1px solid var(--ink-200); border-radius: var(--r-l); background: var(--paper); }
-.item__ph { width: 84px; height: 84px; border-radius: var(--r-m); overflow: hidden; background: var(--ink-100); }
-.item__ph img { width: 100%; height: 100%; object-fit: cover; }
-.item h3 { font-size: 17px; letter-spacing: -.02em; line-height: 1.25; }
-.item p { font-size: 14px; color: var(--ink-500); }
-.item__row { display: flex; justify-content: space-between; align-items: flex-end; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
-.item__when { font: 500 14px var(--f-mono); color: var(--ink-900); letter-spacing: -.02em; }
-.item__p { margin-left: auto; font: 500 13px var(--f-mono); text-align: right; color: var(--ink-600); }
-.item__p b { display: block; font-size: 15px; color: var(--ink-900); }
-.item__x { font-size: 13px; font-weight: 500; color: var(--ink-500); text-decoration: underline; text-underline-offset: 3px; }
-.item__x:hover { color: var(--accent-ink); }
+/* Pagar la seña: un turno, guardado 10 minutos. En la compu, a la izquierda el turno, los datos y cómo sigue;
+   a la derecha el resumen con el botón, quieto al bajar. En el celular: turno, datos, resumen y cómo sigue. */
+#page-pago .back { padding-block: 4px 8px; min-height: 44px; }
+#page-pago .pg { padding-top: 12px; }
+.chk { display: grid; gap: 18px; grid-template-columns: minmax(0, 1fr); grid-template-areas: 'head' 'turno' 'datos' 'side' 'pasos'; }
+.chk__head { grid-area: head; display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 14px 24px; }
+.chk__head h1 { font-size: clamp(30px, 4vw, 46px); letter-spacing: -.04em; margin-top: 6px; }
+.chk__turno { grid-area: turno; display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); border: 1px solid var(--ink-200); border-radius: var(--r-l); overflow: hidden; background: var(--paper); }
+.chk__datos { grid-area: datos; } .chk__side { grid-area: side; min-width: 0; display: grid; gap: 18px; } .pasos { grid-area: pasos; }
+.chk__mapa h2 { margin-bottom: 12px; } .chk__mapa .mapbox { max-width: none; }
+.chk__ph { position: relative; min-height: 230px; background: var(--ink-100); }
+.chk__ph img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.chk__b { padding: 22px 24px; display: grid; gap: 10px; align-content: center; }
+.chk__b h2 { font-size: clamp(22px, 2.4vw, 28px); letter-spacing: -.03em; }
+.chk__when { font: 600 clamp(22px, 2.4vw, 28px)/1.15 var(--f-mono); letter-spacing: -.04em; }
+.chk__when span { white-space: nowrap; }
+.chk__facts { display: flex; flex-wrap: wrap; gap: 6px 18px; color: var(--ink-600); font-size: 15px; }
+.chk__facts li { display: inline-flex; align-items: center; gap: 6px; }
+.chk__b .link { justify-self: start; font-size: 14.5px; }
+.reloj { display: inline-flex; align-items: center; gap: 8px; padding: 9px 16px; border-radius: 999px; background: var(--ok-50); color: var(--ok-ink); font-size: 14px; font-weight: 500; transition: background-color .3s, color .3s; }
+.reloj b { font: 600 19px var(--f-mono); letter-spacing: -.02em; min-width: 5ch; }
+.reloj.is-poco { background: var(--accent-50); color: var(--accent-ink); }
+.mbar__t span .mbar__reloj { display: inline; font: 600 12.5px var(--f-mono); letter-spacing: 0; color: var(--ok-ink); }
+.pasos h2 { font-size: 20px; letter-spacing: -.02em; margin-bottom: 14px; }
+.pasos ol { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.pasos li { border: 1px solid var(--ink-200); border-radius: var(--r-l); padding: 18px; display: grid; gap: 6px; align-content: start; background: var(--paper); }
+.pasos li > span:last-child { color: var(--ink-600); font-size: 14.5px; }
+.pasos li b { font-size: 17px; letter-spacing: -.02em; }
+.pasos__n { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--ink-900); color: #fff; font: 600 13px var(--f-mono); margin-bottom: 4px; }
+@media (min-width: 940px) {
+  .chk { grid-template-columns: minmax(0, 1fr) 380px; grid-template-areas: 'head head' 'turno side' 'datos side' 'pasos side'; gap: 20px 48px; align-items: start; }
+  .chk__side { position: sticky; top: calc(var(--header-h) + 18px); }
+}
+@media (max-width: 600px) { .chk__turno { grid-template-columns: 1fr; } .chk__ph { min-height: 0; aspect-ratio: 16 / 8; } .chk__b { padding: 18px; } }
+/* Sin turno guardado: se venció el tiempo o se llegó sin elegir ninguno. Abajo, turnos libres. */
+.aviso { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 18px; align-items: start; padding: clamp(20px, 3vw, 32px); border-radius: var(--r-xl); background: var(--ink-50); border: 1px solid var(--ink-200); }
+.aviso--vencio { background: var(--accent-50); border-color: #f5d5ca; }
+.aviso__ic { width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; background: var(--paper); color: var(--accent-ink); }
+.aviso__ic .icon { width: 26px; height: 26px; }
+.aviso h1 { font-size: clamp(28px, 3.6vw, 42px); letter-spacing: -.04em; margin-bottom: 10px; }
+.aviso p { color: var(--ink-600); max-width: 60ch; font-size: 16.5px; }
+.aviso__acts { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+.aviso__turno { grid-column: 1 / -1; display: grid; grid-template-columns: 120px minmax(0, 1fr); border-radius: var(--r-l); overflow: hidden; background: var(--paper); border: 1px solid #f5d5ca; }
+.aviso__ph { position: relative; background: var(--ink-100); min-height: 110px; }
+.aviso__ph img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.aviso__ph .tag { top: 8px; left: 8px; }
+.aviso__b { padding: 14px 16px; display: grid; gap: 4px; align-content: center; font-size: 14px; color: var(--ink-600); }
+.aviso__b b { font-size: 17px; color: var(--ink-900); letter-spacing: -.02em; }
+.aviso__when { font: 600 17px var(--f-mono); color: var(--ink-900); letter-spacing: -.03em; }
+@media (min-width: 900px) {
+  .aviso--vencio { grid-template-columns: auto minmax(0, 1fr) minmax(300px, 360px); align-items: center; }
+  .aviso__turno { grid-column: auto; grid-template-columns: 1fr; }
+  .aviso__ph { min-height: 0; aspect-ratio: 16 / 8; }
+}
+@media (max-width: 520px) { .aviso { grid-template-columns: minmax(0, 1fr); } .aviso__turno { grid-template-columns: 96px minmax(0, 1fr); } .aviso__ph .tag { display: none; } }
+.mas { margin-top: clamp(32px, 5vw, 56px); }
+.mas .sec__head { margin-bottom: 18px; align-items: center; }
+.mas .sec__head h2 { font-size: clamp(24px, 2.8vw, 34px); }
+/* Mis turnos, recién pagado */
+.okban { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; padding: 16px 18px; margin-bottom: 18px; border-radius: var(--r-l); background: var(--ok-50); color: var(--ok-ink); }
+.okban__ic { width: 40px; height: 40px; border-radius: 50%; background: var(--ok); color: #fff; display: grid; place-items: center; flex: none; }
+.okban > div { flex: 1 1 220px; display: grid; gap: 2px; font-size: 14.5px; }
+.okban > div b { color: var(--ink-900); font-size: 17px; letter-spacing: -.02em; }
+/* Aviso de turno guardado: en la compu, arriba ("10:00 Pagar seña"); en el celular, una barra sobre la de abajo */
+.hold b { font: 600 14px var(--f-mono); letter-spacing: -.02em; }
+.hold.is-poco { animation: latido 1.6s var(--ease) infinite; }
+@keyframes latido { 50% { box-shadow: 0 0 0 5px rgba(228,87,46,.18); } }
+.hold-bar { display: none; }
 .panel { border: 1px solid var(--ink-200); border-radius: var(--r-l); padding: 22px; background: var(--paper); }
 .panel h2 { font-size: 20px; letter-spacing: -.02em; margin-bottom: 16px; }
 .panel--sum { box-shadow: var(--shadow-m); }
@@ -431,19 +485,24 @@ dialog .row { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wr
 /* ---------- Barra inferior (mobile) ---------- */
 .tabbar { display: none; }
 @media (max-width: 820px) {
-  .tlink, .top__neg, #t-carrito { display: none; }
+  .tlink, .top__neg, #t-pago { display: none; }
   .top__in { gap: 12px; }
   body { padding-bottom: 68px; }
-  .tabbar { position: fixed; z-index: 55; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: repeat(4, 1fr); background: rgba(255,255,255,.96); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-top: 1px solid var(--ink-200); padding-bottom: env(safe-area-inset-bottom, 0px); }
+  .tabbar { position: fixed; z-index: 55; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: repeat(3, 1fr); background: rgba(255,255,255,.96); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-top: 1px solid var(--ink-200); padding-bottom: env(safe-area-inset-bottom, 0px); }
   .tabbar button { position: relative; display: grid; justify-items: center; gap: 2px; padding: 9px 0 8px; font-size: 11px; font-weight: 500; color: var(--ink-500); }
   .tabbar button.is-on { color: var(--accent); }
   .tabbar .badge { top: 3px; right: calc(50% - 22px); }
   .toast { bottom: 84px; }
+  .hold-bar:not([hidden]) { position: fixed; z-index: 54; left: 10px; right: 10px; bottom: calc(var(--tabbar-h, 57px) + 8px); display: flex; align-items: center; gap: 12px; padding: 10px 10px 10px 16px; border-radius: var(--r-l); background: var(--ink-900); color: #fff; box-shadow: var(--shadow-l); }
+  .hold-bar__t { flex: 1; min-width: 0; display: grid; font-size: 13px; color: var(--ink-300); }
+  .hold-bar__t > b { color: #fff; font-size: 14.5px; }
+  .hold-bar__t span b { font: 600 13px var(--f-mono); color: var(--accent-claro); }
+  body.con-hold { padding-bottom: 140px; }
+  body.con-hold .toast { bottom: 150px; }
 }
 @media (max-width: 520px) {
   .rubros { gap: 8px; } .rubro__n { font-size: 12.5px; left: 7px; }
   .frow { grid-template-columns: 1fr 1fr; } .frow .ff:first-child { grid-column: 1 / -1; }
-  .item { grid-template-columns: 68px 1fr; gap: 12px; } .item__ph { width: 68px; height: 68px; }
   .gal { grid-template-columns: 1fr; grid-template-rows: 1fr; } .gal figure:not(:first-child) { display: none; } .gal figure:first-child { border-radius: var(--r-l); }
 }
 
@@ -489,7 +548,7 @@ dialog .row { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wr
 @media (pointer: coarse) {
   .btn--s, .pill, .copy, .unit, .tlink, .brand { min-height: 44px; }
   .linkbox input { height: 44px; }
-  .link, .item__x { display: inline-flex; align-items: center; min-height: 44px; }
+  .link { display: inline-flex; align-items: center; min-height: 44px; }
   .stepper button { width: 40px; height: 40px; }
   .foot__col a { padding-block: 10px; }
   .foot__col { gap: 0; }
@@ -621,11 +680,11 @@ dialog .row { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wr
 
 /* ---------- Con el dedo: se aprieta al tocar y rebota al soltar (toque.js) ---------- */
 @media (hover: none), (pointer: coarse) {
-  .btn, .tlink, .copy, .pill, .day, .slot, .qslot, .unit, .cupo, .rubro, .now, .vcard, .tabbar button, .back, .link, .brand, .item__x, .stepper button {
+  .btn, .tlink, .copy, .pill, .day, .slot, .qslot, .unit, .cupo, .rubro, .now, .vcard, .tabbar button, .back, .link, .brand, .stepper button {
     transition: transform var(--t-press) var(--ease), background-color .2s ease, border-color .2s ease, color .2s ease;
   }
   .btn.is-apreta, .copy.is-apreta, .pill.is-apreta, .day.is-apreta, .slot.is-apreta, .qslot.is-apreta, .unit.is-apreta, .tlink.is-apreta, .stepper button.is-apreta, .tabbar button.is-apreta { transform: scale(.94); }
-  .rubro.is-apreta, .now.is-apreta, .vcard.is-apreta, .cupo.is-apreta, .back.is-apreta, .link.is-apreta, .brand.is-apreta, .item__x.is-apreta { transform: scale(.97); }
+  .rubro.is-apreta, .now.is-apreta, .vcard.is-apreta, .cupo.is-apreta, .back.is-apreta, .link.is-apreta, .brand.is-apreta { transform: scale(.97); }
   .is-suelta { transform: scale(1.04) translateY(-2px); transition: transform 360ms var(--ease-rebote), background-color .36s ease, color .36s ease; }
   .btn--block.is-suelta, .rubro.is-suelta, .now.is-suelta, .vcard.is-suelta { transform: scale(1.02) translateY(-1px); }
   /* el verde agua del barrido, de una, mientras el dedo apoya y un momento después */

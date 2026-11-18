@@ -2,7 +2,9 @@
 //   - inicio: rubros con foto, dónde/cuándo/hora y "Buscar turnos"; "Libres ahora" con su switch; lugares
 //   - resultados: rubro, día, franja y zona; horarios rápidos; "Solo techadas"
 //   - ficha del lugar: día, horario, cancha o barbero, "Reservar turno" (y la barra de abajo en el celular)
-//   - carrito: avisos al lado de cada campo, pago simulado → Mis turnos → cancelar con su diálogo
+//   - pagar la seña (sin carrito): el turno guardado 10 minutos, el aviso "Pagar seña" en las otras pantallas,
+//     avisos al lado de cada campo, pago simulado → Mis turnos → cancelar con su diálogo
+//   - turno guardado: a los 10 minutos se libera y se puede volver a reservar (con el reloj de Playwright)
 //   - parte para negocios: botones de la franja, copiar link, reglas de cancelación, preguntas, "Sumá tu negocio"
 //   - "Sumá tu negocio" → registro del panel con los datos cargados → cuenta creada → panel (las cinco vistas)
 //   - links viejos: reservar.html?rubro=…, reservar.html, index.html#sumate
@@ -134,19 +136,33 @@ const medir = () => {
       ok(/Seña ahora/.test(await p.textContent('#book .sum')), `${w} ficha: muestra la seña y lo que se paga en el lugar`);
       await p.limpio('ficha con horario');
       await p.toca('#book [data-act="reservar"]'); await espera(p);
-      ok((await p.pagina()) === 'carrito' && (await p.locator('#carrito-root .item').count()) === 1, `${w} reservar: el turno va al carrito`);
-      ok(await p.evaluate(() => [...document.querySelectorAll('[data-count="carrito"]')].some((b) => b.textContent === '1')), `${w} carrito: el contador marca 1`);
-      await p.limpio('carrito');
+      ok((await p.pagina()) === 'pago' && (await p.locator('#pago-root .chk__turno').count()) === 1 && /Confirmá tu turno/.test(await p.textContent('#pago-root h1')), `${w} reservar: va directo a pagar la seña de ese turno`);
+      const reloj0 = await p.textContent('#pago-root .reloj b');
+      ok(/^(10:00|09:5\d)$/.test(reloj0), `${w} pago: el turno queda guardado 10 minutos (${reloj0})`);
+      ok(await p.evaluate(() => !document.querySelector('[data-tab="carrito"], #t-carrito, [data-count="carrito"]') && !/carrito/i.test(document.body.innerText)), `${w} sin carrito: ni pestaña, ni ícono, ni la palabra`);
+      ok(/Dónde queda/.test(await p.textContent('#pago-root')) && (await p.locator('#pago-root .pasos li').count()) === 3, `${w} pago: muestra dónde queda y los tres pasos de cómo sigue`);
+      await p.limpio('pago');
 
-      // ---------- Carrito → pago simulado → Mis turnos ----------
+      // ---------- El turno guardado sigue a la vista en las otras pantallas ----------
+      await p.toca('#page-pago .back'); await espera(p);
+      ok((await p.pagina()) === 'ficha', `${w} pago: "Volver" vuelve a la ficha`);
+      await p.toca('.top .brand'); await espera(p);
+      if (cel) ok(await p.isVisible('#hold-bar') && /^0\d:\d\d$/.test(await p.textContent('#hold-bar [data-reloj]')), `${w} turno guardado: en el celular, la barra "Pagar seña" con el tiempo que queda`);
+      else ok(await p.isVisible('#t-pago') && /^0\d:\d\d$/.test(await p.textContent('#t-pago [data-reloj]')), `${w} turno guardado: arriba, "Pagar seña" con el tiempo que queda`);
+      await p.limpio('inicio con un turno guardado');
+      await p.toca(cel ? '#hold-bar .btn' : '#t-pago'); await espera(p);
+      ok((await p.pagina()) === 'pago' && (await p.locator('#pago-root .chk__turno').count()) === 1 && !(await p.isVisible('#hold-bar')) && !(await p.isVisible('#t-pago')), `${w} turno guardado: "Pagar seña" vuelve a la pantalla de pago`);
+
+      // ---------- Pago simulado → Mis turnos ----------
       await p.toca('[data-act="pay"]'); await espera(p, 200);
-      ok(await p.isVisible('#c-nombre-e') && await p.isVisible('#c-wa-e'), `${w} carrito: sin datos, avisa al lado de cada campo`);
+      ok(await p.isVisible('#c-nombre-e') && await p.isVisible('#c-wa-e'), `${w} pago: sin datos, avisa al lado de cada campo`);
       await p.fill('#c-nombre', 'Ana Prueba'); await p.fill('#c-wa', '2622 15 123456');
       await p.toca('[data-act="pay"]'); await espera(p, 300);
-      ok(await p.isVisible('.mpov'), `${w} carrito: aparece el pago simulado`);
+      ok(await p.isVisible('.mpov'), `${w} pago: aparece el pago simulado`);
       await p.waitForSelector('#page-turnos:not([hidden]) .tcard', { timeout: 6000 }); await espera(p);
       ok((await p.pagina()) === 'turnos' && (await p.locator('#turnos-root .tcard').count()) === 1 && /BK-/.test(await p.textContent('.tcard .code')), `${w} pago: el turno queda en Mis turnos con su código`);
       ok(/demo/i.test(await p.textContent('#toast')), `${w} pago: avisa que es una demo`);
+      ok(await p.isVisible('.okban [data-go="home"]') && (await p.locator('#turnos-root .mas .now').count()) > 0 && !(await p.isVisible('#hold-bar')) && !(await p.isVisible('#t-pago')), `${w} Mis turnos: "¡Listo!" con "Reservar otro turno", turnos libres abajo y sin turno guardado`);
       await p.limpio('Mis turnos');
       await p.toca('[data-act="cancel"]'); await espera(p, 300);
       ok(await p.isVisible('#dlg[open]'), `${w} Mis turnos: "Cancelar" pregunta antes`);
@@ -155,8 +171,7 @@ const medir = () => {
       await p.toca('[data-act="cancel"]'); await espera(p, 300); await p.toca('#dlg-si'); await espera(p);
       ok((await p.locator('.tcard').count()) === 0 && /Todavía no tenés turnos/.test(await p.textContent('#turnos-root')), `${w} Mis turnos: cancelar lo saca`);
       if (cel) {
-        await p.toca('.tabbar [data-tab="carrito"]'); await espera(p);
-        ok((await p.pagina()) === 'carrito' && /vacío/.test(await p.textContent('#carrito-root')), `${w} barra de abajo: Carrito`);
+        ok((await p.locator('.tabbar button').count()) === 3, `${w} barra de abajo: Reservar, Mis turnos y Negocios (sin Carrito)`);
         await p.toca('.tabbar [data-tab="home"]'); await espera(p);
         ok((await p.pagina()) === 'home', `${w} barra de abajo: Reservar`);
       }
@@ -231,6 +246,25 @@ const medir = () => {
       });
       ok(r.fin <= r.ve && r.rotulo, `${w}x${h} primer pantallazo: "¿Qué querés reservar?" y "Buscar turnos" entran sin bajar (termina en ${r.fin}, se ve hasta ${r.ve})`);
       if (w <= 820) ok(r.envivo >= r.ve - 1, `${w}x${h} celular: la pantalla termina justo después del buscador, "En vivo" aparece al bajar (empieza en ${r.envivo})`);
+      await q.context().close();
+    }
+
+    // ---------- Turno guardado 10 minutos (pedido del dueño, 18/11): se vence, se libera y se puede volver a reservar ----------
+    for (const [w, h] of [[1440, 900], [390, 844]]) {
+      const q = await abrir(w, h);
+      await q.clock.install();
+      await q.ir(B + 'reservar.html?rubro=padel&dia=1');
+      await q.toca('.qslot >> nth=0'); await espera(q, 300);
+      await q.toca('#book [data-act="reservar"]'); await espera(q);
+      await q.clock.fastForward('08:30'); await espera(q, 300);
+      const poco = await q.evaluate(() => ({ t: document.querySelector('#pago-root .reloj b').textContent, naranja: document.querySelector('#pago-root .reloj').classList.contains('is-poco') }));
+      ok(/^01:[23]\d$/.test(poco.t) && poco.naranja, `${w} turno guardado: a los 8 minutos y medio quedan ${poco.t} y el reloj se pone naranja`);
+      await q.clock.fastForward('01:45'); await espera(q, 300);
+      ok(await q.isVisible('.aviso--vencio') && /Se terminó el tiempo/.test(await q.textContent('#pago-root')) && (await q.locator('#pago-root .mas .now').count()) > 0, `${w} turno guardado: a los 10 minutos se libera, avisa y muestra otros turnos libres`);
+      await q.limpio('turno vencido');
+      await q.toca('[data-act="otra-vez"]'); await espera(q);
+      ok((await q.locator('#pago-root .chk__turno').count()) === 1 && /^(10:00|09:5\d)$/.test(await q.textContent('#pago-root .reloj b')), `${w} turno vencido: "Volver a reservarlo" lo guarda otros 10 minutos`);
+      ok(q.errs.length === 0, `${w} turno guardado: sin errores ${q.errs.join(' | ')}`);
       await q.context().close();
     }
 

@@ -6,7 +6,7 @@ Turnos online con seña para canchas de pádel, fútbol y tenis y para barbería
 - **Frente** (`index.html`, `sitio.css`, `sitio.js`): una sola página, sin frameworks, que está publicada en https://bookea.ar. Incluye:
   - el buscador (rubro con foto, dónde, cuándo y hora), "Libres ahora" y los lugares de cada rubro
   - resultados con filtros, la ficha de cada lugar (fotos, cupos de la semana, horarios, precios) y la reserva
-  - carrito con la seña, pago simulado y "Mis turnos" (con cancelar), guardados en el navegador de quien reserva
+  - pago de la seña al reservar (sin carrito: el turno queda guardado 10 minutos), pago simulado y "Mis turnos" (con cancelar), guardados en el navegador de quien reserva
   - la parte para negocios: cómo funciona, funciones, "Sumá tu negocio" (primer paso del registro del panel) y preguntas
   - letras Inter Tight y JetBrains Mono servidas desde `assets/fuentes/` (licencia OFL), colores de Bookea
 - **reservar.html**: solo redirige al inicio, para que los links viejos (`reservar.html?rubro=padel…`) sigan andando.
