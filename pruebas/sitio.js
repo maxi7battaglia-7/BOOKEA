@@ -87,6 +87,7 @@ const medir = () => {
       ok((await p.pagina()) === 'home' && (await p.locator('#f-rubros .rubro').count()) === 4, `${w} inicio: los cuatro rubros con foto`);
       ok(await p.evaluate(() => [...document.fonts].some((f) => f.family.includes('Inter Tight') && f.status === 'loaded')), `${w} inicio: la letra Inter Tight cargó desde bookea.ar`);
       ok(await p.evaluate(() => [...document.images].every((i) => !i.complete || i.naturalWidth > 0)), `${w} inicio: ninguna foto rota`);
+      ok(await p.evaluate(() => { const t = [...document.querySelectorAll('.top a, .top button')].filter((e) => e.offsetParent).map((e) => e.textContent.trim()); return !t.some((x) => /Reservar turno/.test(x)) && t.some((x) => x === 'Ingresar'); }), `${w} barra de arriba: sin "Reservar turno", con "Ingresar"`);
       await p.limpio('inicio');
       await p.toca('#f-rubros .rubro[data-k="futbol"]'); await espera(p, 200);
       ok((await p.getAttribute('#f-rubros .rubro[data-k="futbol"]', 'aria-pressed')) === 'true' && (await p.getAttribute('#f-rubros .rubro[data-k="padel"]', 'aria-pressed')) === 'false', `${w} inicio: tocar Fútbol 5 lo marca`);
