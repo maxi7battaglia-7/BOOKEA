@@ -216,6 +216,19 @@ const medir = () => {
       await p.context().close();
     }
 
+    // ---------- Primer pantallazo: el buscador entero a la vista, sin bajar (pedido del dueño, 18/11) ----------
+    for (const [w, h] of [[360, 560], [390, 600], [390, 664], [414, 720], [768, 900], [1280, 620], [1366, 657], [1440, 760], [1536, 730], [1920, 950]]) {
+      const q = await abrir(w, h);
+      await q.ir(B); await q.waitForTimeout(900);
+      const r = await q.evaluate(() => {
+        const tb = document.querySelector('.tabbar'), tabH = tb && getComputedStyle(tb).display !== 'none' ? tb.getBoundingClientRect().height : 0;
+        const k = document.querySelector('.finder__k');
+        return { ve: Math.floor(innerHeight - tabH), fin: Math.ceil(document.querySelector('#finder').getBoundingClientRect().bottom), rotulo: getComputedStyle(k).display !== 'none' && k.getBoundingClientRect().height > 0 };
+      });
+      ok(r.fin <= r.ve && r.rotulo, `${w}x${h} primer pantallazo: "¿Qué querés reservar?" y "Buscar turnos" entran sin bajar (termina en ${r.fin}, se ve hasta ${r.ve})`);
+      await q.context().close();
+    }
+
     // ---------- Movimiento ----------
     {
       const q = await abrir(1440, 900);

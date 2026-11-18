@@ -496,6 +496,39 @@ dialog .row { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wr
   .foot__bottom summary, .foot__col .copy { min-height: 44px; display: inline-flex; align-items: center; }
 }
 
+/* ---------- Primer pantallazo: el buscador entero a la vista (pedido del dueño, 18/11) ----------
+   Los espacios, el título, el texto y las fotos de los rubros se achican según el alto de la pantalla,
+   para que "¿Qué querés reservar?" y "Buscar turnos" entren sin bajar, en notebooks y en el celular. */
+.hero { padding-block: clamp(14px, 3.5vh, 48px) clamp(28px, 5vh, 56px); }
+.hero h1 { font-size: clamp(32px, min(6vw, 8.6vh), 74px); margin-block: clamp(6px, 1.3vh, 12px) clamp(10px, 1.8vh, 16px); }
+.hero__lead { font-size: clamp(15.5px, min(1.6vw, 2.5vh), 19px); margin-bottom: clamp(14px, 2.8vh, 26px); max-width: 48ch; }
+.finder { padding: clamp(12px, 1.9vh, 18px); }
+.finder__k { margin-bottom: 8px; }
+.rubros { margin-bottom: clamp(10px, 1.7vh, 16px); }
+.rubro { aspect-ratio: 1 / .92; }
+.frow { margin-bottom: clamp(10px, 1.5vh, 14px); }
+.ff { padding: 7px 12px 6px; }
+.finder .btn--lg { min-height: clamp(46px, 6.4vh, 52px); }
+.finder__note { margin-top: 10px; }
+.collage { height: min(560px, 46vw, calc(100vh - var(--header-h) - 72px)); }
+@supports (height: 100svh) { .collage { height: min(560px, 46vw, calc(100svh - var(--header-h) - 72px)); } }
+@media (max-height: 820px) { .rubro { aspect-ratio: 4 / 3; } .finder__note { display: none; } }
+@media (max-height: 680px) and (min-width: 761px) { .hero p.eyebrow { display: none; } .rubro { aspect-ratio: 16 / 11; } }
+@media (max-width: 760px) {
+  :root { --header-h: 58px; }
+  .hero { padding-block: 12px 32px; }
+  .hero p.eyebrow, .lead__mas, .finder__note { display: none; }
+  .hero h1 { font-size: clamp(30px, 9vw, 40px); margin-block: 0 10px; }
+  .hero__lead { font-size: 15.5px; line-height: 1.45; margin-bottom: 14px; }
+  .rubro { aspect-ratio: 4 / 3; }
+}
+@media (max-width: 760px) and (min-height: 640px) { .lead__mas { display: inline; } }
+@media (max-width: 760px) and (max-height: 640px) {
+  .hero h1 { font-size: 28px; }
+  .rubro { aspect-ratio: 16 / 10; }
+  .ff { padding-block: 5px 4px; }
+}
+
 /* =========================================================
    Movimiento de Bookea (DESIGN.md: "Pantalla de carga", "Barrido verde", toque en pantallas táctiles)
    Todo respeta "reducir movimiento": ahí no hay barrido ni entradas, y la pantalla de carga se desvanece.
