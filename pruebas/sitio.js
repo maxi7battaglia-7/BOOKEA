@@ -223,9 +223,11 @@ const medir = () => {
       const r = await q.evaluate(() => {
         const tb = document.querySelector('.tabbar'), tabH = tb && getComputedStyle(tb).display !== 'none' ? tb.getBoundingClientRect().height : 0;
         const k = document.querySelector('.finder__k');
-        return { ve: Math.floor(innerHeight - tabH), fin: Math.ceil(document.querySelector('#finder').getBoundingClientRect().bottom), rotulo: getComputedStyle(k).display !== 'none' && k.getBoundingClientRect().height > 0 };
+        return { ve: Math.floor(innerHeight - tabH), fin: Math.ceil(document.querySelector('#finder').getBoundingClientRect().bottom), rotulo: getComputedStyle(k).display !== 'none' && k.getBoundingClientRect().height > 0,
+          envivo: Math.floor(document.querySelector('#libres .eyebrow').getBoundingClientRect().top) };
       });
       ok(r.fin <= r.ve && r.rotulo, `${w}x${h} primer pantallazo: "¿Qué querés reservar?" y "Buscar turnos" entran sin bajar (termina en ${r.fin}, se ve hasta ${r.ve})`);
+      if (w <= 820) ok(r.envivo >= r.ve - 1, `${w}x${h} celular: la pantalla termina justo después del buscador, "En vivo" aparece al bajar (empieza en ${r.envivo})`);
       await q.context().close();
     }
 
