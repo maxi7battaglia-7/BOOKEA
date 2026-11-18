@@ -543,7 +543,7 @@
     if (h === "pick" || h === "reservar") return { page: "home", ir: "pick" };
     return { page: "home" };
   })();
-  try { history.scrollRestoration = "manual"; history.replaceState({ page: inicial.page }, "", location.pathname); } catch {}
+  try { history.scrollRestoration = "manual"; history.replaceState({ page: inicial.page }, "", /^https?:$/.test(location.protocol) ? location.pathname.replace(/\/index\.html$/, "/") : location.pathname); } catch {}
   show({ page: inicial.page });
   if (inicial.ir) requestAnimationFrame(() => scrollTo(inicial.ir));
   // Un link con # a la misma página (por ejemplo bookea.ar/#sumate con el sitio ya abierto) no recarga:

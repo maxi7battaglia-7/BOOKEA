@@ -68,6 +68,7 @@ def armar(nombre, archivos):
     html = re.sub(r'\s*<link rel="preconnect"[^>]*>', "", html)
     html = re.sub(r'<link href="https://fonts.googleapis.com[^>]+>', LETRA, html)
     html = re.sub(r'\s*<link rel="preload"[^>]*>', "", html)  # la letra ya va adentro del CSS
+    html = html.replace('href="./"', 'href="index.html"')  # sin servidor, "./" abriría la carpeta
     for a in archivos:
         html = adentro(html, a, "window.BOOKEA_CONFIG = {};" if a == "config.js" else None)
     # fotos repetidas en <img>: la primera lleva la foto, las otras la copian

@@ -197,6 +197,7 @@ const medir = () => {
       await p.fill('#i-email', 'demo@example.com'); await p.fill('#i-clave', 'bookea2026');
       await p.toca('#f-ingresar button[type="submit"]'); await espera(p, 4200);
       ok(await p.isVisible('#panel'), `${w} panel: entra con la cuenta de prueba`);
+      ok(await p.evaluate(() => [...document.querySelectorAll('a.brand')].every((l) => l.getAttribute('href') === './')), `${w} panel: el logo vuelve a bookea.ar/ (no a /index.html)`);
       for (const v of ['agenda', 'finanzas', 'clientes', 'negocio', 'cuenta']) {
         await p.toca(`.menu__i[data-vista="${v}"]`); await espera(p, 700);
         await p.limpio(`panel, ${v}`);
@@ -206,11 +207,13 @@ const medir = () => {
       await p.ir(B + 'index.html#sumate');
       ok((await p.pagina()) === 'negocios' && await p.evaluate(() => Math.abs(document.querySelector('#sumate').getBoundingClientRect().top) < 160), `${w} link viejo index.html#sumate: abre el formulario`);
       await p.evaluate(() => { window.__sinRecargar = 1; }); await p.toca('.tabbar [data-tab="home"], .top .brand'); await espera(p);
-      await p.goto(B + 'index.html#preguntas'); await espera(p, 900);
+      await p.goto(B + '#preguntas'); await espera(p, 900);
       ok((await p.pagina()) === 'negocios' && await p.evaluate(() => window.__sinRecargar === 1 && (() => { const r = document.querySelector('#preguntas').getBoundingClientRect(); return r.top >= -2 && r.top < innerHeight - 100; })()), `${w} link #preguntas con la página ya abierta: va a las preguntas sin recargar`);
       await p.ir(B + 'reservar.html');
       ok((await p.pagina()) === 'home' && /\/$|index\.html$/.test(new URL(p.url()).pathname), `${w} link viejo reservar.html: abre el buscador del inicio`);
       ok((await p.getAttribute('.top a.btn--ink', 'href')) === 'admin.html', `${w} "Ingresar" lleva al panel`);
+      await p.ir(B + 'index.html');
+      ok(new URL(p.url()).pathname === '/', `${w} entrar por /index.html deja la dirección limpia (bookea.ar/)`);
       ok((await p.evaluate(() => document.documentElement.scrollWidth)) <= w, `${w}: sin desplazamiento horizontal`);
       ok(p.errs.length === 0, `${w}: sin errores en la consola ni archivos que falten ${p.errs.join(' | ')}`);
       await p.context().close();
