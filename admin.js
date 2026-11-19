@@ -1202,6 +1202,18 @@
     return [primero, hoy];
   };
   const CONCEPTO = (r) => r.estado === "jugada" ? "Turno pagado" : r.estado === "confirmada" ? "Seña" : r.estado === "ausente" ? "Seña retenida (no vino)" : "Seña retenida (canceló tarde)";
+  // Finanzas en tarjetas (pedido del dueño, 19/11: "que ocupen menos espacio y se vean en una sola pantalla la mayoría",
+  // y un gráfico más fácil de entender). Arriba lo cobrado con su gráfico y los últimos cobros; después cuatro tarjetas
+  // chicas con las otras cifras; abajo el reparto por cancha y por horario.
+  const enMiles = (v) => (v >= 1e6 ? `${(v / 1e6).toLocaleString("es-AR", { maximumFractionDigits: 1 })} M` : v >= 1000 ? `${Math.round(v / 1000).toLocaleString("es-AR")} mil` : String(Math.round(v)));
+  const fechaC = (iso) => `${DIAS_C[dow(iso)]} ${corto(iso)}`;
+  const mini = (id, k, v, n, { barra = null, alerta = false } = {}) =>
+    `<section class="card fz-k${alerta ? " fz-k--alerta" : ""}" aria-labelledby="${id}"><h2 class="fz-k__k" id="${id}">${k}</h2><p class="fz-k__v">${v}</p>${barra !== null ? `<span class="fz-k__barra" aria-hidden="true"><i style="width:${Math.round(barra * 100)}%"></i></span>` : ""}<p class="fz-k__n">${n}</p></section>`;
+  const reparto = (filas, total) => {
+    if (!filas.length || !total) return `<p class="vacio-p">Todavía no entró plata en este período.</p>`;
+    const max = Math.max(1, ...filas.map((f) => f.v));
+    return `<ul class="rep">${filas.map((f) => `<li class="rep__f"><span class="rep__n">${esc(f.n)}</span><span class="rep__b" aria-hidden="true"><i style="width:${(f.v / max) * 100}%"></i></span><span class="rep__v">${plata(f.v)}<small>${pct(f.v / total)}</small></span></li>`).join("")}</ul>`;
+  };
   VISTAS.finanzas = () => {
     const [desde, hasta] = rango(FIN.periodo), dias = diasEntre(desde, hasta) + 1;
     const R = resumen(desde, hasta), P = resumen(sumar(desde, -dias), sumar(desde, -1));
@@ -1210,19 +1222,28 @@
     const porDia = [];
     for (let f = desde; f <= hasta; f = sumar(f, 1)) {
       const l = R.lista.filter((r) => r.fecha === f);
-      porDia.push({ iso: f, v: l.reduce((s, r) => s + ingreso(r), 0), n: l.filter((r) => esTurno(r) && ocupa(r)).length });
+      porDia.push({ iso: f, v: l.reduce((s, r) => s + ingreso(r), 0), n: l.filter((r) => esTurno(r) && ocupa(r)).length, hoy: f === hoy });
     }
+    // el promedio y el mejor día se cuentan sin hoy, que todavía está sumando; el promedio, sobre los días que entró plata
+    const cerrados = porDia.filter((d) => !d.hoy), conCobro = cerrados.filter((d) => d.v > 0);
+    const prom = conCobro.length ? conCobro.reduce((s, d) => s + d.v, 0) / conCobro.length : 0;
+    const mejor = cerrados.reduce((a, d) => (d.v > (a ? a.v : 0) ? d : a), null);
+    const conHoy = porDia.some((d) => d.hoy);
     const porRec = NEG.recursos.map((rec) => ({ n: rec.nombre, v: R.lista.filter((r) => r.recurso === rec.id).reduce((s, r) => s + ingreso(r), 0) }));
     const porFranja = NEG.franjas.map((fr) => {
       const d = aMin(fr.desde); let h = aMin(fr.hasta); if (h <= d) h += 1440;
       return { n: `${fr.desde} a ${fr.hasta}`, v: R.lista.filter((r) => { const m = r.hora % 1440, mm = m < d ? m + 1440 : m; return mm >= d && mm < h; }).reduce((s, r) => s + ingreso(r), 0) };
     });
     const movs = R.lista.filter((r) => ingreso(r) > 0).sort((a, b) => b.fecha.localeCompare(a.fecha) || b.hora - a.hora);
-    const verMovs = FIN.todos ? movs : movs.slice(0, 12);
     const prevD = sumar(desde, -dias), prevH = sumar(desde, -1), futPlata = futuros.reduce((s, r) => s + r.precio - r.sena, 0);
     const delta = P.cobrado
       ? `<span class="${varCob >= 0 ? "sube" : "baja"}">${varCob >= 0 ? "▲ +" : "▼ −"}${Math.abs(Math.round(varCob * 100))} %</span> contra los ${dias} días anteriores (${corto(prevD)} al ${corto(prevH)})`
       : `Del ${corto(desde)} al ${corto(hasta)}`;
+    const U = unidad(NEG);
+    const movFila = (r) => `<li class="mov"><div class="mov__q"><b>${esc(r.cliente)}</b><small>${fechaC(r.fecha)} · ${aHora(r.hora)} · ${CONCEPTO(r)} · ${esc(nombreRec(r.recurso))}</small></div><b class="mov__v">${plata(ingreso(r))}</b></li>`;
+    const tablaMovs = () => `<div class="tabla-wrap"><table class="tabla tabla--cards"><thead><tr><th scope="col">Cliente</th><th scope="col">Fecha</th><th scope="col">Concepto</th><th scope="col">${esc(U)}</th><th scope="col" class="num">Monto</th></tr></thead><tbody>
+          ${movs.map((r) => `<tr><td class="cli">${esc(r.cliente)}</td><td class="nowrap solo-pc">${fechaC(r.fecha)} · ${aHora(r.hora)}</td><td class="solo-pc">${CONCEPTO(r)}</td><td class="solo-pc gris">${esc(nombreRec(r.recurso))}</td><td class="num"><b>${plata(ingreso(r))}</b></td><td class="dato-2 solo-cel">${fechaC(r.fecha)} ${aHora(r.hora)} · ${CONCEPTO(r)} · ${esc(nombreRec(r.recurso))}</td></tr>`).join("")}
+        </tbody></table></div>`;
     $("#vista").innerHTML = `
       <header class="vhead">
         <div><h1>Finanzas</h1><p class="vhead__frase">Lo que entró por señas y turnos del <b>${corto(desde)}</b> al <b>${corto(hasta)}</b>. Las señas van directo a tu Mercado Pago.</p></div>
@@ -1230,48 +1251,53 @@
           <div class="seg" data-seg="per" role="group" aria-label="Período">${Object.entries(PERIODOS).map(([k, t]) => `<button type="button" data-per="${k}" aria-pressed="${FIN.periodo === k}">${periodoBoton(t)}</button>`).join("")}</div>
         </div>
       </header>
-      ${kpis([
-        kpi("Cobrado", plata(R.cobrado), delta, { lider: true }),
-        kpi("Señas cobradas", plata(R.senas), "Ya están sumadas en lo cobrado"),
-        kpi("Turnos pagados", R.jugados, `Ocupaste el ${pct(R.ocupacion)} de los horarios`),
-        kpi("No vinieron", R.ausentes.length, R.ausentes.length ? `Te quedaste con ${plata(R.ausentes.reduce((s, r) => s + r.sena, 0))} de seña` : "Nadie faltó en el período"),
-        kpi("Falta cobrar", plata(futPlata), `De ${plural(futuros.length, "turno", "turnos")} de hoy en adelante, en el lugar`),
-      ])}
-      <section class="card" aria-labelledby="g-t">
-        <div class="card__head"><div><h2 id="g-t">Cobrado por día</h2><p class="card__sub">Cada barra es lo que entró ese día. ${window.matchMedia("(hover: none), (pointer: coarse)").matches ? "Tocá una barra" : "Pasá el cursor o usá las flechas"} para ver el detalle.</p></div></div>
-        <div class="chart" id="chart"></div>
-        <details class="tabla-dias" style="margin-top:12px"><summary class="link" style="display:inline-block;cursor:pointer">Ver los números de cada día</summary>
-          <div class="tabla-wrap"><table class="tabla" style="margin-top:8px"><thead><tr><th scope="col">Día</th><th scope="col" class="num">Turnos</th><th scope="col" class="num">Cobrado</th></tr></thead>
-          <tbody>${porDia.map((d) => `<tr><td>${DIAS_C[dow(d.iso)]} ${corto(d.iso)}</td><td class="num">${d.n}</td><td class="num">${plata(d.v)}</td></tr>`).join("")}</tbody></table></div>
-        </details>
-      </section>
-      <div class="grid2">
-        <section class="card" aria-labelledby="r-t"><div class="card__head"><div><h2 id="r-t">Por ${esc(unidad(NEG).toLowerCase())}</h2><p class="card__sub">Cuánto dejó cada una en el período</p></div></div>${hbar(porRec, R.cobrado)}</section>
-        <section class="card" aria-labelledby="f-t"><div class="card__head"><div><h2 id="f-t">Por franja horaria</h2><p class="card__sub">Según la hora en que empezó cada turno</p></div></div>${hbar(porFranja, R.cobrado)}</section>
-      </div>
-      <section class="card" aria-labelledby="m-t">
-        <div class="card__head"><div><h2 id="m-t">Movimientos</h2><p class="card__sub">${plural(movs.length, "cobro", "cobros")} en el período, del más nuevo al más viejo</p></div>
-          <button type="button" class="btn btn--line btn--sm" id="csv" ${movs.length ? "" : "disabled"}>${ico("bajar")}Descargar planilla (CSV)</button></div>
-        ${movs.length ? `<div class="tabla-wrap"><table class="tabla tabla--cards"><thead><tr><th scope="col">Cliente</th><th scope="col">Fecha</th><th scope="col">Concepto</th><th scope="col">${esc(unidad(NEG))}</th><th scope="col" class="num">Monto</th></tr></thead><tbody>
-          ${verMovs.map((r) => `<tr><td class="cli">${esc(r.cliente)}</td><td class="nowrap solo-pc">${DIAS_C[dow(r.fecha)]} ${corto(r.fecha)} · ${aHora(r.hora)}</td><td class="solo-pc">${CONCEPTO(r)}</td><td class="solo-pc gris">${esc(nombreRec(r.recurso))}</td><td class="num"><b>${plata(ingreso(r))}</b></td><td class="dato-2 solo-cel">${DIAS_C[dow(r.fecha)]} ${corto(r.fecha)} ${aHora(r.hora)} · ${CONCEPTO(r)} · ${esc(nombreRec(r.recurso))}</td></tr>`).join("")}
-        </tbody></table></div>${movs.length > 12 ? `<p style="margin-top:12px"><button type="button" class="link" id="mas">${FIN.todos ? "Ver menos" : `Ver los ${movs.length} cobros`}</button></p>` : ""}`
-        : `<p class="vacio-p">Todavía no entró plata en este período. Cuando te paguen una seña o un turno, aparece acá.</p>`}
-      </section>`;
+      <div class="fz${FIN.todos ? " fz--todos" : ""}">
+        <section class="card fz-cob" aria-labelledby="fz-cob">
+          <div class="fz-cob__top">
+            <div>
+              <h2 class="fz-k__k" id="fz-cob">Cobrado</h2>
+              <p class="fz-cob__v">${plata(R.cobrado)}</p>
+              <p class="fz-k__n">${delta}</p>
+            </div>
+            <dl class="fz-datos">
+              <div><dt>Un día promedio</dt><dd>${plata(prom)}</dd></div>
+              <div><dt>Mejor día</dt><dd>${mejor ? `${fechaC(mejor.iso)}<span class="fz-datos__sep"> · </span><span class="fz-datos__m">${plata(mejor.v)}</span>` : "Todavía ninguno"}</dd></div>
+            </dl>
+          </div>
+          <div class="chart" id="chart"></div>
+          <div class="fz-cob__pie">
+            <p class="ley"><span><i class="ley__barra"></i>Lo que entró cada día</span>${prom ? `<span><i class="ley__prom"></i>Promedio de los días con cobros</span>` : ""}${conHoy ? `<span><i class="ley__hoy"></i>Hoy, todavía suma</span>` : ""}</p>
+            <details class="tabla-dias"><summary class="link">Ver cada día en números</summary>
+              <div class="tabla-wrap"><table class="tabla"><thead><tr><th scope="col">Día</th><th scope="col" class="num">Turnos</th><th scope="col" class="num">Cobrado</th></tr></thead>
+              <tbody>${porDia.map((d) => `<tr><td>${fechaC(d.iso)}${d.hoy ? " (hoy)" : ""}</td><td class="num">${d.n}</td><td class="num">${plata(d.v)}</td></tr>`).join("")}</tbody></table></div>
+            </details>
+          </div>
+        </section>
+        <div class="fz-minis">
+          ${mini("fz-senas", "Señas cobradas", plata(R.senas), "Ya están sumadas en lo cobrado")}
+          ${mini("fz-jug", "Turnos pagados", R.jugados, `Ocupaste el ${pct(R.ocupacion)} de los horarios`, { barra: R.ocupacion })}
+          ${mini("fz-aus", "No vinieron", R.ausentes.length, R.ausentes.length ? `Te quedaste con ${plata(R.ausentes.reduce((s, r) => s + r.sena, 0))} de seña` : "Nadie faltó en el período", { alerta: R.ausentes.length > 0 })}
+          ${mini("fz-falta", "Falta cobrar", plata(futPlata), `${plural(futuros.length, "turno", "turnos")} de hoy en adelante, se cobran en el lugar`)}
+        </div>
+        <section class="card fz-rep" aria-labelledby="r-t"><h2 id="r-t" class="fz-t">Por ${esc(U.toLowerCase())}</h2><p class="card__sub">Cuánto dejó cada una en el período</p>${reparto(porRec, R.cobrado)}</section>
+        <section class="card fz-rep" aria-labelledby="f-t"><h2 id="f-t" class="fz-t">Por horario</h2><p class="card__sub">Según la hora en que empezó cada turno</p>${reparto(porFranja, R.cobrado)}</section>
+        <section class="card fz-movs" aria-labelledby="m-t">
+          <div class="fz-movs__head"><div><h2 id="m-t" class="fz-t">${FIN.todos ? "Todos los cobros" : "Últimos cobros"}</h2><p class="card__sub">${plural(movs.length, "cobro", "cobros")} en el período</p></div>
+            <button type="button" class="btn btn--line btn--sm" id="csv" ${movs.length ? "" : "disabled"}>${ico("bajar")}Planilla (CSV)</button></div>
+          ${movs.length ? (FIN.todos ? tablaMovs() : `<ul class="movs">${movs.slice(0, 5).map(movFila).join("")}</ul>`) + (movs.length > 5 ? `<p class="fz-movs__pie"><button type="button" class="link" id="mas">${FIN.todos ? "Ver menos" : `Ver los ${movs.length} cobros`}</button></p>` : "")
+          : `<p class="vacio-p">Todavía no entró plata en este período. Cuando te paguen una seña o un turno, aparece acá.</p>`}
+        </section>
+      </div>`;
     $$("[data-per]").forEach((b) => b.addEventListener("click", () => { FIN.periodo = b.dataset.per; FIN.todos = false; VISTAS.finanzas(); $(`[data-per="${FIN.periodo}"]`).focus(); }));
     animarSegs();
-    const mas = $("#mas"); if (mas) mas.addEventListener("click", () => { FIN.todos = !FIN.todos; VISTAS.finanzas(); $("#mas").focus(); });
+    const mas = $("#mas"); if (mas) mas.addEventListener("click", () => { FIN.todos = !FIN.todos; VISTAS.finanzas(); $("#mas").focus(); if (FIN.todos) $(".fz-movs").scrollIntoView({ block: "start", behavior: "smooth" }); });
     const csv = $("#csv"); if (csv) csv.addEventListener("click", () => descargarCSV(movs, desde, hasta));
     const cont = $("#chart");
-    graficoBarras(cont, porDia);
+    graficoBarras(cont, porDia, prom);
     if ("ResizeObserver" in window) {
       let w = cont.clientWidth;
-      new ResizeObserver(() => { if (cont.isConnected && Math.abs(cont.clientWidth - w) > 8) { w = cont.clientWidth; graficoBarras(cont, porDia); } }).observe(cont);
+      new ResizeObserver(() => { if (cont.isConnected && Math.abs(cont.clientWidth - w) > 8) { w = cont.clientWidth; graficoBarras(cont, porDia, prom); } }).observe(cont);
     }
-  };
-  const hbar = (filas, total = 0) => {
-    const max = Math.max(1, ...filas.map((f) => f.v));
-    if (!filas.length) return `<p class="vacio-p">Sin datos.</p>`;
-    return `<div class="hbar">${filas.map((f) => `<div class="hbar__f"><span class="hbar__n">${esc(f.n)}</span><span class="hbar__p"><span class="hbar__b" style="width:calc(${(f.v / max) * 100}% - ${(f.v / max) * 110}px)"></span><span class="hbar__v">${plata(f.v)}${total ? `<span class="hbar__s">${pct(f.v / total)} del total</span>` : ""}</span></span></div>`).join("")}</div>`;
   };
   const techo = (max) => {
     if (max <= 0) return { tope: 1000, paso: 250 };
@@ -1279,23 +1305,45 @@
     const paso = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((p) => p >= crudo);
     return { tope: Math.ceil(max / paso) * paso, paso };
   };
-  // Columnas de una sola serie: verde agua, máximo 24 px, borde redondeado arriba y recto en la base,
-  // grilla fina, etiquetas en tinta y un tooltip al pasar el cursor o al moverse con las flechas.
-  const graficoBarras = (cont, datos) => {
-    const W = Math.max(280, cont.clientWidth || 640), H = W < 520 ? 200 : 240;
-    const m = { l: 52, r: 8, t: 12, b: 28 }, iw = W - m.l - m.r, ih = H - m.t - m.b;
-    const { tope, paso } = techo(Math.max(...datos.map((d) => d.v)));
-    const banda = iw / datos.length, ancho = Math.max(2, Math.min(24, banda - 2));
+  // Columnas de una sola serie (skill dataviz): verde agua, máximo 24 px, punta redondeada y base recta, grilla finita.
+  // Para que se lea de un vistazo: la línea del promedio con su monto en el eje, el mejor día con su monto arriba,
+  // hoy en verde pálido (el día no terminó), la inicial del día debajo de cada número y el detalle al pasar el cursor o tocar.
+  const LETRA_DIA = ["D", "L", "M", "M", "J", "V", "S"];
+  const graficoBarras = (cont, datos, prom = 0) => {
+    const W = Math.max(280, cont.clientWidth || 640), chico = W < 520, H = chico ? 176 : 212;
+    const m = { l: 64, r: 6, t: 24, b: 38 }, iw = W - m.l - m.r, ih = H - m.t - m.b;
+    const { tope, paso } = techo(Math.max(prom, ...datos.map((d) => d.v)));
+    const banda = iw / datos.length, ancho = Math.max(2, Math.min(24, banda - 4));
     const y = (v) => m.t + ih - (v / tope) * ih;
-    const cadaCuanto = Math.max(1, Math.ceil(datos.length / Math.floor(iw / 46)));
-    let s = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Cobrado por día. Usá las flechas para recorrer los días." tabindex="0">`;
-    for (let v = 0; v <= tope + 0.5; v += paso) s += `<line class="${v === 0 ? "base" : "grilla"}" x1="${m.l}" x2="${W - m.r}" y1="${y(v)}" y2="${y(v)}"/><text class="eje" x="${m.l - 8}" y="${y(v) + 4}" text-anchor="end">${v === 0 ? "0" : "$ " + compacto.format(v)}</text>`;
+    const ancha = banda >= 58, conLetra = banda >= 16; // alcanza para "Sáb 7" / para la inicial debajo
+    const cadaCuanto = conLetra ? 1 : Math.max(1, Math.ceil(datos.length / Math.floor(iw / 28)));
+    const mejor = datos.filter((d) => !d.hoy).reduce((a, d) => (d.v > (a ? a.v : 0) ? d : a), null);
+    const xc = (i) => m.l + i * banda + banda / 2;
+    let s = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Lo que entró cada día${prom ? `. Un día promedio: ${plata(prom)}` : ""}${mejor ? `. Mejor día: ${fechaC(mejor.iso)}, ${plata(mejor.v)}` : ""}. Usá las flechas para recorrer los días." tabindex="0">`;
+    const yProm = prom ? y(prom) : -99;
+    for (let v = 0; v <= tope + 0.5; v += paso) {
+      s += `<line class="${v === 0 ? "base" : "grilla"}" x1="${m.l}" x2="${W - m.r}" y1="${y(v)}" y2="${y(v)}"/>`;
+      if (Math.abs(y(v) - yProm) > 14) s += `<text class="eje" x="${m.l - 8}" y="${y(v) + 4}" text-anchor="end">${v === 0 ? "0" : "$ " + enMiles(v)}</text>`;
+    }
     datos.forEach((d, i) => {
       const x = m.l + i * banda + (banda - ancho) / 2, h = (d.v / tope) * ih, b = m.t + ih, rr = Math.min(4, h, ancho / 2);
-      if (h > 0) s += `<path class="barra" data-i="${i}" d="M${x},${b} V${b - h + rr} Q${x},${b - h} ${x + rr},${b - h} H${x + ancho - rr} Q${x + ancho},${b - h} ${x + ancho},${b - h + rr} V${b} Z"/>`;
-      if (i % cadaCuanto === 0) s += `<text class="eje" x="${m.l + i * banda + banda / 2}" y="${H - 8}" text-anchor="middle">${datos.length > 10 ? aD(d.iso).getUTCDate() : `${DIAS_C[dow(d.iso)]} ${aD(d.iso).getUTCDate()}`}</text>`;
-      s += `<rect class="toque" data-i="${i}" x="${m.l + i * banda}" y="${m.t}" width="${banda}" height="${ih}"/>`;
+      if (h > 0) s += `<path class="barra${d.hoy ? " barra--hoy" : ""}" data-i="${i}" d="M${x},${b} V${b - h + rr} Q${x},${b - h} ${x + rr},${b - h} H${x + ancho - rr} Q${x + ancho},${b - h} ${x + ancho},${b - h + rr} V${b} Z"/>`;
+      const dia = aD(d.iso).getUTCDate();
+      if (i % cadaCuanto === 0 || d.hoy) {
+        const cls = d.hoy ? "eje eje--hoy" : "eje";
+        if (ancha) s += `<text class="${cls}" x="${xc(i)}" y="${H - 20}" text-anchor="middle">${DIAS_C[dow(d.iso)]} ${dia}</text>${d.hoy ? `<text class="eje eje--hoy" x="${xc(i)}" y="${H - 4}" text-anchor="middle">hoy</text>` : ""}`;
+        else {
+          s += `<text class="${cls}" x="${xc(i)}" y="${H - 20}" text-anchor="middle">${dia}</text>`;
+          if (conLetra || d.hoy) s += `<text class="${d.hoy ? "eje eje--hoy" : "eje eje--letra"}" x="${xc(i)}" y="${H - 4}" text-anchor="middle">${d.hoy && (banda >= 26 || !conLetra) ? "hoy" : LETRA_DIA[dow(d.iso)]}</text>`;
+        }
+      }
+      s += `<rect class="toque" data-i="${i}" x="${m.l + i * banda}" y="${m.t - 20}" width="${banda}" height="${ih + 20}"/>`;
     });
+    if (prom) s += `<line class="prom" x1="${m.l}" x2="${W - m.r}" y1="${yProm}" y2="${yProm}"/><text class="eje eje--prom" x="${m.l - 8}" y="${yProm + 4}" text-anchor="end">$ ${enMiles(prom)}</text>`;
+    if (mejor && mejor.v) {
+      const i = datos.indexOf(mejor), x = Math.max(m.l + 30, Math.min(W - m.r - 30, xc(i)));
+      s += `<text class="tope-t" x="${x}" y="${y(mejor.v) - 8}" text-anchor="middle">$ ${enMiles(mejor.v)}</text>`;
+    }
     s += `</svg><div class="tip" aria-hidden="true"></div>`;
     cont.innerHTML = s;
     const svg = $("svg", cont), tip = $(".tip", cont);
@@ -1305,8 +1353,9 @@
       $$(".barra", cont).forEach((p) => p.classList.toggle("is-on", +p.dataset.i === i));
       if (i < 0) { tip.classList.remove("is-on"); return; }
       const d = datos[i], escala = svg.getBoundingClientRect().width / W;
-      tip.innerHTML = `${DIAS_C[dow(d.iso)]} ${corto(d.iso)}<b>${plata(d.v)}</b>${d.n} turnos`;
-      tip.style.left = `${(m.l + i * banda + banda / 2) * escala}px`;
+      const contra = d.hoy ? "Hoy, todavía suma" : prom && d.v ? (Math.abs(d.v - prom) / prom < 0.05 ? "Como el promedio" : `${pct(Math.abs(d.v - prom) / prom)} ${d.v > prom ? "más" : "menos"} que el promedio`) : "";
+      tip.innerHTML = `${fechaC(d.iso)}<b>${plata(d.v)}</b>${plural(d.n, "turno", "turnos")}${contra ? `<small>${contra}</small>` : ""}`;
+      tip.style.left = `${Math.max(70, Math.min(W - 70, xc(i))) * escala}px`;
       tip.style.top = `${Math.min(y(d.v), m.t + ih - 4) * escala}px`;
       tip.classList.add("is-on");
     };
@@ -1406,69 +1455,78 @@
   });
 
   const ORDEN_DIAS = [1, 2, 3, 4, 5, 6, 0];
+  // Mi negocio en tarjetas (pedido del dueño, 19/11: "hay mucho espacio libre, quiero que sea más compacto y lindo… hacelo
+  // de otra forma"). Tres columnas en la compu (dos en pantallas medianas, una en el celular), cada tarjeta con su ícono,
+  // el rótulo al costado del campo y los horarios y la duración del turno cada 10 minutos.
+  const HORAS_10 = Array.from({ length: 144 }, (_, i) => aHora(i * 10)); // 00:00, 00:10 … 23:50
+  const opcHoras = (v) => (v && !HORAS_10.includes(v) ? [...HORAS_10, v].sort() : HORAS_10).map((h) => `<option${h === v ? " selected" : ""}>${h}</option>`).join("");
+  const DURACIONES = Array.from({ length: 24 }, (_, i) => (i + 1) * 10); // de 10 minutos a 4 horas, cada 10
+  const durTexto = (d) => (d < 60 ? `${d} minutos` : `${d} minutos (${Math.floor(d / 60)} h${d % 60 ? ` ${d % 60}` : ""})`);
+  const durCorto = (d) => (d < 60 ? `${d} min` : `${Math.floor(d / 60)} h${d % 60 ? ` ${d % 60}` : ""}`);
   VISTAS.negocio = () => {
-    const n = NEG, U = unidad(n);
-    const filaRec = (r) => `<div class="fila fila--rec" data-id="${r.id}"><input aria-label="Nombre" value="${esc(r.nombre)}" placeholder="${U} 1" /><input aria-label="Detalle" value="${esc(r.detalle)}" placeholder="Por ejemplo, techada" /><button type="button" class="quitar" data-quitar aria-label="Quitar ${esc(r.nombre)}">${ico("x")}</button></div>`;
-    const filaFr = (f) => `<div class="fila fila--fr"><input type="time" aria-label="Desde" value="${f.desde}" /><input type="time" aria-label="Hasta" value="${f.hasta}" /><input class="fila__precio" type="number" inputmode="numeric" min="0" step="500" aria-label="Precio" value="${f.precio}" /><button type="button" class="quitar" data-quitar aria-label="Quitar franja">${ico("x")}</button></div>`;
-    const sec = (id, t, d, cuerpo) => `<section class="ajuste" aria-labelledby="${id}"><div class="ajuste__r"><h2 id="${id}">${t}</h2><p>${d}</p></div><div class="ajuste__p">${cuerpo}</div></section>`;
+    const n = NEG, U = unidad(n), u = U.toLowerCase();
+    const filaRec = (r) => `<div class="fila fila--rec" data-id="${r.id}"><input aria-label="Nombre" value="${esc(r.nombre)}" placeholder="${U} 1" /><input aria-label="Detalle" value="${esc(r.detalle)}" placeholder="Detalle (opcional)" /><button type="button" class="quitar" data-quitar aria-label="Quitar ${esc(r.nombre)}">${ico("x")}</button></div>`;
+    const filaFr = (f) => `<div class="fila fila--fr"><select aria-label="Desde">${opcHoras(f.desde)}</select><span class="fila__a" aria-hidden="true">a</span><select aria-label="Hasta">${opcHoras(f.hasta)}</select><div class="pre"><span aria-hidden="true">$</span><input type="number" inputmode="numeric" min="0" step="500" aria-label="Precio" value="${f.precio}" placeholder="Precio" /></div><button type="button" class="quitar" data-quitar aria-label="Quitar franja">${ico("x")}</button></div>`;
+    const filaDia = (d) => { const h = n.horario[d], dis = h.cerrado ? " disabled" : ""; return `<div class="fila fila--hr${h.cerrado ? " is-cerrado" : ""}" data-dia="${d}"><label class="dia-chip"><input type="checkbox" data-abierto aria-label="${mayus(DIAS[d])}: abierto" ${h.cerrado ? "" : "checked"} /><span aria-hidden="true">${DIAS_C[d]}</span></label><select aria-label="${mayus(DIAS[d])}: abre"${dis}>${opcHoras(h.abre)}</select><span class="fila__a" aria-hidden="true">a</span><select aria-label="${mayus(DIAS[d])}: cierra"${dis}>${opcHoras(h.cierra)}</select><span class="fila__cerrado">Cerrado</span></div>`; };
+    const tarjeta = (id, icono, t, d, cuerpo) => `<section class="card ng-card" aria-labelledby="${id}"><header class="ng-card__h">${ico(icono)}<div><h2 id="${id}">${t}</h2><p>${d}</p></div></header>${cuerpo}</section>`;
+    const durs = DURACIONES.includes(n.duracion) ? DURACIONES : [...DURACIONES, n.duracion].sort((a, b) => a - b);
     $("#vista").innerHTML = `
-      <header class="vhead"><div><h1>Mi negocio</h1><p class="vhead__frase">Lo que ven tus clientes cuando reservan y las reglas de tu agenda.</p></div>
-        <div class="vhead__acc"><a class="btn btn--line" href="reservar.html" target="_blank" rel="noopener">${ico("afuera")}Ver la página de reservas</a></div></header>
-      <form class="nform" id="f-neg" novalidate>
-        ${sec("ng-0", "Perfil", "Tu foto y unas líneas sobre el lugar. Es lo primero que ven tus clientes cuando entran a reservar.", `
-          <div class="perfil">
-            <div class="perfil__foto" id="g-foto-ver">${n.foto ? `<img src="${n.foto}" alt="Foto de perfil de ${esc(n.nombre)}" />` : `<span aria-hidden="true">${esc(iniciales(n.nombre))}</span>`}</div>
-            <div class="perfil__acc">
-              <p class="perfil__t">Foto de perfil</p>
-              <div class="perfil__bot">
-                <label class="btn btn--line btn--sm" for="g-foto">${ico("camara")}<span id="g-foto-l">${n.foto ? "Cambiar foto" : "Subir foto"}</span></label>
-                <input class="sr-only" type="file" id="g-foto" accept="image/*" aria-describedby="g-foto-ayuda g-foto-err" />
-                <button type="button" class="btn btn--warn btn--sm" id="g-foto-quitar" ${n.foto ? "" : "hidden"}>Quitar</button>
+      <header class="vhead"><div><h1>Mi negocio</h1><p class="vhead__frase">Lo que ven tus clientes cuando reservan y las reglas de tu agenda. Cada cambio se guarda solo.</p></div>
+        <div class="vhead__acc"><p class="guardado" id="g-msg" role="status" aria-live="polite">Se guarda solo</p><a class="btn btn--line" href="reservar.html" target="_blank" rel="noopener">${ico("afuera")}Ver la página de reservas</a></div></header>
+      <form class="ng" id="f-neg" novalidate>
+        <div class="ng__col">
+          ${tarjeta("ng-0", "negocio", "Tu negocio", "Lo primero que ven tus clientes al reservar.", `
+            <div class="perfil">
+              <div class="perfil__foto" id="g-foto-ver">${n.foto ? `<img src="${n.foto}" alt="Foto de perfil de ${esc(n.nombre)}" />` : `<span aria-hidden="true">${esc(iniciales(n.nombre))}</span>`}</div>
+              <div class="perfil__acc">
+                <div class="perfil__bot">
+                  <label class="btn btn--line btn--sm" for="g-foto">${ico("camara")}<span id="g-foto-l">${n.foto ? "Cambiar foto" : "Subir foto"}</span></label>
+                  <input class="sr-only" type="file" id="g-foto" accept="image/*" aria-describedby="g-foto-ayuda g-foto-err" />
+                  <button type="button" class="btn btn--warn btn--sm" id="g-foto-quitar" ${n.foto ? "" : "hidden"}>Quitar</button>
+                </div>
+                <p class="field__help" id="g-foto-ayuda">El logo o una foto del lugar, en cuadrado.</p>
+                <p class="field__err" id="g-foto-err" hidden></p>
               </div>
-              <p class="field__help" id="g-foto-ayuda">El logo o una foto del lugar. Se recorta en cuadrado.</p>
-              <p class="field__err" id="g-foto-err" hidden></p>
             </div>
-          </div>
-          <div class="field"><label for="g-desc">Descripción del lugar</label><textarea id="g-desc" rows="4" maxlength="300" placeholder="Qué tiene tu lugar: canchas, servicios, si prestan equipo, cómo es el estacionamiento…" aria-describedby="g-desc-cuenta">${esc(n.descripcion || "")}</textarea><p class="field__help" id="g-desc-cuenta"></p></div>`)}
-        ${sec("ng-1", "Datos", "Así te encuentran tus clientes. El link es la dirección de tu página para reservar: pasalo por WhatsApp o ponelo en tu Instagram.", `
-          <div class="campos">
-            <div class="field"><label for="g-nombre">Nombre del negocio</label><input id="g-nombre" value="${esc(n.nombre)}" required aria-describedby="g-nombre-err" /><p class="field__err" id="g-nombre-err" hidden>El negocio necesita un nombre.</p></div>
-            <div class="field"><label for="g-rubro">Rubro</label><input id="g-rubro" list="rubros" value="${esc(n.rubro)}" /></div>
-            <div class="field"><label for="g-wa">WhatsApp del negocio</label><input id="g-wa" type="tel" inputmode="tel" value="${esc(n.whatsapp)}" /></div>
-            <div class="field"><label for="g-slug">Tu link de reservas</label><div class="slug"><span>bookea.ar/</span><input id="g-slug" value="${esc(n.slug)}" autocapitalize="none" spellcheck="false" aria-describedby="g-slug-err" /><button type="button" class="btn btn--ghost btn--sm" id="g-copiar">${ico("copiar")}Copiar</button></div><p class="field__err" id="g-slug-err" hidden></p></div>
-          </div>`)}
-        ${sec("ng-6", "Ubicación", "Para que tus clientes puedan llegar. El botón los lleva directo a Google Maps.", `
-          <div class="campos">
-            <div class="field"><label for="g-dir">Dirección</label><input id="g-dir" value="${esc(n.direccion)}" autocomplete="street-address" placeholder="Calle y número" /></div>
-            <div class="field"><label for="g-ciudad">Ciudad</label><input id="g-ciudad" value="${esc(n.ciudad)}" autocomplete="address-level2" /></div>
-            <div class="field ancho"><label for="g-mapa">Link de Google Maps (opcional)</label><input id="g-mapa" type="url" inputmode="url" value="${esc(n.mapa || "")}" placeholder="https://maps.app.goo.gl/…" autocapitalize="none" spellcheck="false" aria-describedby="g-mapa-ayuda g-mapa-err" />
-              <p class="field__help" id="g-mapa-ayuda">Buscá tu negocio en Google Maps, tocá <b>Compartir</b> y pegá el link acá. Si lo dejás vacío, usamos la dirección y la ciudad.</p>
+            <div class="field campo"><label for="g-nombre">Nombre</label><input id="g-nombre" value="${esc(n.nombre)}" required aria-describedby="g-nombre-err" /><p class="field__err" id="g-nombre-err" hidden>El negocio necesita un nombre.</p></div>
+            <div class="field campo"><label for="g-rubro">Rubro</label><input id="g-rubro" list="rubros" value="${esc(n.rubro)}" /></div>
+            <div class="field campo"><label for="g-wa">WhatsApp</label><input id="g-wa" type="tel" inputmode="tel" value="${esc(n.whatsapp)}" /></div>
+            <div class="field campo campo--arriba"><label for="g-slug">Tu link de reservas</label><div class="slug"><span>bookea.ar/</span><input id="g-slug" value="${esc(n.slug)}" autocapitalize="none" spellcheck="false" aria-describedby="g-slug-err" /><button type="button" class="btn btn--ghost btn--sm" id="g-copiar">${ico("copiar")}Copiar</button></div><p class="field__err" id="g-slug-err" hidden></p></div>
+            <div class="field campo campo--arriba"><label for="g-desc">Descripción del lugar</label><textarea id="g-desc" rows="4" maxlength="300" placeholder="Qué tiene tu lugar: canchas, servicios, si prestan equipo, cómo es el estacionamiento…" aria-describedby="g-desc-cuenta">${esc(n.descripcion || "")}</textarea><p class="field__help ng-cuenta" id="g-desc-cuenta"></p></div>`)}
+          ${tarjeta("ng-6", "pin", "Ubicación", "Para que tus clientes puedan llegar.", `
+            <div class="field campo"><label for="g-dir">Dirección</label><input id="g-dir" value="${esc(n.direccion)}" autocomplete="street-address" placeholder="Calle y número" /></div>
+            <div class="field campo"><label for="g-ciudad">Ciudad</label><input id="g-ciudad" value="${esc(n.ciudad)}" autocomplete="address-level2" /></div>
+            <div class="field campo campo--arriba"><label for="g-mapa">Link de Google Maps (opcional)</label><input id="g-mapa" type="url" inputmode="url" value="${esc(n.mapa || "")}" placeholder="https://maps.app.goo.gl/…" autocapitalize="none" spellcheck="false" aria-describedby="g-mapa-ayuda g-mapa-err" />
+              <p class="field__help" id="g-mapa-ayuda">En Google Maps tocá <b>Compartir</b> y pegá el link acá.</p>
               <p class="field__err" id="g-mapa-err" hidden>Pegá un link de Google Maps: empieza con https://maps.app.goo.gl o https://www.google.com/maps</p></div>
-          </div>
-          <div class="mapa" id="g-mapa-ver"></div>`)}
-        ${sec("ng-2", "Qué se reserva", `Tus ${esc(U.toLowerCase())}s, salas, sillones o profesionales. Cada uno tiene su columna en la agenda.`, `
-          <div class="fila fila--rec cabeza-filas" aria-hidden="true"><span>Nombre</span><span>Detalle (opcional)</span><span></span></div>
-          <div class="filas" id="g-recs">${n.recursos.map(filaRec).join("")}</div>
-          <p class="field__err" id="g-recs-err" hidden></p>
-          <button type="button" class="btn btn--ghost btn--sm agregar" id="g-rec-mas">${ico("mas")}Agregar</button>`)}
-        ${sec("ng-3", "Horario", "Los días y horas en que se puede reservar. Cada turno dura lo mismo.", `
-          <div class="field" style="max-width:280px"><label for="g-dur">Cada turno dura</label><select id="g-dur">${[30, 45, 60, 90, 120].map((d) => `<option value="${d}" ${d === n.duracion ? "selected" : ""}>${d} minutos</option>`).join("")}</select></div>
-          <div class="filas" id="g-hor">${ORDEN_DIAS.map((d) => { const h = n.horario[d]; return `<div class="fila fila--hr" data-dia="${d}"><span class="fila__dia">${mayus(DIAS[d])}</span><label class="chk"><input type="checkbox" ${h.cerrado ? "" : "checked"} data-abierto /> Abierto</label><input type="time" aria-label="${mayus(DIAS[d])}: abre" value="${h.abre}" ${h.cerrado ? "disabled" : ""} /><input type="time" aria-label="${mayus(DIAS[d])}: cierra" value="${h.cierra}" ${h.cerrado ? "disabled" : ""} /></div>`; }).join("")}</div>
-          <p class="field__help">Si cerrás después de medianoche, poné la hora igual (por ejemplo, 00:30).</p>`)}
-        ${sec("ng-4", "Precios por horario", "El precio del turno depende de la hora en que empieza. Por ejemplo, más caro a la noche.", `
-          <div class="fila fila--fr cabeza-filas" aria-hidden="true"><span>Desde</span><span>Hasta</span><span class="fila__precio">Precio</span><span></span></div>
-          <div class="filas" id="g-frs">${n.franjas.map(filaFr).join("")}</div>
-          <p class="field__err" id="g-frs-err" hidden></p>
-          <button type="button" class="btn btn--ghost btn--sm agregar" id="g-fr-mas">${ico("mas")}Agregar franja</button>`)}
-        ${sec("ng-5", "Seña y cancelaciones", "La seña asegura el turno. Vos elegís cuánto cobrar y hasta cuándo pueden cancelar.", `
-          <div class="campos">
-            <div class="field"><label for="g-sena">Seña (% del turno)</label><input id="g-sena" type="number" inputmode="numeric" min="0" max="100" value="${n.senaPct}" aria-describedby="g-sena-ayuda" /><p class="field__help" id="g-sena-ayuda"></p></div>
-            <div class="field"><label for="g-canc">Pueden cancelar hasta (horas antes)</label><input id="g-canc" type="number" inputmode="numeric" min="0" max="72" value="${n.cancelarHoras}" /></div>
-            <label class="chk ancho"><input type="checkbox" id="g-dev" ${n.devolverSena ? "checked" : ""} /> Si cancelan a tiempo, se les devuelve la seña</label>
-          </div>`)}
-        <div class="guardar-barra"><p class="form__msg" id="g-msg" role="status" aria-live="polite">Los cambios se guardan solos.</p></div>
+            <div class="mapa" id="g-mapa-ver"></div>`)}
+        </div>
+        <div class="ng__col">
+          ${tarjeta("ng-2", "cancha", "Qué se reserva", `Cada ${esc(u)} es una columna en tu agenda.`, `
+            <div class="filas" id="g-recs">${n.recursos.map(filaRec).join("")}</div>
+            <p class="field__err" id="g-recs-err" hidden></p>
+            <button type="button" class="btn btn--ghost btn--sm agregar" id="g-rec-mas">${ico("mas")}Agregar ${esc(u)}</button>`)}
+          ${tarjeta("ng-4", "plata", "Precios por horario", "El precio depende de la hora en que empieza el turno.", `
+            <div class="filas" id="g-frs">${n.franjas.map(filaFr).join("")}</div>
+            <p class="field__err" id="g-frs-err" hidden></p>
+            <button type="button" class="btn btn--ghost btn--sm agregar" id="g-fr-mas">${ico("mas")}Agregar franja</button>`)}
+          ${tarjeta("ng-5", "candado", "Seña y cancelaciones", "La seña asegura el turno. Vos elegís cuánto y hasta cuándo.", `
+            <div class="field campo"><label for="g-sena">Seña</label><div class="pre pre--fin"><input id="g-sena" type="number" inputmode="numeric" min="0" max="100" value="${n.senaPct}" aria-describedby="g-sena-ayuda" /><span aria-hidden="true">% del turno</span></div></div>
+            <div class="field campo"><label for="g-canc">Cancelan hasta</label><div class="pre pre--fin"><input id="g-canc" type="number" inputmode="numeric" min="0" max="72" value="${n.cancelarHoras}" aria-label="Pueden cancelar hasta cuántas horas antes" /><span aria-hidden="true">horas antes</span></div></div>
+            <label class="chk"><input type="checkbox" id="g-dev" ${n.devolverSena ? "checked" : ""} /> Si cancelan a tiempo, se les devuelve la seña</label>
+            <p class="ng-ej" id="g-sena-ayuda"></p>`)}
+        </div>
+        <div class="ng__col ng__col--c">
+          ${tarjeta("ng-3", "agenda", "Horario", "Los días y horas en que se puede reservar.", `
+            <div class="field campo"><label for="g-dur">Cada turno dura</label><select id="g-dur">${durs.map((d) => `<option value="${d}"${d === n.duracion ? " selected" : ""}>${durTexto(d)}</option>`).join("")}</select></div>
+            <div class="filas filas--hr" id="g-hor">${ORDEN_DIAS.map(filaDia).join("")}</div>
+            <p class="field__help">¿Cerrás después de medianoche? Elegí la hora igual (00:30).</p>`)}
+          ${tarjeta("ng-7", "clientes", "Así te ven", "Tu ficha en Bookea, con lo que vas cargando.", `<div class="prev" id="g-prev" aria-live="off"></div>`)}
+        </div>
       </form>`;
     const f = $("#f-neg");
+    const msg = $("#g-msg");
+    const estadoMsg = (tipo, html) => { msg.className = "guardado" + (tipo ? " " + tipo : ""); msg.innerHTML = html; };
     $("#g-copiar").addEventListener("click", async (e) => {
       const b = e.currentTarget, link = `https://bookea.ar/${slugDe($("#g-slug").value)}`;
       try { await navigator.clipboard.writeText(link); } catch { const i = $("#g-slug"); i.select(); try { document.execCommand("copy"); } catch {} }
@@ -1499,33 +1557,50 @@
       const datos = { nombre: $("#g-nombre").value.trim(), direccion: $("#g-dir").value.trim(), ciudad: $("#g-ciudad").value.trim(), mapa: $("#g-mapa").value.trim() };
       if (datos.mapa && !MAPS_OK.test(datos.mapa)) datos.mapa = "";
       const url = linkMaps(datos), donde = [datos.direccion, datos.ciudad].filter(Boolean).join(", ");
+      const pegado = $("#g-mapa").value.trim() && MAPS_OK.test($("#g-mapa").value.trim());
       $("#g-mapa-ver").innerHTML = url
-        ? `<span class="mapa__pin">${ico("pin")}</span><div class="mapa__t"><b>${esc(donde || "Ubicación de Google Maps")}</b><small>${$("#g-mapa").value.trim() && MAPS_OK.test($("#g-mapa").value.trim()) ? "Con el link que pegaste" : "Armado con la dirección y la ciudad"}</small></div><a class="btn btn--ghost btn--sm" href="${esc(url)}" target="_blank" rel="noopener" id="g-mapa-ir">${ico("afuera")}Abrir en Google Maps</a>`
+        ? `<a class="mapa__a" href="${esc(url)}" target="_blank" rel="noopener" id="g-mapa-ir"><span class="mapa__pin">${ico("pin")}</span><span class="mapa__t"><b>${esc(donde || "Ubicación de Google Maps")}</b><small>Abrir en Google Maps${pegado ? " (con tu link)" : ""}</small></span>${ico("afuera")}</a>`
         : `<span class="mapa__pin">${ico("pin")}</span><div class="mapa__t"><b>Todavía sin ubicación</b><small>Completá la dirección para que tus clientes puedan llegar.</small></div>`;
     };
     pintarMapa(); ["#g-dir", "#g-ciudad", "#g-mapa", "#g-nombre"].forEach((id) => $(id).addEventListener("input", pintarMapa));
     $("#g-mapa").addEventListener("blur", (e) => { const v = e.target.value.trim(); marcar(e.target, "g-mapa-err", !!v && !MAPS_OK.test(v)); });
-    const ayudaSena = () => { const p = n.franjas[0] ? +n.franjas[0].precio : 0, pc = +$("#g-sena").value || 0; $("#g-sena-ayuda").textContent = p ? `Con un turno de ${plata(p)}, la seña es de ${plata(Math.round((p * pc) / 100 / 100) * 100)}.` : ""; };
+    const ayudaSena = () => { const p = n.franjas[0] ? +n.franjas[0].precio : 0, pc = +$("#g-sena").value || 0; $("#g-sena-ayuda").textContent = p ? `Con un turno de ${plata(p)}, la seña es de ${plata(Math.round((p * pc) / 100 / 100) * 100)}.` : ""; $("#g-sena-ayuda").hidden = !p; };
     ayudaSena(); $("#g-sena").addEventListener("input", ayudaSena);
     f.addEventListener("click", (e) => {
-      const q = e.target.closest("[data-quitar]"); if (q) { const fila = q.closest(".fila"), cont = fila.parentElement; fila.remove(); const sig = $("input", cont); sig && sig.focus(); programar(0); }
+      const q = e.target.closest("[data-quitar]"); if (q) { const fila = q.closest(".fila"), cont = fila.parentElement; fila.remove(); const sig = $("input, select", cont); sig && sig.focus(); programar(0); }
     });
     $("#g-rec-mas").addEventListener("click", () => { const c = $("#g-recs"); c.insertAdjacentHTML("beforeend", filaRec({ id: "", nombre: `${U} ${c.children.length + 1}`, detalle: "" })); $("input", c.lastElementChild).select(); programar(0); });
-    $("#g-fr-mas").addEventListener("click", () => { const c = $("#g-frs"); c.insertAdjacentHTML("beforeend", filaFr({ desde: "", hasta: "", precio: "" })); $("input", c.lastElementChild).focus(); });
-    $$("[data-abierto]", f).forEach((c) => c.addEventListener("change", () => $$('input[type="time"]', c.closest(".fila")).forEach((i) => (i.disabled = !c.checked))));
+    // la franja nueva arranca donde termina la anterior, por 3 horas; falta el precio
+    $("#g-fr-mas").addEventListener("click", () => {
+      const c = $("#g-frs"), ult = c.lastElementChild, desde = ult ? $$("select", ult)[1].value : "09:00";
+      c.insertAdjacentHTML("beforeend", filaFr({ desde, hasta: aHora(aMin(desde) + 180), precio: "" }));
+      $(".pre input", c.lastElementChild).focus();
+    });
+    $$("[data-abierto]", f).forEach((c) => c.addEventListener("change", () => { const fila = c.closest(".fila"); fila.classList.toggle("is-cerrado", !c.checked); $$("select", fila).forEach((i) => (i.disabled = !c.checked)); }));
     // lo que hay en pantalla al abrir: si al salir cambió algo, se guarda solo (ver salirNegocio)
     const estado = () => JSON.stringify([foto, ...$$("input, select, textarea", f).map((e) => (e.type === "checkbox" ? e.checked : e.value))]);
     let inicial = estado();
     // cada cambio se guarda solo, un segundo después de que se deja de escribir (pedido del dueño, 19/11: sin "Guardar cambios")
     let espera = null;
-    const programar = (ms = 1100) => { clearTimeout(espera); espera = setTimeout(() => { espera = null; if (estado() !== inicial) guardar({ auto: true }); }, ms); };
+    const pintarPrev = () => {
+      const nombre = $("#g-nombre").value.trim() || n.nombre, lugar = [$("#g-rubro").value.trim(), $("#g-ciudad").value.trim()].filter(Boolean).join(" · ");
+      const precios = $$("#g-frs .pre input").map((i) => +i.value || 0).filter(Boolean), desde = precios.length ? Math.min(...precios) : 0;
+      const pc = Math.min(100, Math.max(0, +$("#g-sena").value || 0)), desc = $("#g-desc").value.trim();
+      $("#g-prev").innerHTML = `
+        <div class="prev__top"><div class="prev__foto">${foto ? `<img src="${foto}" alt="" />` : `<span aria-hidden="true">${esc(iniciales(nombre))}</span>`}</div>
+          <div class="prev__t"><b>${esc(nombre)}</b><small>${esc(lugar || "Completá el rubro y la ciudad")}</small></div></div>
+        ${desc ? `<p class="prev__desc">${esc(desc)}</p>` : ""}
+        <dl class="prev__datos"><div><dt>Turnos de</dt><dd>${durCorto(+$("#g-dur").value)}</dd></div><div><dt>Desde</dt><dd>${desde ? plata(desde) : "Sin precio"}</dd></div><div><dt>Seña</dt><dd>${desde ? plata(senaDe({ senaPct: pc }, desde)) : `${pc} %`}</dd></div></dl>
+        <p class="prev__link">${ico("afuera")}bookea.ar/${esc(slugDe($("#g-slug").value) || n.slug)}</p>`;
+    };
+    const programar = (ms = 1100) => { pintarPrev(); clearTimeout(espera); espera = setTimeout(() => { espera = null; if (estado() !== inicial) guardar({ auto: true }); }, ms); };
     f.addEventListener("input", () => programar()); f.addEventListener("change", () => programar());
+    pintarPrev();
     const guardar = async ({ auto = false } = {}) => {
-      const msg = $("#g-msg"); msg.className = "form__msg"; msg.textContent = "";
       const slugAntes = n.slug;
       const nombre = $("#g-nombre").value.trim(), slug = slugDe($("#g-slug").value);
       const recs = $$("#g-recs .fila").map((fila, i) => { const [a, b] = $$("input", fila); return { id: fila.dataset.id || `r${Date.now().toString(36)}${i}`, nombre: a.value.trim() || `${U} ${i + 1}`, detalle: b.value.trim() }; });
-      const frs = $$("#g-frs .fila").map((fila) => { const [a, b, c] = $$("input", fila); return { desde: a.value, hasta: b.value, precio: Math.max(0, Math.round(+c.value || 0)) }; }).filter((x) => x.desde || x.hasta || x.precio);
+      const frs = $$("#g-frs .fila").map((fila) => { const [a, b, c] = $$("select, input", fila); return { desde: a.value, hasta: b.value, precio: Math.max(0, Math.round(+c.value || 0)) }; });
       const hoy = ahora().fecha;
       const quitados = n.recursos.filter((r) => !recs.some((x) => x.id === r.id));
       const conTurnos = quitados.filter((r) => RES.some((x) => x.recurso === r.id && x.fecha >= hoy && ocupa(x) && esTurno(x)));
@@ -1538,8 +1613,9 @@
       eR.hidden = eF.hidden = true;
       if (!recs.length) { eR.textContent = "Necesitás al menos uno para tomar reservas."; eR.hidden = false; ok.push(false); }
       else if (conTurnos.length) { eR.textContent = `${conTurnos.map((r) => r.nombre).join(" y ")} tiene turnos de hoy en adelante. Cancelalos antes de quitarlo.`; eR.hidden = false; ok.push(false); }
-      if (!frs.length || frs.some((x) => !x.desde || !x.hasta)) { eF.textContent = "Cada franja necesita hora de inicio, de fin y precio."; eF.hidden = false; ok.push(false); }
-      if (ok.includes(false)) { msg.className = "form__msg err"; msg.textContent = "Revisá los campos marcados."; const p = $(".is-invalid", f) || $(".field__err:not([hidden])", f); if (!auto && p) p.scrollIntoView({ block: "center" }); return false; }
+      if (!frs.length) { eF.textContent = "Necesitás al menos una franja con su precio."; eF.hidden = false; ok.push(false); }
+      else if (frs.some((x) => !x.precio)) { eF.textContent = "Cada franja necesita su precio."; eF.hidden = false; ok.push(false); }
+      if (ok.includes(false)) { estadoMsg("err", "Revisá los campos marcados"); const p = $(".is-invalid", f) || $(".field__err:not([hidden])", f); if (!auto && p) p.scrollIntoView({ block: "center" }); return false; }
       Object.assign(n, {
         nombre, rubro: $("#g-rubro").value.trim(), ciudad: $("#g-ciudad").value.trim(), direccion: $("#g-dir").value.trim(),
         whatsapp: $("#g-wa").value.trim(), slug, recursos: recs, franjas: frs, duracion: +$("#g-dur").value,
@@ -1547,8 +1623,8 @@
         senaPct: Math.min(100, Math.max(0, Math.round(+$("#g-sena").value || 0))), cancelarHoras: Math.max(0, Math.round(+$("#g-canc").value || 0)),
         devolverSena: $("#g-dev").checked,
       });
-      $$("#g-hor .fila").forEach((fila) => { const d = +fila.dataset.dia, [a, b] = $$('input[type="time"]', fila); n.horario[d] = { abre: a.value || "09:00", cierra: b.value || "21:00", cerrado: !$("[data-abierto]", fila).checked }; });
-      msg.className = "form__msg"; msg.textContent = "Guardando…";
+      $$("#g-hor .fila").forEach((fila) => { const d = +fila.dataset.dia, [a, b] = $$("select", fila); n.horario[d] = { abre: a.value || "09:00", cierra: b.value || "21:00", cerrado: !$("[data-abierto]", fila).checked }; });
+      estadoMsg("", "Guardando…");
       let r = await sincronizar();
       if (!r.ok && r.error === "slug") {
         // el link ya es de otro negocio: se deja el de antes y se guarda todo lo demás
@@ -1556,19 +1632,18 @@
         r = await sincronizar();
         pintarLado();
         marcar($("#g-slug"), "g-slug-err", "Ese link ya lo usa otro negocio. Probá con otro.");
-        msg.className = "form__msg err";
-        msg.textContent = r.ok ? "Guardamos todo menos el link." : "No se pudo guardar. " + (MENSAJES[r.error] || MENSAJES.otro);
+        estadoMsg("err", r.ok ? "Guardamos todo menos el link" : "No se pudo guardar. " + esc(MENSAJES[r.error] || MENSAJES.otro));
         if (!auto) $("#g-slug").scrollIntoView({ block: "center" });
         inicial = estado(); // lo demás quedó guardado: el link se queda como estaba y no traba el salir
         return r.ok;
       }
-      if (!r.ok) { msg.className = "form__msg err"; msg.textContent = "No se pudo guardar. " + (MENSAJES[r.error] || MENSAJES.otro); return false; }
+      if (!r.ok) { estadoMsg("err", "No se pudo guardar. " + esc(MENSAJES[r.error] || MENSAJES.otro)); return false; }
       if (store.modo === "local" && local.get(CLAVE) && foto && !local.get(CLAVE).includes(foto.slice(-40))) { n.foto = ""; aviso("No entró la foto en este navegador. Probá con una más chica."); }
       pintarLado();
       // las filas nuevas quedan con su id: el próximo guardado no las toma como otras
       $$("#g-recs .fila").forEach((fila, i) => { if (recs[i]) fila.dataset.id = recs[i].id; });
       inicial = estado();
-      msg.className = "form__msg ok"; msg.innerHTML = tilde() + "Guardado";
+      estadoMsg("ok", tilde() + "Guardado");
       return true;
     };
     f.addEventListener("submit", (e) => { e.preventDefault(); guardar(); });

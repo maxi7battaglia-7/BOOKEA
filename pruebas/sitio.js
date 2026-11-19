@@ -230,6 +230,13 @@ const medir = () => {
         await p.toca(`.menu__i[data-vista="${v}"]`); await espera(p, 700);
         await p.limpio(`panel, ${v}`);
       }
+      // Finanzas en tarjetas y Mi negocio compacto, con la duración y los horarios cada 10 minutos (pedido del dueño, 19/11)
+      await p.toca('.menu__i[data-vista="finanzas"]'); await espera(p, 700);
+      ok(await p.evaluate(() => document.querySelectorAll('.fz-k').length === 4 && !!document.querySelector('.chart .prom') && !!document.querySelector('.chart .tope-t') && !!document.querySelector('.chart .eje--hoy')), `${w} finanzas: cuatro tarjetas, la línea del promedio, el monto del mejor día y hoy marcado`);
+      if (w === 1440) ok(await p.evaluate(() => document.querySelector('.fz').getBoundingClientRect().bottom <= innerHeight), `${w} finanzas: todas las tarjetas entran en la pantalla sin bajar`);
+      await p.toca('.menu__i[data-vista="negocio"]'); await espera(p, 700);
+      ok(await p.evaluate(() => { const d = [...document.querySelectorAll('#g-dur option')].map((o) => +o.value), h = [...document.querySelector('#g-hor select').options].map((o) => o.value); return d[0] === 10 && d.every((x, i) => !i || x - d[i - 1] === 10) && h.length === 144 && h[1] === '00:10'; }), `${w} mi negocio: la duración y los horarios van cada 10 minutos`);
+      if (w === 1440) ok(await p.evaluate(() => getComputedStyle(document.querySelector('.ng')).gridTemplateColumns.split(' ').length === 3 && document.documentElement.scrollHeight < 1250), `${w} mi negocio: tres columnas y casi todo en una pantalla`);
 
       // ---------- Links viejos ----------
       await p.ir(B + 'index.html#sumate');

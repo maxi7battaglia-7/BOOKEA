@@ -262,23 +262,49 @@ textos que se entiendan en cada cuadro.
   página de reservas" y la cuenta con "Salir". En celular y tablet (≤900px): barra arriba (logo + negocio + Salir) y el mismo
   menú como barra de 5 botones abajo (Agenda, Finanzas, Clientes, Negocio, Cuenta).
 - **Cada pantalla:** un h1 (30px) y una frase debajo armada con los datos (Agenda: "El próximo turno es a las 13:30: Lu P. en
-  Cancha 2. Te quedan 15 horarios libres hoy."). Las cifras van en **un solo contenedor dividido**, cada celda con rótulo,
-  valor y una frase que dice contra qué o por qué ("Ocupaste el 33 % de los horarios", "El resto de cada turno, que se paga
-  en el lugar"). En Finanzas "Cobrado" es la cifra más grande y su cambio dice contra qué días (naranja si baja, verde si sube).
+  Cancha 2. Te quedan 15 horarios libres hoy."). Cada cifra lleva rótulo, valor y una frase que dice contra qué o por qué
+  ("Ocupaste el 49 % de los horarios", "127 turnos de hoy en adelante, se cobran en el lugar"). En Clientes van en un solo
+  contenedor dividido; en Finanzas, en tarjetas (abajo). "Cobrado" es la cifra más grande y su cambio dice contra qué días
+  (naranja si baja, verde si sube).
+- **Finanzas en tarjetas (pedido del dueño, 19/11: "que ocupen menos espacio y se vean en una sola pantalla la mayoría",
+  hecho con `anti-ui-slop` y `dataviz`).** A 1440×900 entra todo sin bajar:
+  - Fila 1: **Cobrado** (8 de 12 columnas) con su gráfico adentro, "Un día promedio" y "Mejor día"; a la derecha **Últimos
+    cobros** (los 5 más nuevos, "Planilla (CSV)" y "Ver los N cobros", que abre la tabla entera a todo el ancho).
+  - Fila 2: cuatro tarjetas chicas: Señas cobradas, Turnos pagados (con la barra de ocupación), No vinieron (en naranja si hubo)
+    y Falta cobrar. Fila 3: **Por cancha** y **Por horario** (nombre, barra contra la mejor, monto y su parte del total).
+  - **El gráfico, para que se entienda de un vistazo:** columnas verde agua; una línea punteada con el promedio de los días con
+    cobros y su monto en negrita en el eje; el monto del mejor día arriba de su columna; **hoy en verde pálido** con la palabra
+    "hoy" (el día no terminó, no es un mal día); la inicial del día debajo de cada número (L M M J V S D); montos en "mil".
+    Al pasar el cursor o tocar una columna: día, monto, turnos y cuánto más o menos que el promedio. Abajo, la leyenda y
+    "Ver cada día en números" (la tabla). En pantallas medianas lo cobrado y los cobros van a todo el ancho; en el celular,
+    una columna con las cuatro tarjetas de a dos.
 - **Agenda: solo la agenda** (pedido del dueño, 6/11): sin cifras, sin estadísticas y sin plata; eso vive en Finanzas.
   Grilla por cancha y horario + riel a la derecha (336px) con **Para cerrar** (turnos que ya terminaron sin marcar,
   con "Pagó" y "No vino" a un toque) y **Próximos turnos**. En pantallas angostas "Para cerrar" sube arriba de la grilla.
   Estados: con seña = verde agua pálido; sin seña = blanco con borde gris; pagado = gris; no vino = naranja pálido;
   bloqueado = noche; libre = verde agua más pálido con "+ Libre"; ya pasó sin turno = "Finalizado", solo texto. Cada uno con su punto y su palabra.
-- **Mi negocio: Perfil y Ubicación** (pedido del dueño, 6/11). Perfil: foto (se recorta en cuadrado y se achica a 320 px,
-  se ve enseguida y queda con "Guardar cambios"; también aparece en el costado en lugar de las iniciales) y descripción del lugar
-  (hasta 300 letras, con contador). Ubicación: dirección, ciudad y un link de Google Maps opcional (solo acepta links de Maps).
-  Abajo, una tarjeta con el pin naranja y "Abrir en Google Maps": usa el link pegado o arma uno con nombre, dirección y ciudad.
+- **Mi negocio en tarjetas (pedido del dueño, 19/11: "hay mucho espacio libre, quiero que sea más compacto y lindo… hacelo de
+  otra forma", con `anti-ui-slop`).** Sin la columna de títulos a la izquierda: tres columnas de tarjetas (de 1200px para arriba;
+  dos en pantallas medianas, con Horario y "Así te ven" abajo; una en el celular). A 1440 mide 1141px de alto (antes 2755).
+  - Columna 1: **Tu negocio** (foto de 64px con "Subir foto"/"Quitar", nombre, rubro, WhatsApp, link de reservas con "Copiar",
+    descripción de hasta 300 letras) y **Ubicación** (dirección, ciudad, link de Maps opcional; abajo una franja que es toda un
+    link a Google Maps, armado con el link pegado o con nombre, dirección y ciudad).
+  - Columna 2: **Qué se reserva** (canchas con nombre y detalle), **Precios por horario** (desde, hasta y precio con "$"; una
+    franja nueva arranca donde termina la anterior, por 3 horas, y pide el precio) y **Seña y cancelaciones** (seña en "% del
+    turno", "horas antes", devolver la seña y el ejemplo en verde pálido).
+  - Columna 3: **Horario** (cuánto dura cada turno y los siete días: un botón con el día, verde pálido si abre; si se destilda,
+    dice "Cerrado") y **Así te ven**: la ficha del negocio armada con lo que se va cargando (foto, nombre, rubro y ciudad,
+    descripción, turnos de, precio desde, seña y el link).
+  - Cada tarjeta: ícono de línea en verde agua, título de 16px y una línea gris. El rótulo va al costado del campo (arriba en el
+    link, la descripción y el link de Maps); las tarjetas angostas acomodan solas sus filas (container queries).
+  - **Duración del turno y horarios cada 10 minutos (pedido del dueño, 19/11):** la duración va de 10 minutos a 4 horas, de a 10
+    ("90 minutos (1 h 30)"); abre, cierra y las franjas se eligen en desplegables de 00:00 a 23:50, de a 10. Si un negocio
+    tenía una duración u hora que no cae en 10 (por ejemplo 45), se agrega a la lista y se respeta.
 - **Mi negocio se guarda solo (pedido del dueño, 19/11):** sin botón "Guardar cambios". Cada cambio se guarda un segundo después
-  de dejar de escribir (agregar o quitar una cancha o franja, y la foto, enseguida); abajo una línea dice "Guardando…" y "✓ Guardado".
+  de dejar de escribir (agregar o quitar una cancha o franja, y la foto, enseguida). Una pastilla dice "Se guarda solo", "Guardando…"
+  y "✓ Guardado" (arriba, al lado de "Ver la página de reservas"; en el celular queda fija arriba de la barra de abajo).
   Si un dato está mal, avisa al lado del campo sin mover la pantalla. Al salir de Mi negocio con algo pendiente, se guarda antes de cambiar.
-- **Ajustes (Mi negocio y Cuenta):** dos columnas, a la izquierda el título y para qué sirve, a la derecha el panel blanco.
-  "Copiar" al lado del link de reservas. Barra de guardar fija abajo.
+- **Cuenta:** dos columnas, a la izquierda el título y para qué sirve, a la derecha el panel blanco.
 - **Movimiento (solo como respuesta, nunca entradas de pantalla):** barrido verde del sitio en el botón principal y el menú;
   el "+" gira; la pastilla oscura de Día/Semana y de los períodos se desliza; las flechas de fecha empujan; el punto de "Ahora"
   late; el turno recién cambiado hace "pop"; el aviso trae una tilde que se dibuja; "Guardado" y "Copiado" con tilde.
