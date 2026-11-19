@@ -25,7 +25,7 @@ def sin_iconos(html):
 # ---------- Inicio (el frente: buscar, resultados, ficha, pagar la seña, Mis turnos y la parte para negocios) ----------
 html = pagina("index.html")
 body = re.search(r"<body>(.*)</body>", html, re.S).group(1)
-for js in ("sitio.js", "toque.js"):
+for js in ("config.js", "cuenta.js", "sitio.js", "toque.js"):
     assert f'<script src="{js}"></script>' in body, js
     body = body.replace(f'<script src="{js}"></script>', "")
 # Las letras (assets/fuentes/) y las fotos (assets/) se publican como archivos al lado de la página
@@ -36,6 +36,12 @@ landing = f"""<title>Bookea · Reservá turnos en segundos</title>
 </style>
 {body.strip()}
 <script>
+window.BOOKEA_CONFIG = {{}}; // la vista previa va siempre en modo de prueba: las cuentas de clientes quedan en el navegador
+</script>
+<script>
+{leer("cuenta.js")}
+</script>
+<script>
 {leer("sitio.js")}
 </script>
 <script>
@@ -44,6 +50,11 @@ landing = f"""<title>Bookea · Reservá turnos en segundos</title>
 """
 (dist / "bookea.html").write_text(landing, encoding="utf-8")
 print("OK ->", dist / "bookea.html", f"({len(landing)//1024} KB)")
+
+# ---------- Privacidad y condiciones: página aparte, con su CSS adentro ----------
+priv = sin_iconos(adentro(pagina("privacidad.html"), "sitio.css"))
+(dist / "privacidad.html").write_text(priv, encoding="utf-8")
+print("OK ->", dist / "privacidad.html", f"({len(priv)//1024} KB)")
 
 # ---------- reservar.html: solo redirige al inicio (links viejos) ----------
 (dist / "reservar.html").write_text(leer("reservar.html"), encoding="utf-8")

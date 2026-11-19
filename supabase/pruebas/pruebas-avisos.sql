@@ -89,6 +89,59 @@ do $$ begin
   assert not has_function_privilege('anon', 'public.html_seguro(text)', 'execute'), 'anon puede llamar html_seguro';
   raise notice 'OK  mail_bookea, saludo y html_seguro no se pueden llamar desde la página';
 end $$;
+-- Clientes de bookea.ar: al reservar les llega la confirmación, y al cancelar, la cancelación
+insert into auth.users (id, email, raw_user_meta_data) values
+  ('00000000-0000-0000-0000-0000000000e1', 'juli@prueba.com', '{"nombre":"Juli Paz","celular":"261 555 1234","cliente":true}');
+do $$ begin
+  assert (select count(*) from net.enviados where body -> 'to' ->> 0 = 'juli@prueba.com') = 0, 'al registrarse un cliente no se manda nada desde acá (lo manda Supabase)';
+end $$;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000e1', false) \g /dev/null
+set role authenticated;
+do $$
+declare t jsonb;
+begin
+  t := public.reservar_turno(jsonb_build_object('lugar_id', 'losalamos', 'lugar', 'Los <Álamos>', 'zona', 'Tupungato', 'rubro', 'Pádel',
+    'servicio_id', 'turno', 'servicio', 'Turno de 90 min', 'cancha', 'Cancha 2', 'fecha', current_date + 7, 'hora', '20:00', 'fin', '21:30',
+    'precio', 34000, 'sena', 8500, 'cancelar_horas', 6));
+  perform set_config('prueba.turno', t ->> 'id', false);
+  perform set_config('prueba.codigo', t ->> 'codigo', false);
+end $$;
+reset role;
+do $$
+declare e record;
+begin
+  select * into e from net.enviados order by id desc limit 1;
+  assert e.body -> 'to' ->> 0 = 'juli@prueba.com' and e.body ->> 'from' = 'Bookea <avisos@bookea.test>', 'confirmación: ' || e.body::text;
+  assert public.fecha_larga('2026-11-20') = 'viernes 20 de noviembre' and public.fecha_larga('2027-01-03') = 'domingo 3 de enero', 'fecha_larga';
+  assert e.body ->> 'subject' = 'Turno confirmado: Los <Álamos>, ' || public.fecha_larga(current_date + 7) || ' a las 20:00', 'asunto: ' || (e.body ->> 'subject');
+  assert e.body ->> 'html' like '%Hola, Juli:%' and e.body ->> 'html' like '%Los &lt;Álamos&gt;%' and e.body ->> 'html' not like '%Los <Álamos>%', 'html sin escapar';
+  assert e.body ->> 'html' like '%' || upper(left(public.fecha_larga(current_date + 7), 1)) || substr(public.fecha_larga(current_date + 7), 2) || ', de 20:00 a 21:30%' and e.body ->> 'html' like '%Cancha 2%'
+     and e.body ->> 'html' like '%$&nbsp;8.500%' and e.body ->> 'html' like '%$&nbsp;25.500%'
+     and e.body ->> 'html' like '%' || current_setting('prueba.codigo') || '%', 'faltan datos del turno: ' || (e.body ->> 'html');
+  assert e.body ->> 'html' like '%https://bookea.ar/#mis-turnos%' and e.body ->> 'html' like '%hasta 6 h antes%', 'falta el link o la regla de cancelación';
+  assert e.body ->> 'html' like '%la seña no se cobró%', 'mientras está en prueba, el mail lo dice';
+  raise notice 'OK  turno confirmado: al cliente le llega el mail con el día, la hora, la cancha, la seña, lo que paga en el lugar y el código';
+end $$;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000e1', false) \g /dev/null
+set role authenticated;
+do $$ begin perform public.cancelar_turno(current_setting('prueba.turno')::uuid); end $$;
+reset role;
+do $$
+declare e record;
+begin
+  select * into e from net.enviados order by id desc limit 1;
+  assert e.body -> 'to' ->> 0 = 'juli@prueba.com' and e.body ->> 'subject' = 'Turno cancelado: Los <Álamos>, ' || public.fecha_larga(current_date + 7) || ' a las 20:00', 'cancelación: ' || e.body::text;
+  assert e.body ->> 'html' like '%la seña de $&nbsp;8.500 se devuelve%' and e.body ->> 'html' like '%hola@bookea.ar%', 'html: ' || (e.body ->> 'html');
+  raise notice 'OK  turno cancelado: le llega el mail con lo que pasa con la seña';
+end $$;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000e1', false) \g /dev/null
+set role authenticated;
+do $$ begin perform public.cancelar_turno(current_setting('prueba.turno')::uuid); end $$;
+reset role;
+do $$ begin
+  assert (select count(*) from net.enviados where body ->> 'subject' like 'Turno cancelado%') = 1, 'cancelar dos veces mandó dos mails';
+  raise notice 'OK  cancelar dos veces no manda dos mails';
+end $$;
 -- si pg_net falla, registrarse sigue funcionando
 create or replace function net.http_post(url text, body jsonb default '{}', params jsonb default '{}',
   headers jsonb default '{}', timeout_milliseconds int default 5000) returns bigint

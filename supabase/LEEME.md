@@ -112,9 +112,36 @@ y cada dueño sigue siendo dueño de su negocio.
 Para probar que quedó bien: creá una cuenta desde el panel, confirmá el mail, aprobala desde Solicitudes,
 cargá un turno y abrí el panel desde otro dispositivo con la misma cuenta.
 
+## Clientes que reservan en bookea.ar (cuentas para pagar la seña)
+
+Desde el 19/11, para pagar la seña el cliente crea su cuenta (nombre, email, celular y contraseña) o entra con la suya.
+Las cuentas son de Supabase Auth, igual que las de los negocios, y la base guarda sus datos (tabla `clientes`) y sus
+turnos (tabla `turnos`). Cada cliente ve solo lo suyo. La página es `../cuenta.js`.
+
+Para que funcione en bookea.ar, una vez:
+
+1. **SQL Editor:** pegá todo `esquema.sql` y tocá **Run** (agrega `clientes` y `turnos` sin tocar lo que ya hay).
+2. **SQL Editor:** pegá todo `avisos-por-mail.sql` y tocá **Run** (agrega los mails "Tu turno está confirmado" y
+   "Cancelaste tu turno"). Necesita las claves en Vault (`resend_api_key`, `aviso_bookea_email` y `resend_remitente`,
+   ver arriba): sin `resend_remitente` no se le manda nada a los clientes.
+3. **Authentication → URL Configuration → Redirect URLs:** agregá `https://bookea.ar/**`. Así el link del mail de
+   confirmación (y el de contraseña nueva) vuelve a la página de reservas, donde el cliente paga su turno. Si falta,
+   el link cae en el panel, que lo reenvía a la página igual, pero es un paso de más.
+4. **Authentication → Emails → Templates → Confirm signup:** pegá de nuevo todo `mails/confirmar-cuenta.html`
+   (ahora tiene un texto para los clientes y otro para los negocios).
+5. **Probar:** en una ventana de incógnito, en bookea.ar reservá un turno, creá una cuenta con un email tuyo,
+   confirmala desde el mail y pagá (es simulado). Te tiene que llegar "Tu turno está confirmado" y verse en Mis turnos.
+
+Mientras los lugares sean de ejemplo, el mail de confirmación aclara que la seña no se cobró. Cuando se cobre con
+Mercado Pago, cambiá `bookea_en_prueba()` (en `avisos-por-mail.sql`) a `false` y volvé a correr el archivo.
+
+**Datos personales (Ley 25.326):** antes de abrir el registro a clientes reales, inscribí la base en el Registro
+Nacional de Bases de Datos (AAIP, por Trámites a Distancia, con tu clave fiscal) y completá en `../privacidad.html`
+quién es el responsable, su domicilio y el número de inscripción.
+
 ## Qué falta para la siguiente etapa
 
-- **La página de reservas (`reservar.html`) todavía usa negocios de ejemplo.** El paso que sigue es que lea el
+- **La página de reservas (`index.html`) todavía usa negocios de ejemplo** (las cuentas de los clientes y sus turnos ya van a la base). El paso que sigue es que lea el
   negocio por su link (`slug`) y que el cliente reserve contra la base, con una función que controle que el
   horario esté libre y que no muestre datos de otros clientes.
 - **Pasar los mails de Supabase (confirmar cuenta, contraseña nueva) al castellano** en Authentication → Emails → Templates.
@@ -125,4 +152,4 @@ cargá un turno y abrí el panel desde otro dispositivo con la misma cuenta.
 - `bash supabase/pruebas/correr.sh` (como un usuario que pueda crear bases en un Postgres local): prueba el
   esquema, la aprobación, las reglas de permisos con dos negocios y los avisos por mail (con Vault y pg_net
   simulados).
-- `node supabase/pruebas/e2e/nube-e2e.js`: prueba el panel real contra ese Postgres (ver `pruebas/e2e/LEEME.md`).
+- `node supabase/pruebas/e2e/nube-e2e.js`: prueba el panel real y la cuenta de los clientes en el frente contra ese Postgres (ver `pruebas/e2e/LEEME.md`).

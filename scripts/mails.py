@@ -60,12 +60,15 @@ def plantilla(titulo, texto, boton, nota):
     )
 
 
-# El mismo mail de confirmación le llega al dueño que se registra y a quien entra con una
-# invitación de Equipo (su negocio ya está aprobado). {{ .Data }} son los datos de la cuenta:
-# nube.js guarda "invitacion" ahí al registrarse con el link.
+# El mismo mail de confirmación le llega al dueño que se registra, a quien entra con una
+# invitación de Equipo (su negocio ya está aprobado) y al cliente que se registra para reservar.
+# {{ .Data }} son los datos de la cuenta: nube.js guarda "invitacion" ahí al registrarse con el
+# link, y cuenta.js guarda "cliente".
 CONFIRMAR = plantilla(
     "Confirmá tu email",
-    "{{ if .Data.invitacion }}"
+    "{{ if .Data.cliente }}"
+    "Creaste tu cuenta en Bookea para reservar turnos. Tocá el botón para confirmar tu email: volvés a la página y ahí pagás la seña. Tu turno sigue guardado mientras corre el tiempo."
+    "{{ else if .Data.invitacion }}"
     "Te sumaron al equipo de un negocio en Bookea. Tocá el botón para confirmar tu email y después entrás al panel con tu email y tu contraseña."
     "{{ else }}"
     "Creaste una cuenta en Bookea con este email. Tocá el botón para confirmarlo. Después revisamos tu negocio y, cuando esté aprobado, entrás al panel con tu email y tu contraseña."

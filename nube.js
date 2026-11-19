@@ -121,7 +121,8 @@
       const { data: ms, error: e1 } = await sb.from("miembros").select("*")
         .eq("user_id", user.id).order("creado", { ascending: true });
       if (e1) return fallo(e1);
-      if (!ms || !ms.length) return { ok: false, error: "sin-negocio" };
+      // Sin negocio: o es la cuenta de un cliente que reserva en bookea.ar (cuenta.js), o la de alguien sin equipo
+      if (!ms || !ms.length) return { ok: false, error: user.user_metadata && user.user_metadata.cliente ? "cliente" : "sin-negocio" };
       negId = ms[0].negocio_id;
       const { data: fila, error: e2 } = await sb.from("negocios").select("*").eq("id", negId).single();
       if (e2) return fallo(e2);

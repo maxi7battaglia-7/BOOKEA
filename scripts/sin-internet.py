@@ -68,7 +68,7 @@ def armar(nombre, archivos):
     html = re.sub(r'\s*<link rel="preconnect"[^>]*>', "", html)
     html = re.sub(r'<link href="https://fonts.googleapis.com[^>]+>', LETRA, html)
     html = re.sub(r'\s*<link rel="preload"[^>]*>', "", html)  # la letra ya va adentro del CSS
-    html = html.replace('href="./"', 'href="index.html"')  # sin servidor, "./" abriría la carpeta
+    html = html.replace('href="./"', 'href="index.html"').replace('href="./#', 'href="index.html#')  # sin servidor, "./" abriría la carpeta
     for a in archivos:
         html = adentro(html, a, "window.BOOKEA_CONFIG = {};" if a == "config.js" else None)
     # fotos repetidas en <img>: la primera lleva la foto, las otras la copian
@@ -101,7 +101,8 @@ def armar(nombre, archivos):
     print("OK ->", salida / nombre, f"({len(html)//1024} KB)")
 
 
-armar("index.html", ["sitio.css", "sitio.js", "toque.js"])
+armar("index.html", ["sitio.css", "config.js", "cuenta.js", "sitio.js", "toque.js"])
+armar("privacidad.html", ["sitio.css"])
 # reservar.html redirige a "./", que sin servidor abre la carpeta: acá va a index.html
 (salida / "reservar.html").write_text(pagina("reservar.html").replace('"./"', '"index.html"').replace("url=./", "url=index.html"), encoding="utf-8")
 armar("admin.html", ["styles.css", "admin.css", "config.js", "nube.js", "admin.js", "toque.js"])
@@ -119,7 +120,7 @@ Las cuentas reales (las de bookea.ar) necesitan internet: entrá a https://booke
 """
 zp = root / "dist" / "bookea-sin-internet.zip"
 with zipfile.ZipFile(zp, "w", zipfile.ZIP_DEFLATED) as z:
-    for n in ("index.html", "reservar.html", "admin.html"):
+    for n in ("index.html", "reservar.html", "admin.html", "privacidad.html"):
         z.write(salida / n, f"bookea/{n}")
     z.writestr("bookea/LEEME.txt", LEEME)
 print("OK ->", zp, f"({zp.stat().st_size//1024} KB)")

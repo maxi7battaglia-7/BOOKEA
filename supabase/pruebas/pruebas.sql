@@ -460,4 +460,174 @@ do $$ begin
   assert (select nombre from public.miembros where user_id = '00000000-0000-0000-0000-0000000000d2') = 'Emilia R.';
   raise notice 'OK  si alguien cambia su nombre, el dueño lo ve actualizado';
 end $$;
+
+-- =============== Clientes de la página de reservas ===============
+-- Dos clientes se registran desde bookea.ar (con "cliente": true, como manda cuenta.js)
+insert into auth.users (id, email, raw_user_meta_data) values
+  ('00000000-0000-0000-0000-0000000000e1', 'Juli@Prueba.com', '{"nombre":"Juli Paz","celular":"261 555 1234","promos":true,"cliente":true}'),
+  ('00000000-0000-0000-0000-0000000000e2', 'nico@prueba.com', '{"nombre":"Nico","celular":"261 444 0000","cliente":true}');
+do $$
+declare c public.clientes%rowtype;
+begin
+  select * into c from public.clientes where id = '00000000-0000-0000-0000-0000000000e1';
+  assert c.nombre = 'Juli Paz' and c.email = 'juli@prueba.com' and c.celular = '261 555 1234' and c.promos, 'datos de Juli: ' || coalesce(to_jsonb(c)::text, 'nada');
+  assert not (select promos from public.clientes where id = '00000000-0000-0000-0000-0000000000e2'), 'Nico no pidió promociones';
+  assert not exists (select 1 from public.miembros where user_id in ('00000000-0000-0000-0000-0000000000e1', '00000000-0000-0000-0000-0000000000e2')), 'un cliente quedó en un negocio';
+  assert not exists (select 1 from public.negocios where email_dueno in ('juli@prueba.com', 'Juli@Prueba.com', 'nico@prueba.com')), 'un cliente creó un negocio';
+  raise notice 'OK  cliente nuevo: se guardan su nombre, email, celular y si quiere promociones, sin crear ningún negocio';
+end $$;
+
+-- Sin sesión no se ve ni se reserva nada
+set role anon;
+do $$ begin
+  begin
+    perform 1 from public.clientes;
+    raise exception 'FALLA: sin sesión se ven los clientes';
+  exception when insufficient_privilege then null;
+  end;
+  begin
+    perform public.reservar_turno('{}'::jsonb);
+    raise exception 'FALLA: sin sesión se reservó';
+  exception when insufficient_privilege then null;
+  end;
+  raise notice 'OK  sin sesión no se ven clientes ni turnos, y no se puede reservar';
+end $$;
+reset role;
+
+-- Juli reserva
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000e1', false) \g /dev/null
+set role authenticated;
+do $$
+declare t jsonb; d date := current_date + 2;
+begin
+  t := public.reservar_turno(jsonb_build_object('lugar_id', 'losalamos', 'lugar', 'Los Álamos', 'zona', 'Tupungato', 'rubro', 'Pádel',
+    'servicio_id', 'turno', 'servicio', 'Turno de 90 min', 'cancha', 'Cancha 2', 'fecha', d, 'hora', '20:00', 'fin', '21:30',
+    'precio', 34000, 'sena', 8500, 'cancelar_horas', 6));
+  assert t ->> 'codigo' ~ '^BK-[A-Z0-9]{5}$' and t ->> 'estado' = 'confirmado' and (t ->> 'cliente_id')::uuid = auth.uid(), 'turno: ' || t::text;
+  perform set_config('prueba.turno_juli', t ->> 'id', false);
+  assert (select count(*) from public.turnos) = 1, 'Juli no ve su turno';
+  raise notice 'OK  el cliente reserva: queda a su nombre, con código, y lo ve en Mis turnos';
+  begin
+    perform public.reservar_turno(jsonb_build_object('lugar_id', 'losalamos', 'lugar', 'Los Álamos', 'cancha', 'Cancha 1',
+      'fecha', current_date - 1, 'hora', '20:00', 'fin', '21:30', 'precio', 34000, 'sena', 8500));
+    raise exception 'FALLA: se reservó un horario que ya pasó';
+  exception when check_violation then raise notice 'OK  no se reserva un horario que ya pasó';
+  end;
+  begin
+    insert into public.turnos (cliente_id, lugar_id, lugar, cancha, fecha, hora, fin, precio, sena)
+      values (auth.uid(), 'losalamos', 'Los Álamos', 'Cancha 3', current_date + 3, '18:00', '19:30', 0, 0);
+    raise exception 'FALLA: se cargó un turno sin pasar por reservar_turno (sin seña)';
+  exception when insufficient_privilege then null;
+  end;
+  begin
+    update public.turnos set estado = 'cancelado';
+    raise exception 'FALLA: se cambió un turno tocando la tabla';
+  exception when insufficient_privilege then null;
+  end;
+  begin
+    update public.clientes set email = 'otro@prueba.com';
+    raise exception 'FALLA: se cambió el email tocando la tabla';
+  exception when insufficient_privilege then null;
+  end;
+  raise notice 'OK  la tabla no se toca a mano: turnos y datos cambian solo con las funciones';
+end $$;
+reset role;
+
+-- Nico: no ve lo de Juli, no le cancela el turno y no le gana el mismo horario
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000e2', false) \g /dev/null
+set role authenticated;
+do $$ begin
+  assert (select count(*) from public.turnos) = 0 and (select count(*) from public.clientes) = 1, 'Nico ve datos de otro cliente';
+  raise notice 'OK  cada cliente ve solo sus datos y sus turnos';
+  begin
+    perform public.cancelar_turno(current_setting('prueba.turno_juli')::uuid);
+    raise exception 'FALLA: Nico canceló el turno de Juli';
+  exception when no_data_found then raise notice 'OK  nadie cancela el turno de otro';
+  end;
+  begin
+    perform public.reservar_turno(jsonb_build_object('lugar_id', 'losalamos', 'lugar', 'Los Álamos', 'cancha', 'Cancha 2',
+      'fecha', current_date + 2, 'hora', '20:00', 'fin', '21:30', 'precio', 34000, 'sena', 8500));
+    raise exception 'FALLA: el mismo horario se reservó dos veces';
+  exception when unique_violation then raise notice 'OK  un horario de una cancha no se reserva dos veces';
+  end;
+end $$;
+reset role;
+
+-- Juli cancela con tiempo: la seña se devuelve y el horario queda libre para Nico
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000e1', false) \g /dev/null
+set role authenticated;
+do $$
+declare r jsonb;
+begin
+  r := public.cancelar_turno(current_setting('prueba.turno_juli')::uuid);
+  assert r ->> 'estado' = 'cancelado' and (r ->> 'devuelve')::boolean, 'cancelar: ' || r::text;
+  r := public.cancelar_turno(current_setting('prueba.turno_juli')::uuid);
+  assert r ->> 'estado' = 'cancelado', 'cancelar dos veces: ' || r::text;
+  raise notice 'OK  cancelar con tiempo: la seña se devuelve (y cancelar dos veces no rompe nada)';
+  -- corregir sus datos
+  r := public.guardar_mis_datos('Julieta Paz', '261 555 9999', false);
+  assert r ->> 'nombre' = 'Julieta Paz' and r ->> 'celular' = '261 555 9999' and not (r ->> 'promos')::boolean and r ->> 'email' = 'juli@prueba.com', 'datos: ' || r::text;
+  begin
+    perform public.guardar_mis_datos('Julieta', '12', true);
+    raise exception 'FALLA: se guardó un celular sin números';
+  exception when check_violation then null;
+  end;
+  raise notice 'OK  el cliente corrige su nombre, su celular y las promociones (el email no cambia)';
+end $$;
+reset role;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000e2', false) \g /dev/null
+set role authenticated;
+do $$
+declare i int;
+begin
+  perform public.reservar_turno(jsonb_build_object('lugar_id', 'losalamos', 'lugar', 'Los Álamos', 'cancha', 'Cancha 2',
+    'fecha', current_date + 2, 'hora', '20:00', 'fin', '21:30', 'precio', 34000, 'sena', 8500));
+  raise notice 'OK  el horario cancelado se puede volver a reservar';
+  for i in 1..9 loop
+    perform public.reservar_turno(jsonb_build_object('lugar_id', 'parque', 'lugar', 'Tenis Club Parque', 'cancha', 'Cancha 1',
+      'fecha', current_date + 3, 'hora', make_time(8 + i, 0, 0), 'fin', make_time(9 + i, 0, 0), 'precio', 12000, 'sena', 3000));
+  end loop;
+  begin
+    perform public.reservar_turno(jsonb_build_object('lugar_id', 'parque', 'lugar', 'Tenis Club Parque', 'cancha', 'Cancha 2',
+      'fecha', current_date + 3, 'hora', '09:00', 'fin', '10:00', 'precio', 12000, 'sena', 3000));
+    raise exception 'FALLA: una cuenta reservó más de 10 turnos por delante';
+  exception when check_violation then raise notice 'OK  hasta 10 turnos por delante por cuenta';
+  end;
+end $$;
+reset role;
+
+-- Una cuenta que ya existía (Caro, del equipo de un negocio) reserva: primero completa sus datos
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000c', false) \g /dev/null
+set role authenticated;
+do $$ begin
+  begin
+    perform public.reservar_turno(jsonb_build_object('lugar_id', 'potrero', 'lugar', 'El Potrero', 'cancha', 'Cancha 1',
+      'fecha', current_date + 1, 'hora', '21:00', 'fin', '22:00', 'precio', 48000, 'sena', 12000));
+    raise exception 'FALLA: reservó una cuenta sin datos de cliente';
+  exception when insufficient_privilege then null;
+  end;
+  perform public.guardar_mis_datos('Caro', '261 333 2222', false);
+  perform public.reservar_turno(jsonb_build_object('lugar_id', 'potrero', 'lugar', 'El Potrero', 'cancha', 'Cancha 1',
+    'fecha', current_date + 1, 'hora', '21:00', 'fin', '22:00', 'precio', 48000, 'sena', 12000));
+  raise notice 'OK  una cuenta que ya existía completa sus datos y reserva';
+  begin
+    perform public.borrar_mi_cuenta();
+    raise exception 'FALLA: se borró desde la página una cuenta que maneja un negocio';
+  exception when insufficient_privilege then raise notice 'OK  una cuenta que maneja un negocio no se borra desde la página';
+  end;
+end $$;
+reset role;
+
+-- Nico borra su cuenta: se van sus datos y sus turnos
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000e2', false) \g /dev/null
+set role authenticated;
+do $$ begin assert public.borrar_mi_cuenta(); end $$;
+reset role;
+do $$ begin
+  assert not exists (select 1 from auth.users where id = '00000000-0000-0000-0000-0000000000e2')
+     and not exists (select 1 from public.clientes where id = '00000000-0000-0000-0000-0000000000e2')
+     and not exists (select 1 from public.turnos where cliente_id = '00000000-0000-0000-0000-0000000000e2'), 'quedaron datos de Nico';
+  assert exists (select 1 from public.clientes where id = '00000000-0000-0000-0000-0000000000e1'), 'se borró otro cliente';
+  raise notice 'OK  el cliente borra su cuenta: se borran sus datos y sus turnos, y nada de los demás';
+end $$;
 \echo 'Todas las pruebas del esquema pasaron.'

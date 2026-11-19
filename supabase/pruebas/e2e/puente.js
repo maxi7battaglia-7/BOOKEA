@@ -33,7 +33,7 @@ const lit = (v) => {
   return `'${String(v).replace(/'/g, "''")}'`;
 };
 const id = (c) => { if (!/^[a-z_]+$/.test(c)) throw new Error('columna'); return `"${c}"`; };
-const TABLAS = new Set(['negocios', 'miembros', 'reservas', 'admins_bookea', 'invitaciones']);
+const TABLAS = new Set(['negocios', 'miembros', 'reservas', 'admins_bookea', 'invitaciones', 'clientes', 'turnos']);
 
 const comoCuenta = (uid, consulta) => `
 begin;
@@ -52,7 +52,8 @@ const filtros = (fs_) => {
   }).join(' and ');
 };
 
-const FUNCIONES = new Set(['revisar_negocio', 'crear_invitacion', 'ver_invitacion', 'aceptar_invitacion', 'anular_invitacion', 'cambiar_permisos', 'quitar_miembro']);
+const FUNCIONES = new Set(['revisar_negocio', 'crear_invitacion', 'ver_invitacion', 'aceptar_invitacion', 'anular_invitacion', 'cambiar_permisos', 'quitar_miembro',
+  'guardar_mis_datos', 'reservar_turno', 'cancelar_turno', 'borrar_mi_cuenta']); // las de los clientes de bookea.ar (cuenta.js)
 const consulta = async (q) => {
   if (q.op === 'rpc') {
     if (!FUNCIONES.has(q.fn)) return { error: { code: 'PGRST202', message: 'función' } };
@@ -155,7 +156,7 @@ http.createServer(async (req, res) => {
     res.writeHead(200, { 'content-type': 'text/javascript' });
     return res.end(`window.BOOKEA_CONFIG = { supabaseUrl: "http://localhost:${PUERTO}", supabaseAnonKey: "clave-publica-de-prueba" };`);
   }
-  const archivo = path.join(RAIZ, path.normalize(url.pathname === '/' ? '/admin.html' : url.pathname));
+  const archivo = path.join(RAIZ, path.normalize(url.pathname === '/' ? '/index.html' : url.pathname)); // como GitHub Pages
   if (!archivo.startsWith(RAIZ) || !fs.existsSync(archivo) || fs.statSync(archivo).isDirectory()) { res.writeHead(404); return res.end(); }
   res.writeHead(200, { 'content-type': TIPOS[path.extname(archivo)] || 'application/octet-stream' });
   fs.createReadStream(archivo).pipe(res);

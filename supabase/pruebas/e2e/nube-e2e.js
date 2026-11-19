@@ -301,6 +301,105 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
     ok(carla.length === 1 && carla[0].n === 'Estudio Carla' && carla[0].r === 'Peluquería' && carla[0].e === 'pendiente' && carla[0].d === 'Carla Ruiz', 'la cuenta se crea de verdad: negocio pendiente en la base');
 
     for (const [n, p] of [['a', a], ['c', c], ['m', m]]) ok(!p.errs.length, `sin errores en la consola (${n}) ${p.errs.join(' | ')}`);
+
+    // ---------- Frente (bookea.ar): el cliente crea su cuenta para pagar la seña (cuenta.js contra la base) ----------
+    const F = 'http://localhost:8787/index.html';
+    const confirmar = (si) => fetch('http://localhost:8787/api/confirmar', { method: 'POST', body: JSON.stringify({ si }) });
+    const frenteListo = (p) => p.waitForFunction(() => document.documentElement.classList.contains('is-ready') && !document.querySelector('.splash'), null, { timeout: 8000 }).then(() => p.waitForTimeout(500));
+    const pag = (p) => p.evaluate(() => document.querySelector('.page:not([hidden])').dataset.page);
+    const aPagar = async (p) => {
+      await p.goto(F + '?rubro=padel'); await frenteListo(p);
+      await p.click('.qslot >> nth=0'); await p.waitForTimeout(500);
+      await p.click('#ir-pagar [data-act="reservar"]'); await p.waitForSelector('#pago-root .chk__turno');
+    };
+    const crearCuenta = async (p, d) => {
+      await p.fill('#cu-nombre', d.nombre); await p.fill('#cu-email', d.email); await p.fill('#cu-cel', d.cel); await p.fill('#cu-clave', d.clave);
+      await p.check('#cu-acepto'); if (d.promos) await p.check('#cu-promos');
+      await p.click('#f-cuenta button[type=submit]');
+    };
+    await confirmar(true);
+    const f1 = await nueva();
+    await aPagar(f1);
+    ok(await f1.isVisible('#f-cuenta[data-modo="nueva"]'), 'frente con la base: para pagar la seña pide crear la cuenta');
+    await crearCuenta(f1, { nombre: 'Juli Paz', email: 'juli@prueba.com', cel: '261 555 1234', clave: 'canchas2026', promos: true });
+    await f1.waitForSelector('#cuenta.cuenta--mail');
+    const juli = await sql("select row_to_json(c) from public.clientes c where email = 'juli@prueba.com'");
+    ok(juli && juli.nombre === 'Juli Paz' && juli.celular === '261 555 1234' && juli.promos === true, 'frente: la cuenta queda en la base con nombre, email, celular y promociones');
+    ok((await f1.textContent('#cuenta')).includes('juli@prueba.com') && (await pag(f1)) === 'pago', 'frente: con "Confirm email" pide confirmar el email, sin salir del pago');
+    await f1.screenshot({ path: `${out}/fr-confirmar.png`, fullPage: true });
+    await f1.click('.chk__side [data-act="pay"]'); await f1.waitForTimeout(400);
+    ok(!(await f1.isVisible('.mpov')) && /Confirmá tu email/.test(await f1.textContent('#cu-msg')), 'frente: sin confirmar el email no se paga');
+    await f1.click('[data-act="cu-ya"]'); await f1.waitForSelector('#f-cuenta[data-modo="entrar"]');
+    ok((await f1.inputValue('#cu-email')) === 'juli@prueba.com', 'frente: "Ya lo confirmé" sin haberlo hecho: pide entrar, con el email ya escrito');
+    await f1.fill('#cu-clave', 'canchas2026'); await f1.click('#f-cuenta button[type=submit]'); await f1.waitForSelector('#cuenta.cuenta--mail');
+    ok(/Todavía no confirmaste/.test(await f1.textContent('#cu-msg')), 'frente: entrar sin haber confirmado: lo explica y sigue esperando');
+    // confirma con el link del mail, en este mismo navegador: vuelve solo al pago, con la cuenta abierta
+    await sql("with x as (update auth.users set confirmado = true where email = 'juli@prueba.com' returning 1) select count(*) from x");
+    const juliId = await sql("select to_json(id) from auth.users where email = 'juli@prueba.com'");
+    await f1.goto(F + `?cuenta=confirmada#access_token=${juliId}&type=signup`); await frenteListo(f1);
+    await f1.waitForSelector('#cuenta.cuenta--yo', { timeout: 6000 });
+    ok((await pag(f1)) === 'pago' && /Juli Paz/.test(await f1.textContent('#cuenta')) && !/access_token|cuenta=/.test(f1.url()), 'frente: con el link del mail entra solo y vuelve a pagar el turno guardado (la dirección queda limpia)');
+    await f1.click('.chk__side [data-act="pay"]'); await f1.waitForSelector('#page-turnos:not([hidden]) .tcard', { timeout: 8000 });
+    const t1 = await sql("select row_to_json(t) from public.turnos t join public.clientes c on c.id = t.cliente_id where c.email = 'juli@prueba.com'");
+    ok(t1 && t1.estado === 'confirmado' && t1.lugar && t1.cancha && (await f1.textContent('.tcard .code')) === t1.codigo, `frente: al pagar, el turno queda en la base (${t1 && t1.lugar}, ${t1 && t1.cancha}) con el código que se ve en Mis turnos`);
+    await f1.screenshot({ path: `${out}/fr-mis-turnos.png`, fullPage: true });
+    await f1.reload(); await frenteListo(f1);
+    await f1.click('#t-turnos'); await f1.waitForSelector('.micuenta');
+    ok((await f1.locator('.tcard').count()) === 1, 'frente: al volver a abrir la página sigue adentro, con su turno');
+    // Otro cliente (sin "Confirm email") quiere el mismo horario: la base no lo deja
+    await confirmar(false);
+    const f2 = await nueva();
+    await aPagar(f2);
+    await crearCuenta(f2, { nombre: 'Nico Ríos', email: 'nico@prueba.com', cel: '261 444 0000', clave: 'canchas2026' });
+    await f2.waitForSelector('#cuenta.cuenta--yo');
+    ok(!(await sql("select to_json(promos) from public.clientes where email = 'nico@prueba.com'")), 'frente: sin confirmación por mail entra enseguida (y sin promociones si no las marcó)');
+    await f2.click('.chk__side [data-act="pay"]'); await f2.waitForFunction(() => document.querySelector('.page:not([hidden])').dataset.page === 'ficha', null, { timeout: 8000 });
+    ok(/lo acaba de reservar otra persona/.test(await f2.textContent('#toast')) && (await sql("select count(*) from public.turnos where estado = 'confirmado'")) === 1, 'frente: si otra persona ya pagó ese horario, la base lo frena y vuelve a elegir');
+    // Juli corrige sus datos y cancela
+    await f1.click('[data-act="cu-editar"]'); await f1.fill('#dd-cel', '261 555 9999'); await f1.uncheck('#dd-promos');
+    await f1.click('#f-datos button[type=submit]'); await f1.waitForFunction(() => !document.querySelector('#dlg-datos').open);
+    const juli2 = await sql("select row_to_json(c) from public.clientes c where email = 'juli@prueba.com'");
+    ok(juli2.celular === '261 555 9999' && juli2.promos === false && /261 555 9999/.test(await f1.textContent('.micuenta')), 'frente: corregir sus datos los cambia en la base');
+    await f1.click('[data-act="cancel"]'); await f1.click('#dlg-si'); await f1.waitForFunction(() => !document.querySelector('.tcard'));
+    ok((await sql(`select to_json(estado) from public.turnos where codigo = '${t1.codigo}'`)) === 'cancelado', 'frente: cancelar lo cancela en la base');
+    // Se olvidó la contraseña: el link del mail abre "Elegí una contraseña nueva"
+    await f1.click('.micuenta [data-act="cu-salir"]'); await f1.waitForSelector('#f-cuenta[data-modo="entrar"]');
+    await f1.fill('#cu-email', 'juli@prueba.com'); await f1.click('[data-act="cu-olvido"]'); await f1.waitForTimeout(500);
+    const recs = await (await fetch('http://localhost:8787/api/recuperos')).json();
+    ok(recs.includes('juli@prueba.com') && /Te mandamos un mail/.test(await f1.textContent('#cu-msg')), 'frente: "¿Te olvidaste la contraseña?" manda el mail');
+    await f1.goto(F + `?cuenta=clave#access_token=${juliId}&type=recovery`); await frenteListo(f1);
+    await f1.waitForSelector('#dlg-clave[open]', { timeout: 6000 });
+    await f1.fill('#dc-clave', 'nueva-2026'); await f1.click('#f-clave button[type=submit]'); await f1.waitForFunction(() => !document.querySelector('#dlg-clave').open);
+    await f1.click('#t-turnos'); await f1.waitForSelector('.micuenta'); await f1.click('.micuenta [data-act="cu-salir"]'); await f1.waitForSelector('#f-cuenta');
+    await f1.fill('#cu-email', 'juli@prueba.com'); await f1.fill('#cu-clave', 'nueva-2026'); await f1.click('#f-cuenta button[type=submit]');
+    await f1.waitForSelector('.micuenta', { timeout: 6000 });
+    ok(true, 'frente: con el link elige otra contraseña y después entra con ella');
+    // Borra su cuenta: se van sus datos y sus turnos
+    await f1.click('[data-act="cu-borrar"]'); await f1.click('#dlg-si'); await f1.waitForSelector('#f-cuenta');
+    ok((await sql("select count(*) from auth.users where email = 'juli@prueba.com'")) === 0 && (await sql(`select count(*) from public.turnos where codigo = '${t1.codigo}'`)) === 0, 'frente: "Borrar mi cuenta" borra la cuenta, sus datos y sus turnos de la base');
+    // El link de los mails (bookea.ar/#mis-turnos) y una dueña de negocio que reserva con su cuenta
+    const f3 = await nueva();
+    await f3.goto(F + '#mis-turnos'); await frenteListo(f3);
+    ok((await pag(f3)) === 'turnos' && await f3.isVisible('#f-cuenta[data-modo="entrar"]'), 'frente: bookea.ar/#mis-turnos (el botón de los mails) abre Mis turnos para entrar');
+    await f3.fill('#cu-email', 'carla@prueba.com'); await f3.fill('#cu-clave', 'peluqueria2026'); await f3.click('#f-cuenta button[type=submit]');
+    await f3.waitForSelector('#f-cuenta[data-modo="datos"]');
+    ok(/Completá tus datos/.test(await f3.textContent('#cuenta')), 'frente: una cuenta de negocio que entra a reservar completa su nombre y su celular');
+    await f3.fill('#cu-nombre', 'Carla Ruiz'); await f3.fill('#cu-cel', '261 333 2222'); await f3.check('#cu-acepto'); await f3.click('#f-cuenta button[type=submit]');
+    await f3.waitForSelector('.micuenta');
+    await f3.click('[data-act="cu-borrar"]'); await f3.click('#dlg-si'); await f3.waitForTimeout(500);
+    ok(/maneja un negocio/.test(await f3.textContent('#toast')) && (await sql("select count(*) from auth.users where email = 'carla@prueba.com'")) === 1, 'frente: una cuenta que maneja un negocio no se borra desde la página (se pide por mail)');
+    // Un cliente en el panel: se le explica; y si el link de su mail cayó en el panel, sigue en la página de reservas con su sesión
+    await f2.goto(URL_); await f2.waitForSelector('#f-ingresar:not([hidden])');
+    await ingresar(f2, 'nico@prueba.com', 'canchas2026'); await f2.waitForTimeout(800);
+    ok(/es para reservar turnos/.test(await f2.textContent('#i-msg')), 'panel: a un cliente que quiere entrar se le explica que sus turnos están en la página de reservas');
+    const nicoId = await sql("select to_json(id) from auth.users where email = 'nico@prueba.com'");
+    await f2.evaluate(() => localStorage.removeItem('bookea:cliente-sesion'));
+    await f2.goto('about:blank'); // si no, ir a admin.html#… desde admin.html solo cambia el # y no recarga
+    await f2.goto(URL_ + `#access_token=${nicoId}&type=signup`);
+    await f2.waitForURL(/\/\?cuenta=confirmada/, { timeout: 8000 }).catch(() => {});
+    await frenteListo(f2); await f2.waitForSelector('#cuenta.cuenta--yo, .micuenta', { timeout: 8000 }).catch(() => {});
+    ok(/Nico Ríos/.test(await f2.textContent('main')) && !/admin\.html/.test(f2.url()), 'panel: el link del mail de un cliente que cae en el panel lo lleva a la página de reservas, ya adentro');
+    for (const [n, p] of [['f1', f1], ['f2', f2], ['f3', f3]]) ok(!p.errs.filter((x) => !/Failed to load resource/.test(x)).length, `frente: sin errores en la consola (${n}) ${p.errs.join(' | ')}`);
   } catch (e) {
     console.log('FALLA (excepción)', e.message); process.exitCode = 1;
   } finally {

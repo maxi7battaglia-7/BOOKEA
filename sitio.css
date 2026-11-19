@@ -452,6 +452,92 @@ dialog .row { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wr
 .toast { position: fixed; z-index: 150; left: 50%; bottom: 28px; transform: translate(-50%, 20px); background: var(--ink-900); color: #fff; padding: 12px 18px; border-radius: 999px; font-size: 14.5px; font-weight: 500; opacity: 0; pointer-events: none; transition: opacity .25s, transform .3s var(--ease); max-width: calc(100vw - 32px); }
 .toast.is-on { opacity: 1; transform: translate(-50%, 0); }
 
+/* ---------- La cuenta del cliente (cuenta.js): en Confirmá tu turno y en Mis turnos ----------
+   Misma caja blanca de "Tus datos", con los campos de siempre. Crear cuenta | Entrar con el mismo
+   interruptor de Deportes | Servicios. El botón de la caja es noche: el naranja queda para pagar. */
+.cuenta__top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; margin-bottom: 6px; }
+.cuenta__top h2 { margin-bottom: 0; }
+.cuenta__lead { color: var(--ink-600); font-size: 15px; margin-bottom: 16px; max-width: 60ch; }
+.cuenta__lead .link { font-size: inherit; }
+.cuenta__f { display: grid; gap: 14px; }
+.cuenta__f .fields { margin-bottom: 2px; }
+.cuenta__f > .btn { margin-top: 4px; }
+.cuenta__olvido { justify-self: center; font-size: 14px; font-weight: 500; }
+.clave { position: relative; display: block; }
+.clave input { padding-right: 84px; }
+.clave__ver { position: absolute; top: 4px; right: 4px; bottom: 4px; min-width: 72px; padding: 0 12px; border-radius: 9px; font-size: 13.5px; font-weight: 600; color: var(--ink-600); }
+.clave__ver:hover { color: var(--ink-900); background: var(--ink-50); }
+.check { display: flex; gap: 10px; align-items: flex-start; font-size: 14.5px; line-height: 1.45; color: var(--ink-800); cursor: pointer; }
+.check input { flex: none; width: 20px; height: 20px; margin: 1px 0 0; accent-color: var(--ink-900); cursor: pointer; }
+.check input.is-invalid { outline: 2px solid var(--accent); outline-offset: 2px; }
+.check a { color: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--ink-300); }
+.check small { color: var(--ink-500); font-size: inherit; }
+.check + .err { margin: -6px 0 0 30px; font-size: 13px; color: var(--accent-ink); }
+.cuenta__msg { font-size: 14px; line-height: 1.45; font-weight: 500; color: var(--accent-ink); background: var(--accent-50); border-radius: var(--r-m); padding: 10px 12px; }
+.cuenta__msg.is-ok { color: var(--ok-ink); background: var(--ok-50); }
+.legal { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--ink-100); font-size: 12px; line-height: 1.55; color: var(--ink-500); }
+.legal a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+/* Esperando que confirme el email */
+.cuenta--mail { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 16px; align-items: start; background: var(--ok-50); border-color: #cfe9e3; }
+.cuenta--mail h2 { margin-bottom: 6px; }
+.cuenta__ic { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: var(--paper); color: var(--ok-ink); }
+.cuenta__acts { display: flex; flex-wrap: wrap; gap: 10px; }
+.cuenta--mail .note { margin-top: 12px; }
+.cuenta--mail .cuenta__msg { margin-top: 12px; }
+/* Con la cuenta abierta */
+.yo { display: flex; align-items: center; gap: 12px; }
+.yo__av { flex: none; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: var(--ink-900); color: var(--crema); font: 600 15px var(--f-mono); letter-spacing: .02em; }
+.yo__t { flex: 1; min-width: 0; display: grid; gap: 1px; font-size: 14px; color: var(--ink-500); }
+.yo__t b { font-size: 17px; color: var(--ink-900); letter-spacing: -.02em; }
+.yo__t span { overflow-wrap: anywhere; }
+.yo__salir { flex: none; font-size: 14px; }
+.cuenta--yo h2 { margin-bottom: 14px; }
+/* Mis turnos: los turnos y, al lado, tu cuenta */
+.mt { display: grid; gap: 18px; grid-template-columns: minmax(0, 1fr); align-items: start; }
+.mt__lista > .tcard:last-child { margin-bottom: 0; }
+.mt__aside { padding: 22px; border-radius: var(--r-l); background: var(--crema); display: grid; gap: 12px; justify-items: start; align-content: start; }
+.mt__aside h2 { font-size: 20px; letter-spacing: -.02em; }
+.mt__aside p { color: var(--ink-600); font-size: 15px; }
+.mt__aside .mt__neg { font-size: 14px; margin-top: 4px; }
+.micuenta h2 { margin-bottom: 14px; }
+.micuenta__promo { display: flex; align-items: center; margin-top: 14px; font-size: 14px; color: var(--ink-600); }
+.micuenta__acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.micuenta__pie { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 16px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--ink-100); font-size: 13.5px; }
+.link--peligro { color: var(--accent-ink); text-decoration-color: #f0c2b3; font-weight: 500; }
+@media (min-width: 940px) {
+  .mt { grid-template-columns: minmax(0, 1fr) 360px; gap: 20px 48px; }
+  .mt--fuera { grid-template-columns: minmax(0, 1fr) 340px; }
+  .micuenta { position: sticky; top: calc(var(--header-h) + 18px); }
+}
+.fields--1 { grid-template-columns: 1fr !important; }
+dialog form { display: grid; gap: 14px; }
+dialog form > p { margin-bottom: 0; }
+dialog .check { margin-top: 2px; }
+dialog .row { margin-top: 6px; }
+@media (max-width: 520px) { .cuenta__top .secs { width: 100%; } .cuenta__top .secs button { padding-inline: 8px; } .cuenta--mail { grid-template-columns: 1fr; } }
+@media (pointer: coarse) { .check { min-height: 44px; align-items: center; } .check input { margin-top: 0; } }
+
+/* ---------- Privacidad y condiciones (privacidad.html): texto a lo ancho de lectura ---------- */
+.doc { max-width: calc(760px + var(--pad) * 2); padding-block: clamp(32px, 6vw, 72px); }
+.doc h1 { font-size: clamp(34px, 5vw, 56px); letter-spacing: -.045em; margin-block: 10px 16px; }
+.doc__lead { font-size: 18px; color: var(--ink-600); max-width: 62ch; }
+.doc__indice { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 24px; }
+.doc__indice a { display: inline-flex; align-items: center; min-height: 40px; padding: 0 14px; border: 1px solid var(--ink-200); border-radius: 999px; font-size: 14px; font-weight: 600; text-decoration: none; color: var(--ink-900); }
+.doc__indice a:hover { border-color: var(--ink-900); }
+.doc section { margin-top: clamp(40px, 6vw, 64px); scroll-margin-top: calc(var(--header-h) + 16px); }
+.doc h2 { font-size: clamp(26px, 3vw, 34px); letter-spacing: -.035em; padding-bottom: 12px; border-bottom: 1px solid var(--ink-200); }
+.doc h3 { font-size: 18px; letter-spacing: -.02em; margin-top: 26px; }
+.doc p, .doc li { color: var(--ink-800); font-size: 16px; line-height: 1.65; }
+.doc p { margin-top: 8px; max-width: 68ch; }
+.doc ul { margin-top: 8px; padding-left: 20px; display: grid; gap: 6px; max-width: 68ch; }
+.doc a { color: var(--ink-900); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--ink-300); }
+.doc a:hover { text-decoration-color: var(--accent); }
+.doc__aaip { margin-top: 20px; padding: 16px 18px; border-radius: var(--r-m); background: var(--ink-50); border: 1px solid var(--ink-200); }
+.doc__aaip p { font-size: 14px; color: var(--ink-600); margin-top: 0; }
+.doc__aaip p + p { margin-top: 10px; }
+.doc__pie { margin-top: 28px !important; }
+@media (pointer: coarse) { .doc__indice a { min-height: 44px; } }
+
 /* ---------- Para negocios ---------- */
 .biz { border-top: 1px solid var(--ink-100); }
 .band { position: relative; border-radius: var(--r-xl); overflow: hidden; min-height: clamp(320px, 38vw, 480px); display: flex; align-items: flex-end; background: var(--ink-800); }

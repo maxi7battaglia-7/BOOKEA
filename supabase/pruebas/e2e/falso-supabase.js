@@ -28,10 +28,11 @@
   const crear = (base, opc = {}) => {
     const oyentes = [];
     const guarda = !(opc.auth && opc.auth.persistSession === false); // como supabase-js: en memoria o en localStorage
+    const clave = (opc.auth && opc.auth.storageKey) || KEY; // el frente (cuenta.js) guarda la sesión con su propio nombre
     let enMemoria = null;
     const cliente = {
-      _sesion() { if (!guarda) return enMemoria; try { return JSON.parse(localStorage.getItem(KEY)); } catch { return null; } },
-      _guardar(s) { if (!guarda) { enMemoria = s; return; } if (s) localStorage.setItem(KEY, JSON.stringify(s)); else localStorage.removeItem(KEY); },
+      _sesion() { if (!guarda) return enMemoria; try { return JSON.parse(localStorage.getItem(clave)); } catch { return null; } },
+      _guardar(s) { if (!guarda) { enMemoria = s; return; } if (s) localStorage.setItem(clave, JSON.stringify(s)); else localStorage.removeItem(clave); },
       from(t) { return new Consulta(base, cliente, t); },
       async rpc(fn, args) {
         const s = cliente._sesion();

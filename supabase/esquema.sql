@@ -13,6 +13,8 @@
 --   · invitaciones → los links que el dueño le manda a alguien para sumarlo a su equipo.
 --   · reservas  → los turnos de cada negocio.
 --   · admins_bookea → las cuentas del equipo de Bookea, que aprueban o rechazan los negocios nuevos.
+--   · clientes  → quienes reservan turnos desde la página (bookea.ar): nombre, email y celular.
+--   · turnos    → los turnos que reservó cada cliente (ver "Clientes", al final).
 --
 -- Aprobación: un negocio recién registrado queda "pendiente". Hasta que alguien de Bookea lo
 -- apruebe, su cuenta puede ver que está en espera, pero no puede leer ni guardar turnos.
@@ -339,6 +341,18 @@ declare
   k        int   := 1;
   nid      uuid;
 begin
+  -- Cliente que se registra en la página de reservas (bookea.ar) para pagar la seña: se guardan sus datos y
+  -- listo, no tiene negocio. Aceptó las condiciones y la política de privacidad en ese mismo paso.
+  if coalesce(meta ->> 'cliente', '') = 'true' then
+    insert into public.clientes (id, nombre, email, celular, promos)
+      values (new.id,
+              coalesce(nullif(left(btrim(coalesce(meta ->> 'nombre', '')), 80), ''), left(split_part(coalesce(new.email, ''), '@', 1), 80), 'Cliente'),
+              left(lower(coalesce(new.email, '')), 200),
+              left(btrim(coalesce(meta ->> 'celular', '')), 40),
+              coalesce(meta ->> 'promos', '') = 'true')
+      on conflict (id) do nothing;
+    return new;
+  end if;
   if nom_neg = '' then
     -- Cuenta sin negocio propio: si vino con el link de una invitación, entra al equipo de ese negocio.
     -- Si la invitación no sirve (vencida, usada u otro email), la cuenta se crea igual y el panel lo explica.
@@ -458,3 +472,159 @@ create policy "reservas: borrar las de mis negocios" on public.reservas
 drop policy if exists "admins: verse a sí mismo" on public.admins_bookea;
 create policy "admins: verse a sí mismo" on public.admins_bookea
   for select to authenticated using (user_id = auth.uid());
+
+-- =====================================================================================
+-- Clientes: quienes reservan turnos desde la página (bookea.ar)
+--
+-- Para pagar la seña, el cliente crea su cuenta (nombre, email, celular y contraseña) o entra con la suya.
+-- La contraseña la guarda Supabase Auth (solo un hash, igual que las cuentas de los negocios).
+--   · clientes → los datos de cada cliente (uno por cuenta). Los carga alta_de_cuenta al registrarse.
+--   · turnos   → los turnos que reservó cada cliente. Por ahora, en los lugares de ejemplo de la página
+--                (lugar_id es el de sitio.js): cuando los negocios reales estén en la página, se van a atar a negocios.
+-- Cada cliente ve solo lo suyo. Reservar, cancelar, corregir sus datos y borrar la cuenta se hace con las
+-- funciones de abajo, que controlan todo en la base. Los mails de cada turno salen de avisos-por-mail.sql.
+-- =====================================================================================
+create table if not exists public.clientes (
+  id      uuid primary key references auth.users (id) on delete cascade,
+  nombre  text not null check (char_length(nombre) between 1 and 80),
+  email   text not null default '' check (char_length(email) <= 200),
+  celular text not null default '' check (char_length(celular) <= 40),
+  promos  boolean not null default false,          -- quiere recibir promociones (opcional; lo cambia cuando quiere)
+  acepto  timestamptz not null default now(),      -- cuándo aceptó las condiciones y la política de privacidad
+  creado  timestamptz not null default now()
+);
+
+create table if not exists public.turnos (
+  id             uuid primary key default gen_random_uuid(),
+  cliente_id     uuid not null references public.clientes (id) on delete cascade,
+  codigo         text not null default ('BK-' || upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 5)))
+                   check (codigo ~ '^BK-[A-Z0-9]{4,8}$'),
+  lugar_id       text not null check (lugar_id ~ '^[a-z0-9-]{1,40}$'),
+  lugar          text not null check (char_length(lugar) between 1 and 80),
+  zona           text not null default '' check (char_length(zona) <= 80),
+  rubro          text not null default '' check (char_length(rubro) <= 40),
+  servicio_id    text not null default '' check (char_length(servicio_id) <= 40),
+  servicio       text not null default '' check (char_length(servicio) <= 80),
+  cancha         text not null check (char_length(cancha) between 1 and 60),   -- la cancha, o el barbero
+  fecha          date not null,
+  hora           time not null,
+  fin            time not null,
+  precio         integer not null check (precio between 0 and 10000000),
+  sena           integer not null check (sena >= 0 and sena <= precio),
+  cancelar_horas smallint not null default 0 check (cancelar_horas between 0 and 168),  -- hasta cuántas horas antes se devuelve la seña
+  estado         text not null default 'confirmado' check (estado in ('confirmado', 'cancelado')),
+  creado         timestamptz not null default now(),
+  cancelado      timestamptz
+);
+create index if not exists turnos_por_cliente on public.turnos (cliente_id, fecha);
+-- Un horario de una cancha no se reserva dos veces: si dos personas pagan el mismo turno a la vez, la base acepta una.
+create unique index if not exists turnos_un_cliente_por_horario
+  on public.turnos (lugar_id, cancha, fecha, hora) where estado = 'confirmado';
+
+-- La hora de Mendoza (los turnos se guardan en la hora del lugar)
+create or replace function public.ahora_mendoza() returns timestamp
+language sql stable set search_path = '' as $$
+  select (now() at time zone 'America/Argentina/Mendoza')
+$$;
+
+-- El cliente guarda o corrige sus datos. Sirve también para una cuenta que ya existía (por ejemplo, la de un
+-- dueño que reserva en otro lugar): la primera vez queda anotado que aceptó las condiciones.
+create or replace function public.guardar_mis_datos(nom text, cel text, promos_si boolean) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+  n      text := left(btrim(coalesce(nom, '')), 80);
+  c      text := left(btrim(coalesce(cel, '')), 40);
+  correo text;
+  fila   public.clientes%rowtype;
+begin
+  if auth.uid() is null then raise exception 'Hace falta iniciar sesión' using errcode = '42501'; end if;
+  if char_length(n) < 2 then raise exception 'Falta tu nombre' using errcode = '23514'; end if;
+  if char_length(regexp_replace(c, '[^0-9]', '', 'g')) < 8 then raise exception 'Falta tu celular' using errcode = '23514'; end if;
+  select lower(u.email) into correo from auth.users u where u.id = auth.uid();
+  insert into public.clientes as x (id, nombre, email, celular, promos)
+    values (auth.uid(), n, left(coalesce(correo, ''), 200), c, coalesce(promos_si, false))
+    on conflict (id) do update set nombre = excluded.nombre, celular = excluded.celular, promos = excluded.promos, email = excluded.email
+    returning * into fila;
+  return to_jsonb(fila);
+end $$;
+
+-- Reservar (después de pagar la seña). El turno queda a nombre de la cuenta que reserva; la base pone el código.
+-- "t" trae: lugar_id, lugar, zona, rubro, servicio_id, servicio, cancha, fecha, hora, fin, precio, sena, cancelar_horas.
+create or replace function public.reservar_turno(t jsonb) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+  f    date := (t ->> 'fecha')::date;
+  h    time := (t ->> 'hora')::time;
+  fila public.turnos%rowtype;
+begin
+  if auth.uid() is null then raise exception 'Hace falta iniciar sesión' using errcode = '42501'; end if;
+  if not exists (select 1 from public.clientes c where c.id = auth.uid()) then
+    raise exception 'Faltan tus datos' using errcode = '42501';
+  end if;
+  if f + h < public.ahora_mendoza() then raise exception 'Ese horario ya pasó' using errcode = '23514'; end if;
+  if f > current_date + 60 then raise exception 'Ese día está muy lejos' using errcode = '23514'; end if;
+  -- Para que nadie se quede con todos los horarios: hasta 10 turnos por delante por cuenta
+  if (select count(*) from public.turnos x where x.cliente_id = auth.uid() and x.estado = 'confirmado'
+        and x.fecha + x.hora >= public.ahora_mendoza()) >= 10 then
+    raise exception 'Ya tenés 10 turnos por delante' using errcode = '23514';
+  end if;
+  insert into public.turnos (cliente_id, lugar_id, lugar, zona, rubro, servicio_id, servicio, cancha, fecha, hora, fin, precio, sena, cancelar_horas)
+    values (auth.uid(), t ->> 'lugar_id', btrim(t ->> 'lugar'), coalesce(t ->> 'zona', ''), coalesce(t ->> 'rubro', ''),
+            coalesce(t ->> 'servicio_id', ''), coalesce(t ->> 'servicio', ''), btrim(t ->> 'cancha'), f, h, (t ->> 'fin')::time,
+            (t ->> 'precio')::integer, (t ->> 'sena')::integer, coalesce((t ->> 'cancelar_horas')::integer, 0))
+    returning * into fila;
+  return to_jsonb(fila);
+end $$;
+
+-- Cancelar uno de mis turnos (si todavía no empezó). Dice si la seña se devuelve: con más horas de anticipación
+-- que las del lugar, sí; si no, queda para el negocio.
+create or replace function public.cancelar_turno(turno uuid) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+  fila  public.turnos%rowtype;
+  ahora timestamp := public.ahora_mendoza();
+begin
+  if auth.uid() is null then raise exception 'Hace falta iniciar sesión' using errcode = '42501'; end if;
+  select * into fila from public.turnos x where x.id = turno and x.cliente_id = auth.uid() for update;
+  if not found then raise exception 'No existe ese turno' using errcode = 'P0002'; end if;
+  if fila.estado = 'confirmado' then
+    if fila.fecha + fila.hora < ahora then raise exception 'Ese turno ya pasó' using errcode = '23514'; end if;
+    update public.turnos x set estado = 'cancelado', cancelado = now() where x.id = turno returning * into fila;
+  end if;
+  return to_jsonb(fila) || jsonb_build_object('devuelve', (fila.fecha + fila.hora) - ahora > make_interval(hours => fila.cancelar_horas));
+end $$;
+
+-- Borrar mi cuenta y mis datos (Ley 25.326: el cliente puede pedir que se borren). Se borran la cuenta, sus datos
+-- y sus turnos. Una cuenta que también maneja un negocio no se borra desde acá: se pide por mail.
+create or replace function public.borrar_mi_cuenta() returns boolean
+language plpgsql security definer set search_path = '' as $$
+begin
+  if auth.uid() is null then raise exception 'Hace falta iniciar sesión' using errcode = '42501'; end if;
+  if exists (select 1 from public.miembros m where m.user_id = auth.uid())
+     or exists (select 1 from public.admins_bookea a where a.user_id = auth.uid()) then
+    raise exception 'Esta cuenta maneja un negocio' using errcode = '42501';
+  end if;
+  delete from auth.users u where u.id = auth.uid();
+  return true;
+end $$;
+
+alter table public.clientes enable row level security;
+alter table public.turnos enable row level security;
+-- Sin sesión no se ve nada. Con sesión, cada cliente ve solo lo suyo y lo cambia solo con las funciones de arriba.
+revoke all on public.clientes, public.turnos from anon, authenticated;
+grant select on public.clientes, public.turnos to authenticated;
+drop policy if exists "clientes: ver los propios" on public.clientes;
+create policy "clientes: ver los propios" on public.clientes
+  for select to authenticated using (id = auth.uid());
+drop policy if exists "turnos: ver los propios" on public.turnos;
+create policy "turnos: ver los propios" on public.turnos
+  for select to authenticated using (cliente_id = auth.uid());
+revoke all on function public.ahora_mendoza() from public, anon, authenticated;
+revoke all on function public.guardar_mis_datos(text, text, boolean) from public, anon;
+grant execute on function public.guardar_mis_datos(text, text, boolean) to authenticated;
+revoke all on function public.reservar_turno(jsonb) from public, anon;
+grant execute on function public.reservar_turno(jsonb) to authenticated;
+revoke all on function public.cancelar_turno(uuid) from public, anon;
+grant execute on function public.cancelar_turno(uuid) to authenticated;
+revoke all on function public.borrar_mi_cuenta() from public, anon;
+grant execute on function public.borrar_mi_cuenta() to authenticated;

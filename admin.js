@@ -361,6 +361,7 @@
     red: "No hay conexión. Revisá internet y probá de nuevo.",
     libreria: "No pudimos conectarnos con Bookea. Revisá internet y recargá la página.",
     "sin-negocio": "Tu cuenta no está en ningún negocio. Si te invitaron a un equipo, abrí el link que te mandaron.",
+    cliente: "Esta cuenta es para reservar turnos: tus turnos están en Mis turnos, en la página de reservas (bookea.ar). El panel es para negocios.",
     permiso: "No tenés permiso para hacer eso. Si lo necesitás, pedíselo al dueño del negocio.",
     "ya-en-equipo": "Esa persona ya está en tu equipo.",
     "ya-en-negocio": "Esa cuenta ya está en un negocio. Usá otro email.",
@@ -2095,6 +2096,8 @@
     const linkMalo = /error_description=/.test(hash);
     $("#entrada").hidden = true; $("#cargando").hidden = false;
     store.sesionActual().then((r) => {
+      // El link del mail de un cliente (cuenta de bookea.ar) cayó en el panel: sigue en la página de reservas, con la misma sesión
+      if (r.error === "cliente" && /access_token=/.test(hash)) { window.location.replace("./?cuenta=" + (vieneDeRecuperar ? "clave" : "confirmada") + hash); return; }
       if (/access_token|error_description|type=/.test(window.location.hash)) history.replaceState(null, "", window.location.pathname + window.location.search);
       if (r.ok && vieneDeRecuperar) { YO = r.datos.cuenta; $("#nc-email").value = r.datos.cuenta.email; mostrarEntrada("nueva"); return; }
       if (r.ok) { pasar(r.datos, "agenda", saludar); return; }

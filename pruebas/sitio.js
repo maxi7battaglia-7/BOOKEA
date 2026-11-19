@@ -3,7 +3,8 @@
 //   - resultados: rubro, día, franja y zona; horarios rápidos; "Solo techadas"
 //   - ficha del lugar: fotos a lo ancho, días; al tocar uno, sus horarios; al elegir horario, el aviso verde "Ir a pagar"
 //   - pagar la seña (sin carrito): el turno guardado 10 minutos, el aviso "Pagar seña" en las otras pantallas,
-//     avisos al lado de cada campo, pago simulado → Mis turnos → cancelar con su diálogo
+//     sin cuenta no se paga: crear la cuenta ahí mismo (avisos al lado de cada campo, leyenda de la AAIP), pago simulado
+//     → Mis turnos con "Tu cuenta" → cancelar con su diálogo; salir, entrar, corregir los datos y borrar la cuenta; privacidad.html
 //   - turno guardado: a los 10 minutos se libera y se puede volver a reservar (con el reloj de Playwright)
 //   - parte para negocios: botones de la franja, copiar link, reglas de cancelación, preguntas, "Sumá tu negocio"
 //   - "Sumá tu negocio" → registro del panel con los datos cargados → cuenta creada → panel (las cinco vistas)
@@ -177,10 +178,18 @@ const medir = () => {
       await p.toca(cel ? '#hold-bar .btn' : '#t-pago'); await espera(p);
       ok((await p.pagina()) === 'pago' && (await p.locator('#pago-root .chk__turno').count()) === 1 && !(await p.isVisible('#hold-bar')) && !(await p.isVisible('#t-pago')), `${w} turno guardado: "Pagar seña" vuelve a la pantalla de pago`);
 
-      // ---------- Pago simulado → Mis turnos ----------
-      await p.toca('[data-act="pay"]'); await espera(p, 200);
-      ok(await p.isVisible('#c-nombre-e') && await p.isVisible('#c-wa-e'), `${w} pago: sin datos, avisa al lado de cada campo`);
-      await p.fill('#c-nombre', 'Ana Prueba'); await p.fill('#c-wa', '2622 15 123456');
+      // ---------- Para pagar hace falta la cuenta (pedido del dueño, 19/11) → pago simulado → Mis turnos ----------
+      await p.toca('[data-act="pay"]'); await espera(p, 700);
+      ok((await p.pagina()) === 'pago' && !(await p.isVisible('.mpov')) && /Primero creá tu cuenta/.test(await p.textContent('#cu-msg')) && await p.isVisible('#f-cuenta[data-modo="nueva"]'), `${w} pago: sin cuenta no se paga; pide crear la cuenta (o entrar)`);
+      await p.toca('#f-cuenta button[type=submit]'); await espera(p, 200);
+      ok(await p.evaluate(() => ['cu-nombre', 'cu-email', 'cu-cel', 'cu-clave', 'cu-acepto'].every((id) => !document.getElementById(id + '-e').hidden && document.getElementById(id).getAttribute('aria-invalid') === 'true')), `${w} cuenta: sin datos, avisa al lado de cada campo (también que hay que aceptar las condiciones)`);
+      ok(/Ley Nº 25\.326/.test(await p.textContent('#cuenta .legal')) && /Agencia de Acceso a la Información Pública/.test(await p.textContent('#cuenta .legal')) && (await p.locator('#cuenta a[href="privacidad.html"]').count()) >= 1 && !(await p.isChecked('#cu-promos')), `${w} cuenta: la leyenda de la AAIP, el link a la política de privacidad y las promociones sin marcar`);
+      await p.fill('#cu-nombre', 'Ana Prueba'); await p.fill('#cu-email', `ana${w}@prueba.com`); await p.fill('#cu-cel', '2622 15 123456'); await p.fill('#cu-clave', 'canchas2026');
+      await p.check('#cu-acepto');
+      ok(await p.evaluate(() => [...document.querySelectorAll('#f-cuenta .err')].every((e) => e.hidden)), `${w} cuenta: al corregir cada campo, su aviso se va`);
+      await p.toca('#f-cuenta button[type=submit]'); await espera(p, 500);
+      ok((await p.pagina()) === 'pago' && !(await p.isVisible('#f-cuenta')) && /Ana Prueba/.test(await p.textContent('#cuenta')) && (await p.textContent('#cuenta')).includes(`ana${w}@prueba.com`) && (await p.locator('#pago-root .chk__turno').count()) === 1, `${w} cuenta: se crea ahí mismo y sigue en el pago, con el turno guardado`);
+      await p.limpio('pago con la cuenta abierta');
       await p.toca('[data-act="pay"]'); await espera(p, 300);
       ok(await p.isVisible('.mpov'), `${w} pago: aparece el pago simulado`);
       await p.waitForSelector('#page-turnos:not([hidden]) .tcard', { timeout: 6000 }); await espera(p);
@@ -192,8 +201,31 @@ const medir = () => {
       ok(await p.isVisible('#dlg[open]'), `${w} Mis turnos: "Cancelar" pregunta antes`);
       await p.toca('#dlg-no'); await espera(p, 200);
       ok(!(await p.isVisible('#dlg[open]')) && (await p.locator('.tcard').count()) === 1, `${w} Mis turnos: "Volver" no cancela`);
+      ok(await p.isVisible('.micuenta') && (await p.textContent('.micuenta')).includes(`ana${w}@prueba.com`) && /mail a ana/.test(await p.textContent('.okban')), `${w} Mis turnos: al lado, "Tu cuenta" con sus datos; el aviso dice que la confirmación va por mail`);
       await p.toca('[data-act="cancel"]'); await espera(p, 300); await p.toca('#dlg-si'); await espera(p);
       ok((await p.locator('.tcard').count()) === 0 && /Todavía no tenés turnos/.test(await p.textContent('#turnos-root')), `${w} Mis turnos: cancelar lo saca`);
+      if (w === 1440) {
+        // ---------- La cuenta: salir, entrar, corregir los datos y borrarla ----------
+        await p.click('.micuenta [data-act="cu-salir"]'); await espera(p, 300);
+        ok(await p.isVisible('#f-cuenta[data-modo="entrar"]') && /¿Todavía no tenés cuenta\?/.test(await p.textContent('#turnos-root')) && (await p.locator('#turnos-root a[href="admin.html"]').count()) === 1, '1440 Mis turnos sin cuenta: "Entrá a tu cuenta", cómo se crea una y el link al panel para negocios');
+        await p.fill('#cu-email', 'ana1440@prueba.com'); await p.fill('#cu-clave', 'otra-clave');
+        await p.click('#f-cuenta button[type=submit]'); await espera(p, 300);
+        ok(/no coinciden/.test(await p.textContent('#cu-msg')), '1440 entrar: con la contraseña equivocada avisa');
+        await p.fill('#cu-clave', 'canchas2026'); await p.click('#f-cuenta button[type=submit]'); await espera(p, 400);
+        ok(await p.isVisible('.micuenta'), '1440 entrar: con email y contraseña vuelve a su cuenta');
+        await p.click('[data-act="cu-editar"]'); await espera(p, 200);
+        ok(await p.isVisible('#dlg-datos[open]') && (await p.inputValue('#dd-nombre')) === 'Ana Prueba' && (await p.textContent('#dd-email')) === 'ana1440@prueba.com', '1440 corregir datos: abre con sus datos (el email se ve, no se cambia)');
+        await p.fill('#dd-cel', '261 444 9999'); await p.check('#dd-promos'); await p.click('#f-datos button[type=submit]'); await espera(p, 300);
+        ok(!(await p.isVisible('#dlg-datos[open]')) && /261 444 9999/.test(await p.textContent('.micuenta')) && /Recibís promociones/.test(await p.textContent('.micuenta')), '1440 corregir datos: el celular y las promociones quedan guardados');
+        await p.click('[data-act="cu-borrar"]'); await espera(p, 200);
+        ok(/Borrar tu cuenta/.test(await p.textContent('#dlg-t')), '1440 borrar la cuenta: pregunta antes');
+        await p.click('#dlg-si'); await espera(p, 400);
+        ok(!(await p.isVisible('.micuenta')) && await p.isVisible('#f-cuenta') && await p.evaluate(() => !JSON.parse(localStorage.getItem('bookea:clientes:v1')).cuentas.length), '1440 borrar la cuenta: se borran sus datos');
+        await p.goto(B + 'privacidad.html'); await espera(p, 300);
+        ok(/Privacidad y condiciones/.test(await p.textContent('h1')) && (await p.locator('#privacidad, #derechos, #condiciones').count()) === 3 && /Agencia de Acceso a la Información Pública/.test(await p.textContent('.doc__aaip')), '1440 privacidad.html: política, derechos (con la leyenda de la AAIP) y condiciones');
+        await p.limpio('privacidad');
+        await p.ir(B);
+      }
       if (cel) {
         ok((await p.locator('.tabbar button').count()) === 3, `${w} barra de abajo: Reservar, Mis turnos y Negocios (sin Carrito)`);
         await p.toca('.tabbar [data-tab="home"]'); await espera(p);
@@ -366,7 +398,8 @@ const medir = () => {
     await p.ir(B + 'reservar.html?rubro=barberia&dia=1');
     await p.tap('.qslot >> nth=0'); await espera(p, 200);
     await p.tap('#ir-pagar [data-act="reservar"]'); await espera(p, 200);
-    await p.fill('#c-nombre', 'Leo'); await p.fill('#c-wa', '261 555 1234');
+    await p.fill('#cu-nombre', 'Leo Gil'); await p.fill('#cu-email', 'leo@prueba.com'); await p.fill('#cu-cel', '261 555 1234'); await p.fill('#cu-clave', 'canchas2026');
+    await p.check('#cu-acepto'); await p.tap('#f-cuenta button[type=submit]'); await p.waitForSelector('#cuenta.cuenta--yo', { timeout: 3000 });
     await p.tap('[data-act="pay"]'); await p.waitForSelector('#page-turnos:not([hidden]) .tcard', { timeout: 3000 });
     ok(p.errs.length === 0, 'movimiento reducido: reserva completa y rápida, sin errores');
     await p.ir(B);

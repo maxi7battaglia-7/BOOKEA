@@ -127,13 +127,18 @@
   // res: el turno que se está por pagar (uno solo). Queda guardado HOLD (10 minutos) mientras se paga la seña.
   // vencida: el último que se venció sin pagar (para ofrecer volver a reservarlo).
   const HOLD = 10 * 60e3;
-  const S = { page: "home", hs: "padel", rubro: "padel", zona: "", dia: 0, franja: "", techada: false, svc: "", nav: 0, ys: {}, f: null, sec: "deportes", ult: { deportes: "padel", servicios: "barberia" }, res: store.get("reserva", null), vencida: null, turnos: store.get("turnos", []) };
+  // yo: el cliente con la cuenta abierta (o null). email: entró con una cuenta que todavía no tiene sus datos de cliente.
+  // turnos: los de su cuenta (los trae cuenta.js). modoCu: qué muestra la caja de la cuenta ("nueva", "entrar").
+  // pend: el email que espera confirmación (la cuenta recién creada, en modo nube).
+  const S = { page: "home", hs: "padel", rubro: "padel", zona: "", dia: 0, franja: "", techada: false, svc: "", nav: 0, ys: {}, f: null, sec: "deportes", ult: { deportes: "padel", servicios: "barberia" }, res: store.get("reserva", null), vencida: null, turnos: [], yo: null, email: "", modoCu: "nueva", pend: "" };
+  // Cuentas de los clientes (cuenta.js): con config.js completo, en la base; si no, en este navegador
+  const CU = window.BookeaCuenta.crear(window.BOOKEA_CONFIG || {});
   const hoyKey = () => dayInfo(0).key;
   const diaDe = (key) => Math.round((Date.parse(key) - Date.parse(hoyKey())) / 864e5); // 0 = hoy
   const vigente = () => (S.res && S.res.vence > Date.now() ? S.res : null);
   if (S.res && !vigente()) S.res = null; // se venció con la página cerrada
   try { localStorage.removeItem("bookea:carrito"); } catch {} // ya no hay carrito: cada turno se paga al reservarlo
-  const guardar = () => { store.set("reserva", S.res); store.set("turnos", S.turnos); badges(); };
+  const guardar = () => { store.set("reserva", S.res); badges(); }; // los turnos los guarda cuenta.js
 
   // ---------- Disponibilidad (cada turno tiene su propia capacidad) ----------
   const hash = (s) => { let x = 2166136261; for (let i = 0; i < s.length; i++) { x ^= s.charCodeAt(i); x = Math.imul(x, 16777619); } return x >>> 0; };
@@ -185,6 +190,8 @@
       S.f = { v: v.id, dia: st.dia ?? 0, abierto: st.dia != null, svc: svc0.id, t: st.t || null, unit: "any" };
       if (S.f.t && !slotsFor(v, S.f.dia).some((s) => s.t === S.f.t && s.libres.length)) S.f.t = null;
     }
+    // Sin cuenta abierta: en Mis turnos (o si este navegador ya tuvo una cuenta) se ofrece entrar; al pagar por primera vez, crearla
+    if (!S.yo && (page === "pago" || page === "turnos")) S.modoCu = page === "turnos" || store.get("tuvo-cuenta", false) ? "entrar" : "nueva";
     S.page = page;
     document.body.classList.remove("con-irpagar");
     $$(".page").forEach((el) => (el.hidden = el.dataset.page !== page));
@@ -384,7 +391,7 @@
             <div><dt>Llegada</dt><dd>Llegá 10 minutos antes para empezar a horario.</dd></div>
             <div><dt>Pagos</dt><dd>Seña del ${Math.round(SENA * 100)} % online con Mercado Pago. El resto lo abonás en el lugar.</dd></div>
             <div><dt>Cancelación</dt><dd>Hasta ${v.cancel} h antes, la seña se devuelve. Después, queda para el negocio.</dd></div>
-            <div><dt>Cómo reservás</dt><dd>Elegís día y horario, pagás la seña y el turno queda en Mis turnos. Te avisamos por WhatsApp.</dd></div></dl>
+            <div><dt>Cómo reservás</dt><dd>Elegís día y horario, entrás con tu cuenta y pagás la seña. El turno queda en Mis turnos y te llega la confirmación por mail.</dd></div></dl>
             <span class="demo">Negocio de ejemplo · demo</span></div>
         </div>
       </div>
@@ -476,7 +483,7 @@
   function renderPago() {
     const root = $("#pago-root"), r = vigente();
     if (!r) return sinTurno(root);
-    const v = venue(r.vid), R = RUBROS[v.rubro], svc = v.svcs.find((s) => s.id === r.svc) || v.svcs[0], u = store.get("contacto", { nombre: "", wa: "" });
+    const v = venue(r.vid), R = RUBROS[v.rubro], svc = v.svcs.find((s) => s.id === r.svc) || v.svcs[0];
     const quien = v.rubro === "barberia" ? `Con ${esc(r.unit)}` : esc(r.unit);
     root.innerHTML = `
       <a class="back" href="#" data-act="back"><svg class="icon"><use href="#i-back"/></svg>Volver</a>
@@ -498,10 +505,7 @@
             <button type="button" class="link" data-act="cambiar">Cambiar horario</button>
           </div>
         </article>
-        <div class="panel chk__datos"><h2>Tus datos</h2><div class="fields">
-          <label class="field"><span>Nombre</span><input id="c-nombre" autocomplete="name" value="${esc(u.nombre)}" aria-describedby="c-nombre-e" /><p class="err" id="c-nombre-e" hidden>Escribí tu nombre.</p></label>
-          <label class="field"><span>WhatsApp</span><input id="c-wa" type="tel" inputmode="tel" autocomplete="tel" placeholder="261 555 1234" value="${esc(u.wa)}" aria-describedby="c-wa-e" /><p class="err" id="c-wa-e" hidden>Escribí un número de WhatsApp válido.</p></label>
-        </div><p class="note">Te mandamos la confirmación y el recordatorio por WhatsApp.</p></div>
+        ${cuentaHTML("pago")}
         <aside class="chk__side"><div class="panel panel--sum"><h2>Resumen</h2><div class="pay">
           <div><span>Turno</span><b>${money(r.precio)}</b></div>
           <div><span>En el lugar</span><b>${money(r.precio - r.sena)}</b></div>
@@ -509,10 +513,10 @@
           <button type="button" class="btn btn--primary btn--lg btn--block" data-act="pay" style="margin-top:18px"><span class="mp">Pagar seña con Mercado Pago</span></button>
           <p class="note note--ok"><svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg><span>Podés cancelar hasta ${r.cancel} h antes y la seña se devuelve.</span></p>
           <p class="note">Demo: los negocios son de ejemplo y no se cobra nada. En la versión real, acá se abre el pago de Mercado Pago.</p></div>
-          <div class="panel chk__mapa"><h2>Dónde queda</h2><div class="mapbox">${mapSVG(v.id)}<div class="mapbox__t"><b>${ZONAS[v.zona]}</b>Valle de Uco, Mendoza</div></div><p class="mapnote">La dirección exacta te llega por WhatsApp al confirmar.</p></div></aside>
+          <div class="panel chk__mapa"><h2>Dónde queda</h2><div class="mapbox">${mapSVG(v.id)}<div class="mapbox__t"><b>${ZONAS[v.zona]}</b>Valle de Uco, Mendoza</div></div><p class="mapnote">Los datos del turno te llegan por mail al confirmar.</p></div></aside>
         <div class="pasos"><h2>Cómo sigue</h2><ol>
           <li><span class="pasos__n">1</span><b>Pagás la seña</b><span>${money(r.sena)} con Mercado Pago. El turno queda confirmado en el momento.</span></li>
-          <li><span class="pasos__n">2</span><b>Te llega por WhatsApp</b><span>La confirmación con la dirección exacta y un recordatorio antes del turno.</span></li>
+          <li><span class="pasos__n">2</span><b>Te llega por mail</b><span>La confirmación con el día, la hora, ${v.rubro === "barberia" ? "con quién" : "la cancha"} y el código del turno. También queda en Mis turnos.</span></li>
           <li><span class="pasos__n">3</span><b>El resto, en el lugar</b><span>${money(r.precio - r.sena)} el día del turno. Llegá 10 minutos antes.</span></li>
         </ol></div>
       </div>
@@ -537,28 +541,199 @@
     S.res = { ...x, unit: s.libres.includes(x.unit) ? x.unit : s.libres[0], vence: Date.now() + HOLD }; S.vencida = null;
     guardar(); renderPago(); revelar($("#page-pago")); window.scrollTo(0, 0);
   }
-  const valNombre = () => { const f = $("#c-nombre"), bad = f.value.trim().length < 2; f.classList.toggle("is-invalid", bad); $("#c-nombre-e").hidden = !bad; return bad; };
-  const valWa = () => { const f = $("#c-wa"), bad = f.value.replace(/\D/g, "").length < 8; f.classList.toggle("is-invalid", bad); $("#c-wa-e").hidden = !bad; return bad; };
-  function pagar() {
+  // ---------- La cuenta del cliente: hace falta para pagar la seña (cuenta.js) ----------
+  // Nombre, email, celular y contraseña. Se crea o se abre en la misma pantalla de pago (o en Mis turnos),
+  // sin perder el turno guardado. En modo nube, una cuenta nueva confirma su email antes de entrar.
+  const MSJ = {
+    credenciales: "El email o la contraseña no coinciden. Revisalos y probá de nuevo.",
+    "sin-confirmar": "Todavía no confirmaste tu email. Abrí el mail que te mandamos (fijate también en spam o promociones).",
+    existe: "Ya hay una cuenta con ese email. Entrá con tu contraseña.",
+    "clave-debil": "Esa contraseña es muy fácil de adivinar. Usá 8 o más caracteres, con letras y números.",
+    "email-invalido": "Ese email no parece válido. Revisalo.",
+    "email-no-autorizado": "Por ahora no podemos mandar mails a esa dirección. Probá con otro email.",
+    muchos: "Hubo muchos intentos seguidos. Esperá un minuto y probá de nuevo.",
+    ocupado: "Ese horario lo acaba de reservar otra persona. Elegí otro.",
+    pasado: "Ese horario ya pasó. Elegí otro.",
+    limite: "Ya tenés 10 turnos por delante. Cancelá alguno para reservar otro.",
+    "sin-datos": "Completá tu nombre y tu celular para reservar.",
+    negocio: "Esta cuenta también maneja un negocio en el panel. Para borrarla, escribinos a hola@bookea.ar.",
+    "no-existe": "Ese turno ya no está. Actualizamos la lista.",
+    invalido: "Revisá los datos: hay algo que no está bien.",
+    local: "En esta versión de prueba no se mandan mails.",
+    "sin-base": "Todavía no podemos guardar cuentas: falta un paso de configuración. Probá en un rato.",
+    sesion: "Se cerró tu sesión. Entrá de nuevo con tu email y tu contraseña.",
+    libreria: "No pudimos conectarnos. Revisá tu conexión y probá de nuevo.",
+    red: "No pudimos conectarnos. Revisá tu conexión y probá de nuevo.",
+    otro: "Algo salió mal. Probá de nuevo en un rato.",
+  };
+  const msj = (e) => MSJ[e] || MSJ.otro;
+  const iniciales = (n) => (String(n).trim().split(/\s+/).slice(0, 2).map((p) => p[0] || "").join("") || "?").toUpperCase();
+  // Lo que pide la ley de datos personales (Disposición 10/2008 de la AAIP) en el formulario donde se piden
+  const LEGAL = `<p class="legal">Bookea usa tus datos para tus turnos y no los vende. Podés verlos, corregirlos o borrarlos desde Mis turnos. El titular de los datos personales tiene la facultad de ejercer el derecho de acceso a los mismos en forma gratuita a intervalos no inferiores a seis meses, salvo que se acredite un interés legítimo al efecto conforme lo establecido en el artículo 14, inciso 3 de la Ley Nº 25.326. La Agencia de Acceso a la Información Pública, Órgano de Control de la Ley Nº 25.326, tiene la atribución de atender las denuncias y reclamos que interpongan quienes resulten afectados en sus derechos por incumplimiento de las normas vigentes en materia de protección de datos personales.</p>`;
+  const campo = (id, rotulo, extra, error, ayuda = "") => `<label class="field"><span>${rotulo}</span><input id="${id}" ${extra} aria-describedby="${id}-e" /><p class="err" id="${id}-e" hidden>${error}</p>${ayuda}</label>`;
+  const campoClave = (auto) => `<label class="field"><span>Contraseña</span><span class="clave"><input id="cu-clave" type="password" autocomplete="${auto}" minlength="8" aria-describedby="cu-clave-e" /><button type="button" class="clave__ver" data-act="cu-ver" aria-pressed="false" aria-label="Mostrar la contraseña">Ver</button></span><p class="err" id="cu-clave-e" hidden>${auto === "new-password" ? "Usá 8 caracteres o más." : "Escribí tu contraseña."}</p></label>`;
+  const casillas = () => `<label class="check"><input type="checkbox" id="cu-acepto" aria-describedby="cu-acepto-e" /><span>Acepto las <a href="privacidad.html#condiciones" target="_blank" rel="noopener">condiciones de uso</a> y la <a href="privacidad.html" target="_blank" rel="noopener">política de privacidad</a>.</span></label><p class="err" id="cu-acepto-e" hidden>Para seguir, tenés que aceptarlas.</p>
+    <label class="check"><input type="checkbox" id="cu-promos" /><span>Quiero recibir promociones de Bookea por mail <small>(opcional)</small>.</span></label>`;
+  function cuentaHTML(donde) {
+    const pago = donde === "pago", cls = `panel cuenta${pago ? " chk__datos" : ""}`;
+    if (S.yo) {
+      return `<div class="${cls} cuenta--yo" id="cuenta"><h2>Tus datos</h2>
+        <div class="yo"><span class="yo__av" aria-hidden="true">${esc(iniciales(S.yo.nombre))}</span><div class="yo__t"><b>${esc(S.yo.nombre)}</b><span>${esc(S.yo.email)}${S.yo.celular ? ` · ${esc(S.yo.celular)}` : ""}</span></div>
+        <button type="button" class="link yo__salir" data-act="cu-salir">No soy yo</button></div>
+        <p class="note">Te mandamos la confirmación del turno a <b>${esc(S.yo.email)}</b>.</p></div>`;
+    }
+    if (S.pend) {
+      return `<div class="${cls} cuenta--mail" id="cuenta"><span class="cuenta__ic" aria-hidden="true"><svg class="icon"><use href="#i-mail"/></svg></span><div>
+        <h2>Confirmá tu email</h2>
+        <p class="cuenta__lead">Te mandamos un mail a <b>${esc(S.pend)}</b>. Tocá <b>Confirmar mi email</b> y volvé acá${pago ? ": el turno sigue guardado mientras corre el tiempo" : ""}.</p>
+        <div class="cuenta__acts"><button type="button" class="btn btn--ink" data-act="cu-ya">Ya lo confirmé</button><button type="button" class="btn btn--line" data-act="cu-otro">Usar otro email</button></div>
+        <p class="note">¿No llegó? Fijate en spam o en promociones.</p><p class="cuenta__msg" id="cu-msg" role="alert" hidden></p></div></div>`;
+    }
+    if (S.email) { // entró con una cuenta que ya existía (por ejemplo, la de su negocio) y le faltan sus datos de cliente
+      return `<div class="${cls}" id="cuenta"><h2>Completá tus datos</h2>
+        <p class="cuenta__lead">Entraste como <b>${esc(S.email)}</b>. Para reservar, sumá tu nombre y tu celular. <button type="button" class="link" data-act="cu-salir">No soy yo</button></p>
+        <form id="f-cuenta" class="cuenta__f" data-modo="datos" novalidate><div class="fields">
+          ${campo("cu-nombre", "Nombre y apellido", 'autocomplete="name"', "Escribí tu nombre y apellido.")}
+          ${campo("cu-cel", "Celular", 'type="tel" inputmode="tel" autocomplete="tel" placeholder="261 555 1234"', "Escribí tu celular, con la característica.")}
+        </div>${casillas()}
+        <button type="submit" class="btn btn--ink btn--block">Guardar y seguir</button><p class="cuenta__msg" id="cu-msg" role="alert" hidden></p></form>${LEGAL}</div>`;
+    }
+    const nueva = S.modoCu === "nueva";
+    const lead = nueva
+      ? (pago ? "Para pagar la seña necesitás una cuenta: ahí quedan tus turnos y te mandamos la confirmación por mail." : "Con tu cuenta ves tus turnos desde cualquier celular o compu.")
+      : (pago ? "Entrá con tu email y tu contraseña para pagar la seña." : "Entrá con tu email y tu contraseña para ver tus turnos.");
+    return `<div class="${cls}" id="cuenta">
+      <div class="cuenta__top"><h2>${nueva ? "Creá tu cuenta" : "Entrá a tu cuenta"}</h2>
+        <div class="secs cuenta__modo" role="group" aria-label="Tu cuenta" style="--i:${nueva ? 0 : 1}"><button type="button" data-act="cu-modo" data-k="nueva" aria-pressed="${nueva}">Soy nuevo</button><button type="button" data-act="cu-modo" data-k="entrar" aria-pressed="${!nueva}">Ya tengo cuenta</button></div></div>
+      <p class="cuenta__lead">${lead}</p>
+      <form id="f-cuenta" class="cuenta__f" data-modo="${nueva ? "nueva" : "entrar"}" novalidate><div class="fields">
+        ${nueva ? campo("cu-nombre", "Nombre y apellido", 'autocomplete="name"', "Escribí tu nombre y apellido.") : ""}
+        ${campo("cu-email", "Email", 'type="email" inputmode="email" autocomplete="email" autocapitalize="none" spellcheck="false"', "Escribí un email válido.")}
+        ${nueva ? campo("cu-cel", "Celular", 'type="tel" inputmode="tel" autocomplete="tel" placeholder="261 555 1234"', "Escribí tu celular, con la característica.") : ""}
+        ${campoClave(nueva ? "new-password" : "current-password")}
+      </div>${nueva ? casillas() : ""}
+      <button type="submit" class="btn btn--ink btn--block">${nueva ? "Crear cuenta" : "Entrar"}</button>
+      ${nueva ? "" : `<button type="button" class="link cuenta__olvido" data-act="cu-olvido">¿Te olvidaste la contraseña?</button>`}
+      <p class="cuenta__msg" id="cu-msg" role="alert" hidden></p></form>${nueva ? LEGAL : ""}</div>`;
+  }
+  // Volver a dibujar la caja de la cuenta (y lo que depende de ella) en la pantalla abierta
+  function pintarCuenta() {
+    badges();
+    if (S.page === "pago") renderPago();
+    else if (S.page === "turnos") renderTurnos();
+  }
+  // Con la cuenta abierta: sus turnos
+  async function aplicar(r) {
+    S.yo = (r && r.ok && r.cliente) || null;
+    S.email = r && r.ok && !r.cliente && r.email ? r.email : "";
+    if (S.yo || S.email) { S.pend = ""; store.set("tuvo-cuenta", true); }
+    if (S.yo) { const t = await CU.turnos(); S.turnos = t.ok ? t.lista.filter((x) => venue(x.vid)) : []; }
+    else S.turnos = [];
+    pintarCuenta();
+  }
+  const avisoCu = (texto, ok = false) => {
+    const m = $("#cu-msg"); if (!m) return toast(texto);
+    m.textContent = texto; m.hidden = false; m.classList.toggle("is-ok", ok);
+  };
+  const marcar = (id, bad) => { const f = $("#" + id); if (!f) return bad; f.classList.toggle("is-invalid", bad); f.setAttribute("aria-invalid", String(bad)); const e = $("#" + id + "-e"); if (e) e.hidden = !bad; return bad; };
+  const emailOk = (s) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
+  const valCuenta = (modo) => {
+    const v = (id) => ($("#" + id) ? $("#" + id).value.trim() : "");
+    const malos = [];
+    if (modo !== "entrar" && marcar("cu-nombre", v("cu-nombre").length < 2)) malos.push("cu-nombre");
+    if (modo !== "datos" && marcar("cu-email", !emailOk(v("cu-email")))) malos.push("cu-email");
+    if (modo !== "entrar" && marcar("cu-cel", v("cu-cel").replace(/\D/g, "").length < 8)) malos.push("cu-cel");
+    if (modo !== "datos" && marcar("cu-clave", modo === "nueva" ? $("#cu-clave").value.length < 8 : !$("#cu-clave").value)) malos.push("cu-clave");
+    if (modo !== "entrar" && marcar("cu-acepto", !$("#cu-acepto").checked)) malos.push("cu-acepto");
+    return malos;
+  };
+  let enviando = false;
+  async function enviarCuenta(form) {
+    if (enviando) return;
+    const modo = form.dataset.modo, malos = valCuenta(modo);
+    if (malos.length) { $("#" + malos[0]).focus(); return; }
+    const v = (id) => ($("#" + id) ? $("#" + id).value.trim() : "");
+    const btn = $("button[type=submit]", form), txt = btn.textContent;
+    enviando = true; btn.disabled = true; btn.textContent = modo === "nueva" ? "Creando tu cuenta…" : modo === "entrar" ? "Entrando…" : "Guardando…";
+    const fin = () => { enviando = false; if (btn.isConnected) { btn.disabled = false; btn.textContent = txt; } };
+    let r;
+    if (modo === "nueva") r = await CU.registrar({ nombre: v("cu-nombre"), email: v("cu-email").toLowerCase(), celular: v("cu-cel"), clave: $("#cu-clave").value, promos: $("#cu-promos").checked });
+    else if (modo === "entrar") r = await CU.ingresar(v("cu-email").toLowerCase(), $("#cu-clave").value);
+    else r = await CU.guardarDatos({ nombre: v("cu-nombre"), celular: v("cu-cel"), promos: $("#cu-promos").checked });
+    fin();
+    if (!r.ok) {
+      if (r.error === "existe") { // que entre con esa cuenta, con el email ya escrito
+        const correo = v("cu-email"); S.modoCu = "entrar"; pintarCuenta();
+        if ($("#cu-email")) { $("#cu-email").value = correo; $("#cu-clave").focus(); }
+      }
+      if (r.error === "sin-confirmar") { S.pend = v("cu-email").toLowerCase(); pintarCuenta(); }
+      return avisoCu(msj(r.error));
+    }
+    if (r.confirmar) { S.pend = v("cu-email").toLowerCase(); pintarCuenta(); $("#cuenta").scrollIntoView({ block: "nearest", behavior: reduce ? "auto" : "smooth" }); return; }
+    await aplicar(r);
+    if (S.yo) toast(modo === "nueva" ? `¡Listo, ${S.yo.nombre.split(" ")[0]}! Tu cuenta está creada.` : modo === "entrar" ? `Hola, ${S.yo.nombre.split(" ")[0]}.` : "Tus datos quedaron guardados.");
+    if (S.page === "pago" && S.yo && vigente()) requestAnimationFrame(() => { const b = $(".chk__side [data-act=pay]"); if (b && innerWidth >= 940) b.focus({ preventScroll: true }); });
+  }
+  // Recién confirmó el email (en otra pestaña o en este mismo navegador): se fija si ya hay sesión
+  async function yaConfirme() {
+    const r = await CU.iniciar();
+    if (r.ok && (r.cliente || r.email)) return aplicar(r);
+    // lo confirmó en otro celular o compu (o todavía no): que entre con su email y su contraseña
+    const correo = S.pend; S.pend = ""; S.modoCu = "entrar"; pintarCuenta();
+    if ($("#cu-email")) { $("#cu-email").value = correo; $("#cu-clave").focus(); }
+    avisoCu("Entrá con tu email y tu contraseña. Si todavía no confirmaste, tocá el botón del mail que te mandamos.");
+  }
+  // ¿Pagar sin cuenta? Primero la cuenta
+  function pedirCuenta() {
+    const caja = $("#cuenta"); if (!caja) return;
+    caja.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "center" });
+    avisoCu(S.pend ? "Confirmá tu email para pagar la seña." : S.email ? "Completá tus datos para pagar la seña." : S.modoCu === "nueva" ? "Primero creá tu cuenta (o entrá con la tuya) y después pagás la seña." : "Primero entrá con tu cuenta y después pagás la seña.");
+    const f = $("#cuenta input"); if (f) setTimeout(() => f.focus({ preventScroll: true }), reduce ? 0 : 350);
+  }
+  async function olvido() {
+    const correo = ($("#cu-email") || { value: "" }).value.trim();
+    if (marcar("cu-email", !emailOk(correo))) { avisoCu("Escribí tu email y te mandamos un link para elegir otra contraseña."); return $("#cu-email").focus(); }
+    const r = await CU.recuperar(correo.toLowerCase());
+    avisoCu(r.ok ? `Te mandamos un mail a ${correo} con un link para elegir otra contraseña.` : msj(r.error), r.ok);
+  }
+  async function salirCuenta() {
+    await CU.salir();
+    S.yo = null; S.email = ""; S.pend = ""; S.turnos = []; S.modoCu = "entrar";
+    pintarCuenta(); toast("Cerraste tu sesión.");
+  }
+
+  // ---------- Pagar (simulado: en la versión real, acá se abre Mercado Pago) ----------
+  const espera = (ms) => new Promise((ok) => setTimeout(ok, ms));
+  let pagando = false;
+  async function pagar() {
     const r = vigente(); if (!r) return vencer();
-    const malos = [valNombre(), valWa()].filter(Boolean).length;
-    if (malos) { (valNombre() ? $("#c-nombre") : $("#c-wa")).focus(); return; }
-    const contacto = { nombre: $("#c-nombre").value.trim(), wa: $("#c-wa").value.trim() };
-    store.set("contacto", contacto);
+    if (!S.yo) return pedirCuenta();
+    if (pagando) return;
+    pagando = true;
     clearInterval(tic); tic = null; // ya está pagando: el tiempo no corre más
+    const v = venue(r.vid), svc = v.svcs.find((s) => s.id === r.svc) || v.svcs[0];
     const ov = document.createElement("div"); ov.className = "mpov"; ov.setAttribute("role", "alertdialog"); ov.setAttribute("aria-live", "polite");
     ov.innerHTML = `<div class="mpov__in"><div class="spin"></div><h2>Te llevamos a Mercado Pago</h2><p>Un momento, estamos preparando el pago de tu seña.</p></div>`;
     document.body.appendChild(ov);
-    const dur = reduce ? 300 : 1500;
-    setTimeout(() => {
-      ov.innerHTML = `<div class="mpov__in"><div class="okc"><svg class="icon"><use href="#i-check"/></svg></div><h2>¡Turno confirmado!</h2><p>Es una demo: no se cobró nada.</p></div>`;
-      setTimeout(() => {
-        const { vence, ...turno } = r;
-        const nuevo = { ...turno, code: "BK-" + hash(r.id + Date.now()).toString(36).toUpperCase().slice(0, 4), nombre: contacto.nombre, pagado: true };
-        S.turnos = S.turnos.concat(nuevo); S.res = null; S.vencida = null; guardar(); reloj();
-        ov.remove(); go("turnos", { nuevos: [nuevo.id] }); toast("Turno confirmado (demo, sin cobro).");
-      }, reduce ? 300 : 1200);
-    }, dur);
+    const { vence, ...turno } = r;
+    const pedido = CU.reservar({ ...turno, lugar: v.name, zona: ZONAS[v.zona], rubro: RUBROS[v.rubro].n, servicio: svc.n });
+    await espera(reduce ? 300 : 1500);
+    const res = await pedido;
+    if (!res.ok) {
+      ov.remove(); pagando = false;
+      if (res.error === "ocupado" || res.error === "pasado") { // ese horario ya no se puede: a elegir otro
+        S.res = null; guardar(); reloj(); toast(msj(res.error));
+        return go("ficha", { v: r.vid, dia: Math.max(0, Math.min(6, diaDe(r.key))) }, true);
+      }
+      reloj(); // el turno sigue guardado con el tiempo que le quedaba
+      if (res.error === "sesion" || res.error === "sin-datos") { S.yo = null; await aplicar(await CU.iniciar()); }
+      return avisoCu(msj(res.error));
+    }
+    ov.innerHTML = `<div class="mpov__in"><div class="okc"><svg class="icon"><use href="#i-check"/></svg></div><h2>¡Turno confirmado!</h2><p>Es una demo: no se cobró nada.</p></div>`;
+    await espera(reduce ? 300 : 1200);
+    S.turnos = S.turnos.concat(res.turno); S.res = null; S.vencida = null; guardar(); reloj();
+    ov.remove(); pagando = false;
+    go("turnos", { nuevos: [res.turno.id] }); toast("Turno confirmado (demo, sin cobro).");
   }
 
   // ---------- Mis turnos ----------
@@ -568,27 +743,105 @@
     // abajo, siempre, turnos libres del último rubro reservado: la pantalla no queda vacía
     const ult = lista.length ? venue(lista[lista.length - 1].vid) : null, rubro = ult ? ult.rubro : S.rubro;
     const mas = masLibres(rubro, `Reservá otro: ${RUBROS[rubro].n.toLowerCase()}`);
-    if (!lista.length) { root.innerHTML = `<h1>Mis turnos</h1><p class="sub">Acá vas a ver tus turnos confirmados.</p><div class="empty"><h3>Todavía no tenés turnos</h3><p>Reservá el primero en segundos.</p><button type="button" class="btn btn--primary" data-go="home" data-focus="pick">Buscar turnos</button></div>${mas}`; return; }
+    // Sin cuenta abierta: para entrar (o, si todavía no tiene, cómo se crea)
+    if (!S.yo) {
+      root.innerHTML = `<h1>Mis turnos</h1><p class="sub">${S.pend ? "Confirmá tu email para entrar." : S.email ? "Completá tus datos para ver y reservar turnos." : "Entrá con tu cuenta para ver tus turnos."}</p>
+        <div class="mt mt--fuera">${cuentaHTML("turnos")}
+          <aside class="mt__aside"><h2>¿Todavía no tenés cuenta?</h2><p>Se crea cuando reservás tu primer turno: elegís el horario y, antes de pagar la seña, ponés tu nombre, tu email, tu celular y una contraseña.</p>
+            <button type="button" class="btn btn--primary" data-go="home" data-focus="pick">Buscar turnos</button>
+            <p class="mt__neg">¿Tenés un negocio? <a class="link" href="admin.html">Entrá al panel</a></p></aside></div>${mas}`;
+      return;
+    }
+    const cuenta = miCuentaHTML();
+    if (!lista.length) { root.innerHTML = `<h1>Mis turnos</h1><p class="sub">Acá vas a ver tus turnos confirmados.</p><div class="mt"><div class="mt__lista"><div class="empty"><h3>Todavía no tenés turnos</h3><p>Reservá el primero en segundos.</p><button type="button" class="btn btn--primary" data-go="home" data-focus="pick">Buscar turnos</button></div></div>${cuenta}</div>${mas}`; return; }
     const ahora = Date.now();
-    const listo = st.nuevos ? `<div class="okban"><span class="okban__ic"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg></span><div><b>¡Listo, tu turno está confirmado!</b><span>Te mandamos los datos por WhatsApp. El resto lo pagás en el lugar.</span></div><button type="button" class="btn btn--ink btn--s" data-go="home" data-focus="pick">Reservar otro turno</button></div>` : "";
-    root.innerHTML = `<h1>Mis turnos</h1><p class="sub">Tus turnos confirmados, con la seña ya paga.</p>${listo}` + lista.map((it) => {
+    const listo = st.nuevos ? `<div class="okban"><span class="okban__ic"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg></span><div><b>¡Listo, tu turno está confirmado!</b><span>Te mandamos los datos por mail a ${esc(S.yo.email)}. El resto lo pagás en el lugar.</span></div><button type="button" class="btn btn--ink btn--s" data-go="home" data-focus="pick">Reservar otro turno</button></div>` : "";
+    root.innerHTML = `<h1>Mis turnos</h1><p class="sub">Tus turnos confirmados, con la seña ya paga.</p>${listo}<div class="mt"><div class="mt__lista">` + lista.map((it) => {
       const v = venue(it.vid), R = RUBROS[v.rubro], svc = v.svcs.find((s) => s.id === it.svc) || v.svcs[0], pasado = cuando(it).getTime() + 3600e3 < ahora;
       const txt = encodeURIComponent(`Turno en ${v.name}: ${keyLabel(it.key)} ${it.t} hs (${it.unit}). Código ${it.code}.`);
       return `<article class="tcard${st.nuevos && st.nuevos.includes(it.id) ? " is-new" : ""}"><div class="tcard__h"><span class="code">${it.code}</span><span class="status"${pasado ? ' style="color:var(--ink-500);background:var(--ink-100)"' : ""}>${pasado ? "Finalizado" : "Confirmado"}</span></div>
         <div class="tcard__b"><div><h3>${esc(v.name)}</h3><div class="tcard__when">${keyLabel(it.key)} · ${it.t}–${it.end}</div><p>${R.n}${v.rubro === "barberia" ? " · " + svc.n : ""} · ${esc(it.unit)} · ${ZONAS[v.zona]}</p></div>
         <div class="tcard__act"><a class="btn btn--line btn--s" href="https://wa.me/?text=${txt}" target="_blank" rel="noopener"><svg class="icon"><use href="#i-wa"/></svg>Compartir</a>${pasado ? "" : `<button type="button" class="btn btn--line btn--s" data-act="cancel" data-id="${it.id}">Cancelar</button>`}</div></div>
         <div class="tcard__money"><span>Seña pagada <b>${money(it.sena)}</b></span><span>A pagar en el lugar <b>${money(it.precio - it.sena)}</b></span></div></article>`;
-    }).join("") + mas;
+    }).join("") + `</div>${cuenta}</div>` + mas;
   }
+  // Tu cuenta, al lado de los turnos: ver, corregir o borrar tus datos (Ley 25.326), contraseña y salir
+  const miCuentaHTML = () => {
+    const y = S.yo;
+    return `<aside class="panel micuenta" aria-labelledby="mc-t">
+      <h2 id="mc-t">Tu cuenta</h2>
+      <div class="yo"><span class="yo__av" aria-hidden="true">${esc(iniciales(y.nombre))}</span><div class="yo__t"><b>${esc(y.nombre)}</b><span>${esc(y.email)}</span>${y.celular ? `<span>${esc(y.celular)}</span>` : ""}</div></div>
+      <p class="micuenta__promo"><span class="dot${y.promos ? "" : " dot--off"}"></span>${y.promos ? "Recibís promociones de Bookea por mail." : "No recibís promociones de Bookea."}</p>
+      <div class="micuenta__acts"><button type="button" class="btn btn--line btn--s" data-act="cu-editar">Corregir mis datos</button>${CU.modo === "nube" ? `<button type="button" class="btn btn--line btn--s" data-act="cu-clave">Cambiar contraseña</button>` : ""}<button type="button" class="btn btn--line btn--s" data-act="cu-salir">Salir</button></div>
+      <p class="micuenta__pie"><a class="link" href="privacidad.html" target="_blank" rel="noopener">Cómo cuidamos tus datos</a><button type="button" class="link link--peligro" data-act="cu-borrar">Borrar mi cuenta</button></p>
+    </aside>`;
+  };
   function cancelar(id) {
     const it = S.turnos.find((x) => x.id === id); if (!it) return;
     const horas = (cuando(it) - Date.now()) / 3600e3, devuelve = horas > it.cancel;
     const dlg = $("#dlg");
     $("#dlg-t").textContent = "¿Cancelar este turno?";
     $("#dlg-p").textContent = devuelve ? `Cancelás con más de ${it.cancel} h de anticipación: la seña de ${money(it.sena)} se devuelve y el turno se libera.` : `Faltan menos de ${it.cancel} h: la seña de ${money(it.sena)} queda para el negocio y el turno se libera.`;
-    $("#dlg-si").onclick = () => { S.turnos = S.turnos.filter((x) => x.id !== id); guardar(); dlg.close(); renderTurnos(); toast(devuelve ? "Turno cancelado. La seña vuelve." : "Turno cancelado."); };
+    $("#dlg-si").textContent = "Cancelar turno";
+    $("#dlg-si").onclick = async () => {
+      const b = $("#dlg-si"); b.disabled = true;
+      const r = await CU.cancelar(id);
+      b.disabled = false; dlg.close();
+      if (!r.ok && r.error !== "no-existe") return toast(msj(r.error));
+      S.turnos = S.turnos.filter((x) => x.id !== id); badges(); renderTurnos();
+      toast(!r.ok ? msj(r.error) : r.devuelve ? "Turno cancelado. La seña vuelve." : "Turno cancelado.");
+    };
     $("#dlg-no").onclick = () => dlg.close();
     dlg.showModal();
+  }
+  // Borrar la cuenta: se van los datos y los turnos (la base lo hace; en modo de prueba, este navegador)
+  function borrarCuenta() {
+    const dlg = $("#dlg");
+    $("#dlg-t").textContent = "¿Borrar tu cuenta?";
+    $("#dlg-p").textContent = `Se borran tus datos (${S.yo.email}) y todos tus turnos${S.turnos.length ? ", también los que tenés por delante" : ""}. No se puede deshacer.`;
+    $("#dlg-si").textContent = "Borrar mi cuenta";
+    $("#dlg-si").onclick = async () => {
+      const b = $("#dlg-si"); b.disabled = true;
+      const r = await CU.borrar();
+      b.disabled = false; dlg.close();
+      if (!r.ok) return toast(msj(r.error));
+      S.yo = null; S.email = ""; S.turnos = []; S.modoCu = "nueva";
+      try { localStorage.removeItem("bookea:tuvo-cuenta"); } catch {}
+      pintarCuenta(); toast("Borramos tu cuenta y tus datos.");
+    };
+    $("#dlg-no").onclick = () => dlg.close();
+    dlg.showModal();
+  }
+  // Corregir nombre, celular y promociones (el email es el de la cuenta: no se cambia acá)
+  function editarDatos() {
+    const dlg = $("#dlg-datos");
+    $("#dd-nombre").value = S.yo.nombre; $("#dd-cel").value = S.yo.celular; $("#dd-promos").checked = !!S.yo.promos;
+    $("#dd-email").textContent = S.yo.email;
+    ["dd-nombre", "dd-cel"].forEach((id) => marcar(id, false)); $("#dd-msg").hidden = true;
+    dlg.showModal();
+  }
+  async function guardarDatos(form) {
+    const nom = $("#dd-nombre").value.trim(), cel = $("#dd-cel").value.trim();
+    const malos = [marcar("dd-nombre", nom.length < 2) && "dd-nombre", marcar("dd-cel", cel.replace(/\D/g, "").length < 8) && "dd-cel"].filter(Boolean);
+    if (malos.length) return $("#" + malos[0]).focus();
+    const btn = $("button[type=submit]", form); btn.disabled = true;
+    const r = await CU.guardarDatos({ nombre: nom, celular: cel, promos: $("#dd-promos").checked });
+    btn.disabled = false;
+    if (!r.ok) { $("#dd-msg").textContent = msj(r.error); $("#dd-msg").hidden = false; return; }
+    S.yo = r.cliente; $("#dlg-datos").close(); pintarCuenta(); toast("Tus datos quedaron guardados.");
+  }
+  // Volvió con el link de "elegí una contraseña nueva" (modo nube)
+  function pedirClaveNueva() { const d = $("#dlg-clave"); if (d && !d.open) { $("#dc-msg").hidden = true; d.showModal(); } }
+  async function guardarClave(form) {
+    const f = $("#dc-clave");
+    if (marcar("dc-clave", f.value.length < 8)) return f.focus();
+    const btn = $("button[type=submit]", form); btn.disabled = true;
+    const r = await CU.ponerClave(f.value);
+    btn.disabled = false;
+    if (!r.ok) { $("#dc-msg").textContent = msj(r.error); $("#dc-msg").hidden = false; return; }
+    $("#dlg-clave").close(); f.value = "";
+    await aplicar(r); toast("Listo: tu contraseña nueva quedó guardada.");
+    if (vigente() && S.page !== "pago") go("pago");
   }
 
   // ---------- Detalles ----------
@@ -596,9 +849,10 @@
     const n = S.turnos.filter((t) => cuando(t).getTime() + 3600e3 >= Date.now()).length;
     $$('[data-count="turnos"]').forEach((b) => {
       if (b.textContent !== String(n) && n > 0) { b.classList.remove("is-sube"); void b.offsetWidth; b.classList.add("is-sube"); }
-      b.textContent = n; if (b.closest(".tabbar")) b.hidden = !n;
+      b.textContent = n; b.hidden = !n;
     });
-    $("#t-turnos").hidden = !n; // el header solo muestra lo que tiene algo
+    // "Mis turnos" queda siempre arriba: es por donde el cliente entra a su cuenta
+    $("#t-turnos").hidden = false;
   }
   let tt;
   function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("is-on"); clearTimeout(tt); tt = setTimeout(() => t.classList.remove("is-on"), 2600); }
@@ -645,6 +899,28 @@
         case "cambiar": { const x = vigente(); if (x) go("ficha", { v: x.vid, dia: diaDe(x.key), t: x.t }); break; }
         case "otra-vez": otraVez(); break;
         case "cancel": cancelar(d.id); break;
+        // la cuenta del cliente
+        case "cu-modo": {
+          const correo = $("#cu-email") ? $("#cu-email").value : "";
+          S.modoCu = d.k; pintarCuenta();
+          if ($("#cu-email")) $("#cu-email").value = correo; // lo que ya escribió no se pierde al cambiar
+          const f = $(S.modoCu === "nueva" ? "#cu-nombre" : "#cu-email"); if (f && !e.detail) f.focus();
+          break;
+        }
+        case "cu-ver": {
+          const f = $("#cu-clave"), ver = f.type === "password";
+          f.type = ver ? "text" : "password"; t.setAttribute("aria-pressed", String(ver));
+          t.textContent = ver ? "Ocultar" : "Ver"; t.setAttribute("aria-label", ver ? "Ocultar la contraseña" : "Mostrar la contraseña");
+          break;
+        }
+        case "cu-olvido": olvido(); break;
+        case "cu-ya": yaConfirme(); break;
+        case "cu-otro": S.pend = ""; S.modoCu = "nueva"; pintarCuenta(); break;
+        case "cu-salir": salirCuenta(); break;
+        case "cu-editar": editarDatos(); break;
+        case "cu-clave": CU.recuperar(S.yo.email).then((r) => toast(r.ok ? `Te mandamos un mail a ${S.yo.email} para elegir otra contraseña.` : msj(r.error))); break;
+        case "cu-borrar": borrarCuenta(); break;
+        case "dlg-cerrar": t.closest("dialog").close(); break;
       }
       return;
     }
@@ -658,12 +934,27 @@
     if (d.copy) copiar(t);
     if (d.step) { horas = Math.min(48, Math.max(1, horas + +d.step)); nota(); }
   });
-  document.addEventListener("submit", (e) => { if (e.target.id === "finder") { e.preventDefault(); go("resultados"); } });
+  document.addEventListener("submit", (e) => {
+    const id = e.target.id;
+    if (id === "finder") { e.preventDefault(); go("resultados"); }
+    if (id === "f-cuenta") { e.preventDefault(); enviarCuenta(e.target); }
+    if (id === "f-datos") { e.preventDefault(); guardarDatos(e.target); }
+    if (id === "f-clave") { e.preventDefault(); guardarClave(e.target); }
+  });
   document.addEventListener("change", (e) => { if (e.target.id === "r-zona") { S.zona = e.target.value; renderResultados(); }
     if (e.target.id === "f-zona") S.zona = e.target.value;
     if (e.target.id === "f-dia") S.dia = +e.target.value;
     if (e.target.id === "f-franja") S.franja = e.target.value; if (e.target.id === "f-svc") { S.f.svc = e.target.value; renderBook(); } });
-  document.addEventListener("input", (e) => { if (e.target.id === "c-nombre" && e.target.classList.contains("is-invalid")) valNombre(); if (e.target.id === "c-wa" && e.target.classList.contains("is-invalid")) valWa(); });
+  // El aviso de un campo se va apenas se corrige
+  document.addEventListener("input", (e) => {
+    const f = e.target;
+    if (!/^(cu|dd|dc)-/.test(f.id) || f.getAttribute("aria-invalid") !== "true") return;
+    const v = f.value.trim();
+    const bien = f.id.endsWith("nombre") ? v.length >= 2 : f.id.endsWith("cel") ? v.replace(/\D/g, "").length >= 8 : f.id.endsWith("email") ? emailOk(v)
+      : f.id === "cu-clave" ? (S.modoCu === "nueva" ? f.value.length >= 8 : !!f.value) : f.id === "dc-clave" ? f.value.length >= 8 : f.id === "cu-acepto" ? f.checked : true;
+    if (bien) marcar(f.id, false);
+  });
+  document.addEventListener("change", (e) => { if (e.target.id === "cu-acepto" && e.target.checked) marcar("cu-acepto", false); });
 
   // ---------- Sumá tu negocio: reglas, copiar, alta ----------
   let horas = 6, devuelve = true;
@@ -722,6 +1013,7 @@
     }
     if (["sumate", "como-funciona", "funciones", "preguntas"].includes(h)) return { page: "negocios", ir: h };
     if (h === "pick" || h === "reservar") return { page: "home", ir: "pick" };
+    if (h === "mis-turnos") return { page: "turnos" }; // el botón de los mails de cada turno
     return { page: "home" };
   })();
   try { history.scrollRestoration = "manual"; history.replaceState({ page: inicial.page }, "", /^https?:$/.test(location.protocol) ? location.pathname.replace(/\/index\.html$/, "/") : location.pathname); } catch {}
@@ -731,9 +1023,25 @@
   // se resuelve acá, reemplazando la entrada del historial para que "atrás" no quede en el mismo lugar
   window.addEventListener("hashchange", () => {
     const h = location.hash.slice(1);
-    const page = ["sumate", "como-funciona", "funciones", "preguntas"].includes(h) ? "negocios" : h === "pick" || h === "reservar" ? "home" : "";
+    const page = ["sumate", "como-funciona", "funciones", "preguntas"].includes(h) ? "negocios" : h === "pick" || h === "reservar" ? "home" : h === "mis-turnos" ? "turnos" : "";
     if (!page) return;
     go(page, {}, true);
-    requestAnimationFrame(() => scrollTo(h === "reservar" ? "pick" : h));
+    if (page !== "turnos") requestAnimationFrame(() => scrollTo(h === "reservar" ? "pick" : h));
+  });
+
+  // ---------- La cuenta del cliente, al abrir la página ----------
+  // Si quedó abierta en este navegador, se trae con sus turnos. Si se llega desde un link de un mail:
+  // "confirmada" (recién confirmó su email) → a pagar el turno guardado, o a Mis turnos; "clave" → elegir otra contraseña.
+  CU.alRecuperar(pedirClaveNueva);
+  CU.iniciar().then(async (r) => {
+    await aplicar(r);
+    if (CU.vuelta === "confirmada") {
+      if (S.yo) { toast("Tu email quedó confirmado."); if (vigente()) go("pago", {}, true); else if (S.page !== "turnos") go("turnos", {}, true); }
+      else { toast(r.linkVencido ? "Ese link ya se usó o venció. Entrá con tu email y tu contraseña." : "Tu email quedó confirmado. Entrá con tu email y tu contraseña."); S.modoCu = "entrar"; go(vigente() ? "pago" : "turnos", {}, true); }
+    }
+    if (CU.vuelta === "clave") {
+      if (S.yo || S.email) pedirClaveNueva();
+      else if (r.linkVencido) { toast("Ese link ya se usó o venció. Pedí otro desde «¿Te olvidaste la contraseña?»."); go("turnos", {}, true); }
+    }
   });
 })();

@@ -4,13 +4,13 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Bookea · Reservá turnos en segundos</title>
-  <meta name="description" content="Bookea: reservá turnos de pádel, fútbol 5, tenis, barbería y más negocios con turnos, en segundos. Para negocios: agenda online con seña y recordatorio por WhatsApp." />
+  <meta name="description" content="Bookea: reservá turnos de pádel, fútbol 5, tenis, barbería y más negocios con turnos, en segundos. Para negocios: agenda online con seña y aviso al cliente por mail." />
   <meta name="theme-color" content="#ffffff" />
   <link rel="icon" href="marca/isotipo.svg" type="image/svg+xml" />
   <link rel="icon" href="marca/isotipo-32.png" sizes="32x32" type="image/png" />
   <link rel="apple-touch-icon" href="marca/isotipo-192.png" />
   <link rel="preload" href="assets/fuentes/inter-tight.woff2" as="font" type="font/woff2" crossorigin />
-  <link rel="stylesheet" href="sitio.css?v=17" />
+  <link rel="stylesheet" href="sitio.css?v=18" />
 </head>
 <body>
   <script>document.documentElement.classList.add("js");</script>
@@ -64,6 +64,7 @@
       <symbol id="i-back" viewBox="0 0 24 24"><path d="M14.5 5L7.5 12l7 7"/></symbol>
       <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l7.5 3v5.5c0 4.6-3.1 8-7.5 9.5-4.4-1.5-7.5-4.9-7.5-9.5V6z"/><path d="M9 12l2.2 2.2L15.5 10"/></symbol>
       <symbol id="i-shop" viewBox="0 0 24 24"><path d="M4 9l1.6-5h12.8L20 9M4 9v11h16V9M4 9a3 3 0 0 0 5.3 1.9A3 3 0 0 0 14.7 10.9 3 3 0 0 0 20 9M9.5 20v-5h5v5"/></symbol>
+      <symbol id="i-mail" viewBox="0 0 24 24"><rect x="3.5" y="5.5" width="17" height="13" rx="2"/><path d="M4 7.5l8 6 8-6"/></symbol>
       <symbol id="i-wa" viewBox="0 0 24 24"><path d="M4 20l1.2-4.2A8 8 0 1 1 8.4 19z"/><path d="M9.2 9.2c.2 2.6 2.4 4.8 5.2 5.4l1.1-1.2-1.9-.9-.9.6c-.9-.4-1.6-1.1-2-2l.6-.9-.9-1.9z"/></symbol>
     </defs>
   </svg>
@@ -76,7 +77,7 @@
         <span class="brand__word">Bookea</span>
       </a>
       <nav class="top__act" aria-label="Principal">
-        <button class="tlink" type="button" data-go="turnos" id="t-turnos" hidden>Mis turnos <span class="badge" data-count="turnos">0</span></button>
+        <button class="tlink" type="button" data-go="turnos" id="t-turnos">Mis turnos <span class="badge" data-count="turnos" hidden>0</span></button>
         <button class="btn btn--primary btn--s hold" type="button" data-go="pago" id="t-pago" hidden><svg class="icon" aria-hidden="true"><use href="#i-clock"/></svg><b data-reloj>10:00</b>Pagar seña</button>
         <a class="btn btn--line btn--s top__neg" href="#" data-go="negocios">Sumá tu negocio</a>
         <a class="btn btn--ink btn--s" href="admin.html">Ingresar</a>
@@ -174,7 +175,7 @@
           <div class="band__in">
             <p class="eyebrow" style="color:#ffb4a2">Para negocios</p>
             <h1>Cada turno vacío es <em>plata que no vuelve.</em></h1>
-            <p class="band__lead">Bookea te arma la agenda online, cobra la seña con Mercado Pago y le avisa a tu cliente por WhatsApp.</p>
+            <p class="band__lead">Bookea te arma la agenda online, cobra la seña con Mercado Pago y le avisa a tu cliente por mail.</p>
             <div class="band__cta"><button type="button" class="btn btn--primary btn--lg" data-scroll="sumate">Crear mi cuenta</button><button type="button" class="btn btn--lg band__ghost" data-scroll="como-funciona">Cómo funciona</button></div>
           </div>
         </div>
@@ -214,12 +215,12 @@
             <li class="ex">
               <span class="ex__n" aria-hidden="true">3</span>
               <h3>Te reservan con seña</h3>
-              <p>El cliente elige el horario y paga la seña con Mercado Pago. La plata te llega a vos, el turno queda en tu agenda y le avisamos por WhatsApp.</p>
+              <p>El cliente elige el horario y paga la seña con Mercado Pago. La plata te llega a vos, el turno queda en tu agenda y le avisamos por mail.</p>
               <div class="mini">
                 <div><span class="k">Martina eligió</span><p class="v">Cancha 2 · Martes 21:30 · $ 34.000</p></div>
                 <div class="trio">
                   <div><small>Mercado Pago</small><b>$ 8.500</b><small><span class="dot"></span>Seña acreditada en tu cuenta</small></div>
-                  <div><small>WhatsApp</small><span style="display:block;font-size:13px">Martina, te esperamos hoy 21:30 en Cancha 2.</span></div>
+                  <div><small>Mail a Martina</small><span style="display:block;font-size:13px">Tu turno está confirmado: hoy 21:30, Cancha 2.</span></div>
                   <div><small>Tu agenda</small><b style="font-size:15px">21:30 · Cancha 2</b><small>Martina G. · 10 de 15 turnos</small></div>
                 </div>
               </div>
@@ -235,8 +236,8 @@
           <div class="cells">
             <article class="cell"><div><h3>Seña con Mercado Pago</h3><p>La seña se cobra al reservar y entra directo a tu cuenta. Bookea no toca tu plata.</p></div>
               <div class="frag"><span class="eyebrow">Señas de hoy</span><ul><li><span>Martina G. · C2 21:30</span><b>$ 8.500</b></li><li><span>Los del martes · C1 20:00</span><b>$ 8.500</b></li><li><span>Nico R. · C3 18:30</span><b>$ 7.000</b></li><li class="tot"><span>Total cobrado</span><b>$ 24.000</b></li></ul></div></article>
-            <article class="cell"><div><h3>Recordatorio por WhatsApp</h3><p>Confirmación al reservar y aviso horas antes. Si alguien no puede, libera el turno en un toque.</p></div>
-              <div class="frag"><p class="bub">Hola Nico, te esperamos hoy a las 18:30 en la Cancha 3. Si no podés venir, avisanos y liberamos el turno.</p><div class="bacts"><span>Voy</span><span>Liberar turno</span></div></div></article>
+            <article class="cell"><div><h3>Confirmación por mail</h3><p>Al reservar, a tu cliente le llega un mail con el día, la hora y la cancha. Si no puede ir, cancela desde su cuenta y el turno se libera.</p></div>
+              <div class="frag"><p class="bub">Hola, Nico: tu turno está confirmado. Te esperamos hoy a las 18:30 en la Cancha 3. Si no podés venir, cancelalo desde Mis turnos.</p><div class="bacts"><span>Ver mis turnos</span><span>Cancelar turno</span></div></div></article>
             <article class="cell"><div><h3>Turnos fijos</h3><p>“Todos los martes a las 20.” Lo cargás una vez y se repite solo, con su seña cada semana.</p></div>
               <div class="frag"><b style="font-weight:600">Los del martes</b><span style="color:var(--ink-500)">Cancha 1 · martes 20:00 · cada semana</span><div class="dates"><span>10/11</span><span>17/11</span><span>24/11</span><span>1/12</span><span>8/12</span></div></div></article>
             <article class="cell"><div><h3>Precio según el horario</h3><p>La noche vale más que la tarde. Cada franja tiene su precio y su seña.</p></div>
@@ -314,6 +315,7 @@
           <p class="eyebrow">Contacto</p>
           <a href="mailto:hola@bookea.ar">hola@bookea.ar</a>
           <button type="button" class="copy" style="width:fit-content" data-copy="hola@bookea.ar">Copiar mail</button>
+          <a href="privacidad.html">Privacidad y condiciones</a>
         </div>
       </div>
       <div class="foot__bottom">
@@ -338,10 +340,30 @@
     <button type="button" data-go="negocios" data-tab="negocios"><svg class="icon"><use href="#i-shop"/></svg>Negocios</button>
   </nav>
 
+  <!-- Tu cuenta: corregir tus datos (el email es el de la cuenta) -->
+  <dialog id="dlg-datos" aria-labelledby="dd-t"><form id="f-datos" novalidate>
+    <h2 id="dd-t">Tus datos</h2><p>Email de la cuenta: <b id="dd-email"></b></p>
+    <div class="fields fields--1">
+      <label class="field"><span>Nombre y apellido</span><input id="dd-nombre" autocomplete="name" aria-describedby="dd-nombre-e" /><p class="err" id="dd-nombre-e" hidden>Escribí tu nombre y apellido.</p></label>
+      <label class="field"><span>Celular</span><input id="dd-cel" type="tel" inputmode="tel" autocomplete="tel" aria-describedby="dd-cel-e" /><p class="err" id="dd-cel-e" hidden>Escribí tu celular, con la característica.</p></label>
+    </div>
+    <label class="check"><input type="checkbox" id="dd-promos" /><span>Quiero recibir promociones de Bookea por mail.</span></label>
+    <p class="cuenta__msg" id="dd-msg" role="alert" hidden></p>
+    <div class="row"><button class="btn btn--line" type="button" data-act="dlg-cerrar">Cancelar</button><button class="btn btn--primary" type="submit">Guardar</button></div>
+  </form></dialog>
+  <!-- Volvió con el link de "elegí una contraseña nueva" -->
+  <dialog id="dlg-clave" aria-labelledby="dc-t"><form id="f-clave" novalidate>
+    <h2 id="dc-t">Elegí una contraseña nueva</h2><p>Usá 8 caracteres o más. Después entrás con tu email y esta contraseña.</p>
+    <label class="field"><span>Contraseña nueva</span><input id="dc-clave" type="password" autocomplete="new-password" minlength="8" aria-describedby="dc-clave-e" /><p class="err" id="dc-clave-e" hidden>Usá 8 caracteres o más.</p></label>
+    <p class="cuenta__msg" id="dc-msg" role="alert" hidden></p>
+    <div class="row"><button class="btn btn--line" type="button" data-act="dlg-cerrar">Ahora no</button><button class="btn btn--primary" type="submit">Guardar contraseña</button></div>
+  </form></dialog>
   <dialog id="dlg"><h2 id="dlg-t"></h2><p id="dlg-p"></p><div class="row"><button class="btn btn--line" type="button" id="dlg-no">Volver</button><button class="btn btn--primary" type="button" id="dlg-si">Confirmar</button></div></dialog>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-  <script src="sitio.js?v=17"></script>
-  <script src="toque.js?v=17"></script>
+  <script src="config.js?v=18"></script>
+  <script src="cuenta.js?v=18"></script>
+  <script src="sitio.js?v=18"></script>
+  <script src="toque.js?v=18"></script>
 </body>
 </html>
