@@ -668,13 +668,23 @@ dialog .row { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wr
 
 /* ---------- La B del logo, hasta el verde agua del barrido ---------- */
 /* ---------- Secciones: Deportes | Servicios (pedido del dueño, 19/11) ---------- */
-.secs { display: inline-flex; gap: 3px; padding: 3px; border-radius: 999px; background: var(--ink-100); flex: none; }
-.secs button { min-height: 32px; padding: 0 15px; border-radius: 999px; font-size: 14px; font-weight: 600; color: var(--ink-500); white-space: nowrap; transition: background-color .2s, color .2s, box-shadow .2s; }
-.secs button:hover { color: var(--ink-900); }
-.secs button[aria-pressed="true"] { background: var(--paper); color: var(--ink-900); box-shadow: 0 1px 2px rgba(17,21,28,.08), 0 0 0 1px var(--ink-200); }
+.secs { position: relative; isolation: isolate; display: inline-grid; grid-template-columns: 1fr 1fr; padding: 3px; border-radius: 999px; background: var(--ink-100); flex: none; }
+.secs::before { content: ""; position: absolute; z-index: -1; top: 3px; bottom: 3px; left: 3px; width: calc(50% - 3px); border-radius: 999px; background: var(--paper); box-shadow: 0 1px 2px rgba(17,21,28,.08), 0 0 0 1px var(--ink-200); transform: translateX(calc(var(--i, 0) * 100%)); transition: transform .5s var(--ease-expo); }
+.secs button { min-height: 32px; padding: 0 16px; border-radius: 999px; font-size: 14px; font-weight: 600; color: var(--ink-500); white-space: nowrap; transition: color .3s var(--ease); }
+.secs button:hover, .secs button[aria-pressed="true"] { color: var(--ink-900); }
+/* "Libres ahora": el control al lado del título; los rubros de cada sección en el mismo lugar (se funden, no saltan) */
+.libres__tit { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 24px; }
+#hs-secs { padding-bottom: 5px; }
+.switch-rubro { display: grid; }
+.hs-grupo { grid-area: 1 / 1; display: flex; gap: 8px; justify-content: flex-start; opacity: 0; visibility: hidden; transform: translateY(6px); transition: opacity .3s var(--ease), transform .45s var(--ease-expo), visibility 0s linear .3s; }
+.hs-grupo.is-on { opacity: 1; visibility: visible; transform: none; transition: opacity .45s var(--ease) .1s, transform .55s var(--ease-expo) .1s, visibility 0s; }
+.rbar__pills { display: flex; gap: 10px; align-items: center; flex: none; }
+.finder { position: relative; }
+.collage figure { position: relative; }
+.collage img.foto-nueva, .collage img.foto-lista { position: absolute; inset: 0; }
+.collage img.foto-lista { animation: none; }
 .finder__top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; min-height: 30px; }
 .finder__top .finder__k { margin: 0 0 0 2px; }
-.switch-rubro, #r-rubros { align-items: center; }
 /* Con menos de cuatro rubros la fila de fotos mide lo mismo: con tres, el primero ocupa dos lugares;
    con uno o dos, un molde invisible (una foto común) fija el alto y las fotos se estiran a lo ancho. */
 .rubros[data-n] .rubro img { position: absolute; inset: 0; }
@@ -724,8 +734,13 @@ dialog .row { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wr
   .js .finder { transition-delay: 580ms; }
   .js.is-ready .hero .eyebrow, .js.is-ready .hero__lead, .js.is-ready .finder { opacity: 1; transform: none; }
   /* al cambiar de sección, las fotos de al lado se funden; al tocar un día, sus horarios suben */
-  .collage img.is-cambia { animation: cambiaFoto 700ms var(--ease-expo) both; }
-  @keyframes cambiaFoto { from { opacity: 0; transform: scale(1.08); } }
+  .collage img.foto-nueva { animation: fotoEntra 1000ms var(--ease-soft) both; }
+  @keyframes fotoEntra { from { opacity: 0; transform: scale(1.035); } }
+  .rubros--sale { z-index: 2; pointer-events: none; animation: rubrosSale 380ms var(--ease) forwards; }
+  @keyframes rubrosSale { to { opacity: 0; } }
+  .rubros--entra .rubro:not(.rubro--molde) { animation: rubroEntra 560ms var(--ease-expo) both; }
+  .rubros--entra .rubro:nth-child(2) { animation-delay: 60ms; } .rubros--entra .rubro:nth-child(3) { animation-delay: 120ms; }
+  @keyframes rubroEntra { from { opacity: 0; transform: translateY(8px) scale(.985); } }
   .reserva__panel.aparece { animation: aparece 480ms var(--ease-expo); }
   @keyframes aparece { from { opacity: 0; transform: translateY(12px); } }
   /* las fotos se destapan de izquierda a derecha y se asientan */

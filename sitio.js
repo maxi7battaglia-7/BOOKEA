@@ -214,14 +214,35 @@
   const franjaOpts = (rubro) => `<option value="">Todo el día</option>` + franjasDe(rubro).map((f) => `<option value="${f}">${FRANJAS[f]}</option>`).join("");
   // Buscador del home (selects)
   // Las dos secciones (Deportes | Servicios): el mismo control en el buscador, en "Libres ahora" y en los resultados
-  const secsHTML = () => `<div class="secs" role="group" aria-label="Sección">${Object.entries(SECCIONES).map(([k, s]) => `<button type="button" data-act="sec" data-k="${k}" aria-pressed="${k === S.sec}">${s.n}</button>`).join("")}</div>`;
+  // Se dibuja una sola vez y después solo se marca la elegida: así el fondo blanco se desliza de una pestaña a la otra
+  function pintarSecs() {
+    const i = Object.keys(SECCIONES).indexOf(S.sec);
+    ["#f-secs", "#hs-secs", "#r-secs"].forEach((sel) => {
+      const box = $(sel); if (!box) return;
+      if (!box.firstElementChild) box.innerHTML = `<div class="secs" role="group" aria-label="Sección">${Object.entries(SECCIONES).map(([k, s]) => `<button type="button" data-act="sec" data-k="${k}">${s.n}</button>`).join("")}</div>`;
+      const s = box.firstElementChild; s.style.setProperty("--i", i);
+      $$("button", s).forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.k === S.sec)));
+    });
+  }
+  let filaDe = "";
   function renderBuscador() {
     const rs = SECCIONES[S.sec].rubros, fr = $("#f-rubros");
+    // al cambiar de sección, la fila vieja se va (una copia encima que se desvanece) mientras entra la nueva
+    const cambia = filaDe && filaDe !== S.sec && !reduce && fr.offsetWidth;
+    if (cambia) {
+      const viejo = fr.cloneNode(true);
+      viejo.removeAttribute("id"); viejo.setAttribute("aria-hidden", "true"); viejo.inert = true; viejo.classList.add("rubros--sale");
+      viejo.style.cssText = `position:absolute;left:${fr.offsetLeft}px;top:${fr.offsetTop}px;width:${fr.offsetWidth}px;margin:0`;
+      fr.parentElement.appendChild(viejo);
+      setTimeout(() => viejo.remove(), 450);
+    }
+    filaDe = S.sec;
     fr.dataset.n = rs.length;
     // la fila de fotos mide siempre lo mismo: con tres rubros el primero va más ancho; con uno o dos, un molde invisible fija el alto
     fr.innerHTML = rs.map((k) => `<button type="button" class="rubro" data-act="tile" data-k="${k}" aria-pressed="${k === S.rubro}">${img(RUBROS[k].img, "")}<span class="rubro__n">${RUBROS[k].n}</span></button>`).join("")
       + (rs.length <= 2 ? `<span class="rubro rubro--molde" aria-hidden="true"></span>` : "");
-    $("#f-secs").innerHTML = secsHTML();
+    if (cambia) { fr.classList.remove("rubros--entra"); void fr.offsetWidth; fr.classList.add("rubros--entra"); }
+    pintarSecs();
     $("#f-zona").innerHTML = zonaOpts(S.rubro); $("#f-zona").value = S.zona;
     $("#f-dia").innerHTML = Array.from({ length: 7 }, (_, i) => `<option value="${i}">${dayFull(i)}</option>`).join(""); $("#f-dia").value = S.dia;
     $("#f-franja").innerHTML = franjaOpts(S.rubro); $("#f-franja").value = S.franja;
@@ -229,14 +250,17 @@
   }
   // Las tres fotos de al lado del buscador son de la sección elegida
   let collageDe = "";
+  // Al cambiar de sección, la foto nueva aparece encima de la vieja y se funde (una tras otra), y después la vieja se saca
   function pintarCollage() {
     if (S.sec === collageDe) return;
     const primera = !collageDe; collageDe = S.sec;
-    $$(".collage img").forEach((im, i) => {
-      const src = IMG[SECCIONES[S.sec].collage[i]];
-      if (im.getAttribute("src") === src) return;
-      im.src = src;
-      if (!primera) { im.classList.remove("is-cambia"); void im.offsetWidth; im.classList.add("is-cambia"); }
+    $$(".collage figure").forEach((fig, i) => {
+      const src = IMG[SECCIONES[S.sec].collage[i]], fotos = $$("img", fig), ult = fotos[fotos.length - 1];
+      if (ult.getAttribute("src") === src) return;
+      if (primera || reduce) { fotos.forEach((x, j) => (j < fotos.length - 1 ? x.remove() : (x.src = src))); return; }
+      const nueva = ult.cloneNode(); nueva.src = src; nueva.className = "foto-nueva"; nueva.style.animationDelay = `${i * 120}ms`;
+      fig.appendChild(nueva);
+      setTimeout(() => { $$("img", fig).forEach((x) => x !== nueva && fig.lastElementChild === nueva && x.remove()); nueva.className = "foto-lista"; nueva.style.animationDelay = ""; }, 1150 + i * 120);
     });
   }
   function elegirSeccion(k) {
@@ -249,9 +273,14 @@
   function renderDestacados() {
     if (!SECCIONES[S.sec].rubros.includes(S.hs)) S.hs = S.rubro;
     const k = S.hs, R = RUBROS[k];
-    $("#hs-switch").innerHTML = secsHTML() + `<span class="sep" aria-hidden="true"></span>` + SECCIONES[S.sec].rubros.map((key) => `<button type="button" class="pill" data-act="hs" data-k="${key}" aria-pressed="${key === k}">${RUBROS[key].n}</button>`).join("");
+    pintarSecs();
+    const hs = $("#hs-switch");
+    if (!hs.firstElementChild) hs.innerHTML = Object.entries(SECCIONES).map(([sk, s]) => `<div class="hs-grupo" data-sec="${sk}">${s.rubros.map((key) => `<button type="button" class="pill" data-act="hs" data-k="${key}">${RUBROS[key].n}</button>`).join("")}</div>`).join("");
+    $$(".hs-grupo", hs).forEach((g) => { const on = g.dataset.sec === S.sec; g.classList.toggle("is-on", on); g.inert = !on; g.setAttribute("aria-hidden", String(!on)); });
+    $$(".pill", hs).forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.k === k)));
     const vs = VENUES.filter((v) => v.rubro === k);
-    $("#rail-now").innerHTML = proximos(k).map(slotCard).join("") || `<p style="color:var(--ink-500)">Por ahora no quedan turnos de ${R.n.toLowerCase()}. Probá con otro día en el buscador.</p>`;
+    // con pocos lugares (hoy, las barberías), dos horarios de cada uno para que la fila llegue al borde
+    $("#rail-now").innerHTML = proximos(k, vs.length < 4 ? 2 : 1).map(slotCard).join("") || `<p style="color:var(--ink-500)">Por ahora no quedan turnos de ${R.n.toLowerCase()}. Probá con otro día en el buscador.</p>`;
     $("#dest-t").textContent = `${R.n}: para reservar hoy`;
     $("#grid-dest").innerHTML = vs.map(cardV).join("");
     revelar($("#page-home"));
@@ -288,7 +317,8 @@
   function renderResultados() { listaResultados(); revelar($("#r-list")); }
   function listaResultados() {
     const R = RUBROS[S.rubro], vs0 = VENUES.filter((v) => v.rubro === S.rubro);
-    $("#r-rubros").innerHTML = secsHTML() + `<span class="sep" aria-hidden="true"></span>` + SECCIONES[S.sec].rubros.map((k) => `<button type="button" class="pill" data-act="tile" data-k="${k}" aria-pressed="${k === S.rubro}">${RUBROS[k].n}</button>`).join("")
+    pintarSecs();
+    $("#r-rubros").innerHTML = SECCIONES[S.sec].rubros.map((k) => `<button type="button" class="pill" data-act="tile" data-k="${k}" aria-pressed="${k === S.rubro}">${RUBROS[k].n}</button>`).join("")
       + (extraHTML() ? `<span class="sep" aria-hidden="true"></span>${extraHTML().replace(/chipx/g, "pill")}` : "");
     $("#r-dias").innerHTML = Array.from({ length: 7 }, (_, i) => { const d = dayInfo(i); return `<button type="button" class="day${i === S.dia ? " is-on" : ""}" data-act="dia-h" data-i="${i}" aria-pressed="${i === S.dia}"><span>${dayShort(i)}</span><b>${d.d}</b></button>`; }).join("");
     $("#r-franjas").innerHTML = franjasHTML(S.rubro).replace(/chipx/g, "pill");

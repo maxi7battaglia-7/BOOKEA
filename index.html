@@ -10,7 +10,7 @@
   <link rel="icon" href="marca/isotipo-32.png" sizes="32x32" type="image/png" />
   <link rel="apple-touch-icon" href="marca/isotipo-192.png" />
   <link rel="preload" href="assets/fuentes/inter-tight.woff2" as="font" type="font/woff2" crossorigin />
-  <link rel="stylesheet" href="sitio.css?v=14" />
+  <link rel="stylesheet" href="sitio.css?v=15" />
 </head>
 <body>
   <script>document.documentElement.classList.add("js");</script>
@@ -118,8 +118,8 @@
 
       <div class="wrap sec" style="padding-top:8px" id="libres">
         <div class="sec__head">
-          <div><p class="eyebrow">En vivo</p><h2>Libres ahora</h2></div>
-          <div class="switch-rubro" id="hs-switch" role="group" aria-label="Categoría"></div>
+          <div class="libres__tit"><div><p class="eyebrow">En vivo</p><h2>Libres ahora</h2></div><div id="hs-secs"></div></div>
+          <div class="switch-rubro" id="hs-switch" role="group" aria-label="Rubro"></div>
         </div>
         <div class="rail" id="rail-now" aria-label="Próximos turnos libres"></div>
       </div>
@@ -137,7 +137,7 @@
     <section class="page" id="page-resultados" data-page="resultados" hidden>
       <div class="rbar">
         <div class="wrap">
-          <div class="rbar__row" id="r-rubros" role="group" aria-label="Rubro"></div>
+          <div class="rbar__row"><div id="r-secs"></div><span class="sep" aria-hidden="true"></span><div class="rbar__pills" id="r-rubros" role="group" aria-label="Rubro"></div></div>
           <div class="rbar__row">
             <div class="days" id="r-dias" role="group" aria-label="Día"></div>
             <span class="sep" aria-hidden="true"></span>
@@ -341,7 +341,7 @@
   <dialog id="dlg"><h2 id="dlg-t"></h2><p id="dlg-p"></p><div class="row"><button class="btn btn--line" type="button" id="dlg-no">Volver</button><button class="btn btn--primary" type="button" id="dlg-si">Confirmar</button></div></dialog>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-  <script src="sitio.js?v=14"></script>
-  <script src="toque.js?v=14"></script>
+  <script src="sitio.js?v=15"></script>
+  <script src="toque.js?v=15"></script>
 </body>
 </html>

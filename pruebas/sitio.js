@@ -99,7 +99,9 @@ const medir = () => {
       ok((await p.pagina()) === 'home', `${w} resultados: "atrás" del navegador vuelve al inicio`);
 
       // Libres ahora y lugares: la pestaña Servicios cambia toda la página
-      await p.toca('#hs-switch .secs [data-k="servicios"]'); await espera(p, 300);
+      const xPadel = await p.evaluate(() => document.querySelector('#hs-switch .pill[data-k="padel"]').getBoundingClientRect().left);
+      await p.toca('#hs-secs .secs [data-k="servicios"]'); await espera(p, 700);
+      ok(Math.abs(await p.evaluate(() => document.querySelector('#hs-switch .pill[data-k="barberia"]').getBoundingClientRect().left) - xPadel) < 2 && await p.isVisible('#hs-switch .pill[data-k="barberia"]') && !(await p.isVisible('#hs-switch .pill[data-k="padel"]')), `${w} "Libres ahora": Barbería queda donde estaba Pádel (los rubros no se mueven)`);
       ok((await p.textContent('#dest-t')) === 'Barbería: para reservar hoy' && (await p.locator('#grid-dest .vcard').count()) === 3, `${w} inicio: Servicios cambia "Libres ahora" y los lugares a Barbería`);
       ok((await p.locator('#f-rubros .rubro:not(.rubro--molde)').count()) === 1 && (await p.getAttribute('#f-secs [data-k="servicios"]', 'aria-pressed')) === 'true' && await p.evaluate(() => [...document.querySelectorAll('.collage img')].some((i) => /barber/.test(i.getAttribute('src')))), `${w} inicio: el buscador y las fotos de al lado también pasan a Servicios`);
       ok(await p.evaluate(() => { const r = [...document.querySelectorAll('#f-rubros .rubro')].map((e) => e.getBoundingClientRect().height); return Math.abs(r[0] - r[1]) < 2; }), `${w} inicio: con un solo rubro, la fila de fotos mide lo mismo`);
