@@ -285,20 +285,24 @@ textos que se entiendan en cada cuadro.
   con "Pagó" y "No vino" a un toque) y **Próximos turnos**. En pantallas angostas "Para cerrar" sube arriba de la grilla.
   Estados: con seña = verde agua pálido; sin seña = blanco con borde gris; pagado = gris; no vino = naranja pálido;
   bloqueado = noche; libre = verde agua más pálido con "+ Libre"; ya pasó sin turno = "Finalizado", solo texto. Cada uno con su punto y su palabra.
-- **Mi negocio en tarjetas (pedido del dueño, 19/11: "hay mucho espacio libre, quiero que sea más compacto y lindo… hacelo de
-  otra forma", con `anti-ui-slop`).** Sin la columna de títulos a la izquierda: tres columnas de tarjetas (de 1200px para arriba;
-  dos en pantallas medianas, con Horario y "Así te ven" abajo; una en el celular). A 1440 mide 1141px de alto (antes 2755).
-  - Columna 1: **Tu negocio** (foto de 64px con "Subir foto"/"Quitar", nombre, rubro, WhatsApp, link de reservas con "Copiar",
-    descripción de hasta 300 letras) y **Ubicación** (dirección, ciudad, link de Maps opcional; abajo una franja que es toda un
-    link a Google Maps, armado con el link pegado o con nombre, dirección y ciudad).
-  - Columna 2: **Qué se reserva** (canchas con nombre y detalle), **Precios por horario** (desde, hasta y precio con "$"; una
-    franja nueva arranca donde termina la anterior, por 3 horas, y pide el precio) y **Seña y cancelaciones** (seña en "% del
-    turno", "horas antes", devolver la seña y el ejemplo en verde pálido).
-  - Columna 3: **Horario** (cuánto dura cada turno y los siete días: un botón con el día, verde pálido si abre; si se destilda,
-    dice "Cerrado") y **Así te ven**: la ficha del negocio armada con lo que se va cargando (foto, nombre, rubro y ciudad,
-    descripción, turnos de, precio desde, seña y el link).
+- **Mi negocio en tarjetas, por filas (pedidos del dueño, 19/11: "hay mucho espacio libre, quiero que sea más compacto y lindo… hacelo
+  de otra forma" y después "la línea divisora de la parte de abajo debería estar a la misma altura en todas… vos abrís y ves las
+  primeras tarjetas completas, luego bajás y ves las de abajo").** Tres columnas de tarjetas (de 1200px para arriba; dos en
+  pantallas medianas; una en el celular), ordenadas **por filas**: las tarjetas de una fila miden lo mismo, así el borde de abajo
+  queda a la misma altura en todas. En una pantalla de 1280×650 (la del dueño) la primera fila entra entera; las otras, al bajar.
+  - Fila 1: **Tu negocio** (foto de 56px con "Subir foto"/"Quitar", nombre, rubro, WhatsApp, dirección, ciudad y link de reservas
+    con "Copiar"), **Horario** (los siete días: un botón con el día, verde pálido si abre; si se destilda, dice "Cerrado") y
+    **Así te ven**, en noche: la ficha blanca del negocio armada con lo que se va cargando (foto, nombre, rubro y ciudad,
+    descripción, **los horarios de hoy** salidos del horario y la duración que hay en pantalla, turnos de, precio desde y seña)
+    y abajo el link a la página de reservas.
+  - Fila 2: **Qué se reserva** (cuánto dura cada turno y las canchas con nombre y detalle), **Precios por horario** (desde, hasta
+    y precio con "$"; una franja nueva arranca donde termina la anterior, por 3 horas, y pide el precio) y **Seña y
+    cancelaciones** (seña en "% del turno", "horas antes", devolver la seña y el ejemplo en verde pálido).
+  - Fila 3: **Cómo es el lugar** (la descripción, de hasta 300 letras, a lo ancho de dos columnas) y **Cómo llegar** (link de
+    Maps opcional; abajo una franja que es toda un link a Google Maps, armado con el link pegado o con nombre, dirección y ciudad).
   - Cada tarjeta: ícono de línea en verde agua, título de 16px y una línea gris. El rótulo va al costado del campo (arriba en el
-    link, la descripción y el link de Maps); las tarjetas angostas acomodan solas sus filas (container queries).
+    link de reservas y el de Maps); las tarjetas angostas acomodan solas sus filas (container queries). Con mouse, los campos de
+    Mi negocio miden 38px (en pantallas táctiles, 44) para que la primera fila entre entera.
   - **Duración del turno y horarios cada 10 minutos (pedido del dueño, 19/11):** la duración va de 10 minutos a 4 horas, de a 10
     ("90 minutos (1 h 30)"); abre, cierra y las franjas se eligen en desplegables de 00:00 a 23:50, de a 10. Si un negocio
     tenía una duración u hora que no cae en 10 (por ejemplo 45), se agrega a la lista y se respeta.
@@ -306,7 +310,28 @@ textos que se entiendan en cada cuadro.
   de dejar de escribir (agregar o quitar una cancha o franja, y la foto, enseguida). Una pastilla dice "Se guarda solo", "Guardando…"
   y "✓ Guardado" (arriba, al lado de "Ver la página de reservas"; en el celular queda fija arriba de la barra de abajo).
   Si un dato está mal, avisa al lado del campo sin mover la pantalla. Al salir de Mi negocio con algo pendiente, se guarda antes de cambiar.
-- **Cuenta:** dos columnas, a la izquierda el título y para qué sirve, a la derecha el panel blanco.
+- **Cuenta en tarjetas (19/11):** tres del mismo alto: **tu cuenta** en noche (inicial en crema, tu nombre, de qué negocio sos
+  dueño o parte del equipo, el link de tu página y, abajo, "Tu equipo" con "Ver y sumar personas" en crema; a un empleado le
+  muestra "Tu lugar en el equipo" con lo que puede hacer), **Tus datos** y **Cambiar contraseña**. Debajo, Solicitudes (equipo de
+  Bookea) y Datos de prueba (solo en la vista de prueba).
+- **Más llamativo con los colores de la marca (pedido del dueño, 19/11: "que se vea más llamativo y no tan apagado", con
+  `anti-ui-slop`, `ui-ux-pro-max`, `web-design-guidelines` y `design-taste-frontend`).**
+  - **Noche** (como la camiseta y la pantalla de carga): la barra del costado en la compu (íconos grises claros, la sección elegida
+    con su ícono en naranja, como la barra de abajo del sitio; el negocio con sus iniciales en verde agua) y **un bloque por vista**
+    con lo más importante: Agenda, el **próximo turno** grande (hora, quién, cancha, con o sin seña y "En 45 min" en naranja);
+    Finanzas, **lo cobrado** con su gráfico (columnas verde agua, hoy en verde agua apagado, el promedio en crema, la ayuda al
+    pasar el cursor en blanco); Clientes, la **franja de cifras**; Mi negocio, **Así te ven**; Equipo, **qué puede hacer cada uno**
+    (los permisos, de a tres por fila, debajo de la lista); Cuenta, **tu cuenta**. En el celular la barra de arriba y la de abajo
+    siguen claras, iguales a las del sitio.
+  - Adentro de un bloque noche se cambian los tonos del panel por los de noche con los mismos nombres (`--tx`, `--tx-2`, `--regla`,
+    `--v50`…), así el gráfico, las tablas y los rótulos de adentro toman solos sus colores.
+  - **Naranja** en la acción clave de la vista: "Cargar turno" y "Sumar a alguien" (`.btn--naranja`: el paso fuerte del naranja,
+    #cc4520, para que el blanco se lea a 4,7:1, con el barrido a noche al pasar el cursor). Los avisos siguen en naranja pálido.
+  - Tarjetas con esquinas de 16px, como las del sitio. Equipo con una sola persona muestra "Así sumás a alguien" en tres pasos.
+  - Guías web: toque inmediato (`touch-action: manipulation`), sin el recuadro gris del navegador al tocar, `autocomplete` en los
+    campos de Mi negocio y "…" en los textos de ejemplo.
+  - Inspector (`--app`): 0 FAIL en Agenda, Finanzas, Clientes, Mi negocio y Cuenta. Quedan a propósito: el naranja de la barra de
+    abajo (igual al sitio), los nombres de esa barra cerca del borde y los huecos chicos que deja alinear las filas de Mi negocio.
 - **Movimiento (solo como respuesta, nunca entradas de pantalla):** barrido verde del sitio en el botón principal y el menú;
   el "+" gira; la pastilla oscura de Día/Semana y de los períodos se desliza; las flechas de fecha empujan; el punto de "Ahora"
   late; el turno recién cambiado hace "pop"; el aviso trae una tilde que se dibuja; "Guardado" y "Copiado" con tilde.

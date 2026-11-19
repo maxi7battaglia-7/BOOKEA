@@ -746,6 +746,11 @@
     if (foco) { window.scrollTo(0, 0); $("#vista").focus({ preventScroll: true }); }
   };
   $$(".menu__i").forEach((b) => b.addEventListener("click", async () => { if (await dejarNegocio(b.dataset.vista)) ir(b.dataset.vista); }));
+  // Compu: al elegir una sección con el mouse, la barra desplegada se cierra enseguida (si no, tapaba los botones de la
+  // izquierda de la vista nueva mientras el cursor seguía arriba). Se vuelve a abrir al sacar el cursor y volver a entrar.
+  const lado = $(".lado");
+  $(".menu").addEventListener("click", (e) => { if (e.detail > 0 && e.target.closest(".menu__i")) lado.classList.add("is-cerrada"); });
+  lado.addEventListener("mouseleave", () => lado.classList.remove("is-cerrada"));
   $("#salir").addEventListener("click", async () => { await dejarNegocio(""); salir(); }); // intenta guardar lo pendiente, pero Salir nunca se traba
 
   // ---------- Diálogo ----------
@@ -846,7 +851,20 @@
     const filaProx = (r) => `<button type="button" class="lista__f lista__f--boton" data-res="${r.id}"><span class="lista__h">${aHora(r.hora)}<small>${cuandoCorto(r.fecha, hoy.fecha)}</small></span>
         <span class="lista__q"><b>${esc(r.cliente)}</b><small>${esc(nombreRec(r.recurso))}</small></span>
         <span class="punto ${r.sena ? "punto--v" : "punto--g"}">${r.sena ? "Con seña" : "Sin seña"}</span></button>`;
+    // el próximo turno, grande y en noche: cuánto falta, a qué hora, quién y en qué cancha
+    const enCuanto = (r) => {
+      if (r.fecha !== hoy.fecha) return cuandoCorto(r.fecha, hoy.fecha);
+      const m = r.hora - hoy.min;
+      return m <= 0 ? "Ahora" : m < 60 ? `En ${m} min` : `En ${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ""}`;
+    };
+    const prox1 = (r) => `<button type="button" class="prox1" data-res="${r.id}">
+        <span class="prox1__top"><span>Próximo turno</span><span class="prox1__en">${enCuanto(r)}</span></span>
+        <span class="prox1__h">${aHora(r.hora)}</span>
+        <span class="prox1__q"><b>${esc(r.cliente)}</b><small>${esc(nombreRec(r.recurso))} · ${aHora(r.hora)} a ${aHora(r.hora + NEG.duracion)}</small></span>
+        <span class="punto ${r.sena ? "punto--v" : "punto--g"}">${r.sena ? "Con seña" : "Sin seña"}</span></button>`;
+    const resto = prox.slice(1);
     return `<aside class="riel" aria-label="Para hacer y lo que viene">
+        ${prox.length ? `<section class="riel__sec riel__ya" aria-label="Próximo turno">${prox1(prox[0])}</section>` : ""}
         <section class="riel__sec" aria-labelledby="pc-t">
           <h2 id="pc-t" tabindex="-1">Para cerrar ${pend.length ? `<span class="chip-n">${pend.length}</span>` : ""}</h2>
           <p>${pend.length ? (edita ? "Turnos que ya terminaron. Marcá si pagaron el resto o si no vinieron." : "Turnos que ya terminaron y todavía no se marcó si pagaron.") : "Acá aparecen los turnos que ya terminaron, para marcar si pagaron."}</p>
@@ -855,7 +873,7 @@
         </section>
         <section class="riel__sec riel__prox" aria-labelledby="px-t">
           <h2 id="px-t">Próximos turnos</h2>
-          <div class="lista">${prox.length ? prox.map(filaProx).join("") : `<p class="vacio-l">No hay turnos reservados para los próximos días.</p>`}</div>
+          <div class="lista">${resto.length ? resto.map(filaProx).join("") : `<p class="vacio-l">${prox.length ? "No hay más turnos reservados para los próximos días." : "No hay turnos reservados para los próximos días."}</p>`}</div>
         </section>
       </aside>`;
   };
@@ -869,7 +887,7 @@
     $("#vista").innerHTML = `
       <header class="vhead">
         <div><h1>Agenda</h1><p class="vhead__frase">${fraseAgenda(f, hoy, R, esDia)}</p></div>
-        <div class="vhead__acc">${puede("turnos") ? `<button type="button" class="btn btn--ink" data-nuevo>${ico("mas", "ico-mas")}Cargar turno</button>` : `<p class="solo-ver">${ico("candado")}Podés ver la agenda. Para cargar turnos, pedile permiso al dueño.</p>`}</div>
+        <div class="vhead__acc">${puede("turnos") ? `<button type="button" class="btn btn--naranja" data-nuevo>${ico("mas", "ico-mas")}Cargar turno</button>` : `<p class="solo-ver">${ico("candado")}Podés ver la agenda. Para cargar turnos, pedile permiso al dueño.</p>`}</div>
       </header>
       <div class="barra-f">
         <div class="barra-f__izq">
@@ -1419,7 +1437,7 @@
       <section class="card" aria-labelledby="c-t">
         <div class="card__head"><div><h2 id="c-t">Todos tus clientes</h2><p class="card__sub">Tocá WhatsApp para escribirle a cualquiera.</p></div></div>
         <div class="herr">
-          <div class="buscar-w">${ico("buscar")}<label class="sr-only" for="c-q">Buscar cliente</label><input class="buscar" id="c-q" type="search" placeholder="Buscar por nombre o WhatsApp" value="${esc(CLI.q)}" autocomplete="off" /></div>
+          <div class="buscar-w">${ico("buscar")}<label class="sr-only" for="c-q">Buscar cliente</label><input class="buscar" id="c-q" type="search" placeholder="Buscar por nombre o WhatsApp…" value="${esc(CLI.q)}" autocomplete="off" /></div>
           <label class="sr-only" for="c-orden">Ordenar</label>
           <select class="buscar" id="c-orden">
             <option value="turnos" ${CLI.orden === "turnos" ? "selected" : ""}>Los que más juegan</option>
@@ -1477,16 +1495,15 @@
   const durCorto = (d) => (d < 60 ? `${d} min` : `${Math.floor(d / 60)} h${d % 60 ? ` ${d % 60}` : ""}`);
   VISTAS.negocio = () => {
     const n = NEG, U = unidad(n), u = U.toLowerCase();
-    const filaRec = (r) => `<div class="fila fila--rec" data-id="${r.id}"><input aria-label="Nombre" value="${esc(r.nombre)}" placeholder="${U} 1" /><input aria-label="Detalle" value="${esc(r.detalle)}" placeholder="Detalle (opcional)" /><button type="button" class="quitar" data-quitar aria-label="Quitar ${esc(r.nombre)}">${ico("x")}</button></div>`;
-    const filaFr = (f) => `<div class="fila fila--fr"><select aria-label="Desde">${opcHoras(f.desde)}</select><span class="fila__a" aria-hidden="true">a</span><select aria-label="Hasta">${opcHoras(f.hasta)}</select><div class="pre"><span aria-hidden="true">$</span><input type="number" inputmode="numeric" min="0" step="500" aria-label="Precio" value="${f.precio}" placeholder="Precio" /></div><button type="button" class="quitar" data-quitar aria-label="Quitar franja">${ico("x")}</button></div>`;
+    const filaRec = (r) => `<div class="fila fila--rec" data-id="${r.id}"><input aria-label="Nombre" value="${esc(r.nombre)}" placeholder="${U} 1" autocomplete="off" /><input aria-label="Detalle" value="${esc(r.detalle)}" placeholder="Detalle (opcional)" autocomplete="off" /><button type="button" class="quitar" data-quitar aria-label="Quitar ${esc(r.nombre)}">${ico("x")}</button></div>`;
+    const filaFr = (f) => `<div class="fila fila--fr"><select aria-label="Desde">${opcHoras(f.desde)}</select><span class="fila__a" aria-hidden="true">a</span><select aria-label="Hasta">${opcHoras(f.hasta)}</select><div class="pre"><span aria-hidden="true">$</span><input type="number" inputmode="numeric" min="0" step="500" aria-label="Precio" value="${f.precio}" placeholder="Precio" autocomplete="off" /></div><button type="button" class="quitar" data-quitar aria-label="Quitar franja">${ico("x")}</button></div>`;
     const filaDia = (d) => { const h = n.horario[d], dis = h.cerrado ? " disabled" : ""; return `<div class="fila fila--hr${h.cerrado ? " is-cerrado" : ""}" data-dia="${d}"><label class="dia-chip"><input type="checkbox" data-abierto aria-label="${mayus(DIAS[d])}: abierto" ${h.cerrado ? "" : "checked"} /><span aria-hidden="true">${DIAS_C[d]}</span></label><select aria-label="${mayus(DIAS[d])}: abre"${dis}>${opcHoras(h.abre)}</select><span class="fila__a" aria-hidden="true">a</span><select aria-label="${mayus(DIAS[d])}: cierra"${dis}>${opcHoras(h.cierra)}</select><span class="fila__cerrado">Cerrado</span></div>`; };
-    const tarjeta = (id, icono, t, d, cuerpo) => `<section class="card ng-card" aria-labelledby="${id}"><header class="ng-card__h">${ico(icono)}<div><h2 id="${id}">${t}</h2><p>${d}</p></div></header>${cuerpo}</section>`;
+    const tarjeta = (id, icono, t, d, cuerpo, cls = "") => `<section class="card ng-card${cls ? " " + cls : ""}" aria-labelledby="${id}"><header class="ng-card__h">${ico(icono)}<div><h2 id="${id}">${t}</h2><p>${d}</p></div></header>${cuerpo}</section>`;
     const durs = DURACIONES.includes(n.duracion) ? DURACIONES : [...DURACIONES, n.duracion].sort((a, b) => a - b);
     $("#vista").innerHTML = `
       <header class="vhead"><div><h1>Mi negocio</h1><p class="vhead__frase">Lo que ven tus clientes cuando reservan y las reglas de tu agenda. Cada cambio se guarda solo.</p></div>
         <div class="vhead__acc"><p class="guardado" id="g-msg" role="status" aria-live="polite">Se guarda solo</p><a class="btn btn--line" href="reservar.html" target="_blank" rel="noopener">${ico("afuera")}Ver la página de reservas</a></div></header>
       <form class="ng" id="f-neg" novalidate>
-        <div class="ng__col">
           ${tarjeta("ng-0", "negocio", "Tu negocio", "Lo primero que ven tus clientes al reservar.", `
             <div class="perfil">
               <div class="perfil__foto" id="g-foto-ver">${n.foto ? `<img src="${n.foto}" alt="Foto de perfil de ${esc(n.nombre)}" />` : `<span aria-hidden="true">${esc(iniciales(n.nombre))}</span>`}</div>
@@ -1500,21 +1517,19 @@
                 <p class="field__err" id="g-foto-err" hidden></p>
               </div>
             </div>
-            <div class="field campo"><label for="g-nombre">Nombre</label><input id="g-nombre" value="${esc(n.nombre)}" required aria-describedby="g-nombre-err" /><p class="field__err" id="g-nombre-err" hidden>El negocio necesita un nombre.</p></div>
-            <div class="field campo"><label for="g-rubro">Rubro</label><input id="g-rubro" list="rubros" value="${esc(n.rubro)}" /></div>
-            <div class="field campo"><label for="g-wa">WhatsApp</label><input id="g-wa" type="tel" inputmode="tel" value="${esc(n.whatsapp)}" /></div>
-            <div class="field campo campo--arriba"><label for="g-slug">Tu link de reservas</label><div class="slug"><span>bookea.ar/</span><input id="g-slug" value="${esc(n.slug)}" autocapitalize="none" spellcheck="false" aria-describedby="g-slug-err" /><button type="button" class="btn btn--ghost btn--sm" id="g-copiar">${ico("copiar")}Copiar</button></div><p class="field__err" id="g-slug-err" hidden></p></div>
-            <div class="field campo campo--arriba"><label for="g-desc">Descripción del lugar</label><textarea id="g-desc" rows="4" maxlength="300" placeholder="Qué tiene tu lugar: canchas, servicios, si prestan equipo, cómo es el estacionamiento…" aria-describedby="g-desc-cuenta">${esc(n.descripcion || "")}</textarea><p class="field__help ng-cuenta" id="g-desc-cuenta"></p></div>`)}
-          ${tarjeta("ng-6", "pin", "Ubicación", "Para que tus clientes puedan llegar.", `
-            <div class="field campo"><label for="g-dir">Dirección</label><input id="g-dir" value="${esc(n.direccion)}" autocomplete="street-address" placeholder="Calle y número" /></div>
+            <div class="field campo"><label for="g-nombre">Nombre</label><input id="g-nombre" value="${esc(n.nombre)}" required autocomplete="organization" aria-describedby="g-nombre-err" /><p class="field__err" id="g-nombre-err" hidden>El negocio necesita un nombre.</p></div>
+            <div class="field campo"><label for="g-rubro">Rubro</label><input id="g-rubro" list="rubros" value="${esc(n.rubro)}" autocomplete="off" /></div>
+            <div class="field campo"><label for="g-wa">WhatsApp</label><input id="g-wa" type="tel" inputmode="tel" autocomplete="tel" value="${esc(n.whatsapp)}" /></div>
+            <div class="field campo"><label for="g-dir">Dirección</label><input id="g-dir" value="${esc(n.direccion)}" autocomplete="street-address" placeholder="Calle y número…" /></div>
             <div class="field campo"><label for="g-ciudad">Ciudad</label><input id="g-ciudad" value="${esc(n.ciudad)}" autocomplete="address-level2" /></div>
-            <div class="field campo campo--arriba"><label for="g-mapa">Link de Google Maps (opcional)</label><input id="g-mapa" type="url" inputmode="url" value="${esc(n.mapa || "")}" placeholder="https://maps.app.goo.gl/…" autocapitalize="none" spellcheck="false" aria-describedby="g-mapa-ayuda g-mapa-err" />
-              <p class="field__help" id="g-mapa-ayuda">En Google Maps tocá <b>Compartir</b> y pegá el link acá.</p>
-              <p class="field__err" id="g-mapa-err" hidden>Pegá un link de Google Maps: empieza con https://maps.app.goo.gl o https://www.google.com/maps</p></div>
-            <div class="mapa" id="g-mapa-ver"></div>`)}
-        </div>
-        <div class="ng__col">
+            <div class="field campo campo--arriba"><label for="g-slug">Tu link de reservas</label><div class="slug"><span>bookea.ar/</span><input id="g-slug" value="${esc(n.slug)}" autocapitalize="none" autocomplete="off" spellcheck="false" translate="no" aria-describedby="g-slug-err" /><button type="button" class="btn btn--ghost btn--sm" id="g-copiar">${ico("copiar")}Copiar</button></div><p class="field__err" id="g-slug-err" hidden></p></div>`)}
+          ${tarjeta("ng-3", "agenda", "Horario", "Los días y horas en que se puede reservar.", `
+            <div class="filas filas--hr" id="g-hor">${ORDEN_DIAS.map(filaDia).join("")}</div>
+            <p class="field__help">¿Cerrás después de medianoche? Elegí la hora igual (00:30).</p>`)}
+          ${tarjeta("ng-7", "clientes", "Así te ven", "Tu ficha en Bookea, con lo que vas cargando.", `<div class="prev" id="g-prev" aria-live="off"></div>
+            <a class="prev__link" id="g-prev-link" href="reservar.html" target="_blank" rel="noopener"></a>`, "ng-card--prev")}
           ${tarjeta("ng-2", "cancha", "Qué se reserva", `Cada ${esc(u)} es una columna en tu agenda.`, `
+            <div class="field campo"><label for="g-dur">Cada turno dura</label><select id="g-dur">${durs.map((d) => `<option value="${d}"${d === n.duracion ? " selected" : ""}>${durTexto(d)}</option>`).join("")}</select></div>
             <div class="filas" id="g-recs">${n.recursos.map(filaRec).join("")}</div>
             <p class="field__err" id="g-recs-err" hidden></p>
             <button type="button" class="btn btn--ghost btn--sm agregar" id="g-rec-mas">${ico("mas")}Agregar ${esc(u)}</button>`)}
@@ -1527,14 +1542,13 @@
             <div class="field campo"><label for="g-canc">Cancelan hasta</label><div class="pre pre--fin"><input id="g-canc" type="number" inputmode="numeric" min="0" max="72" value="${n.cancelarHoras}" aria-label="Pueden cancelar hasta cuántas horas antes" /><span aria-hidden="true">horas antes</span></div></div>
             <label class="chk"><input type="checkbox" id="g-dev" ${n.devolverSena ? "checked" : ""} /> Si cancelan a tiempo, se les devuelve la seña</label>
             <p class="ng-ej" id="g-sena-ayuda"></p>`)}
-        </div>
-        <div class="ng__col ng__col--c">
-          ${tarjeta("ng-3", "agenda", "Horario", "Los días y horas en que se puede reservar.", `
-            <div class="field campo"><label for="g-dur">Cada turno dura</label><select id="g-dur">${durs.map((d) => `<option value="${d}"${d === n.duracion ? " selected" : ""}>${durTexto(d)}</option>`).join("")}</select></div>
-            <div class="filas filas--hr" id="g-hor">${ORDEN_DIAS.map(filaDia).join("")}</div>
-            <p class="field__help">¿Cerrás después de medianoche? Elegí la hora igual (00:30).</p>`)}
-          ${tarjeta("ng-7", "clientes", "Así te ven", "Tu ficha en Bookea, con lo que vas cargando.", `<div class="prev" id="g-prev" aria-live="off"></div>`)}
-        </div>
+          ${tarjeta("ng-8", "texto", "Cómo es el lugar", "Lo que leen en tu ficha antes de reservar.", `
+            <div class="field ng-desc"><label for="g-desc" class="sr-only">Descripción del lugar</label><textarea id="g-desc" rows="4" maxlength="300" placeholder="Qué tiene tu lugar: canchas, servicios, si prestan equipo, cómo es el estacionamiento…" aria-describedby="g-desc-cuenta">${esc(n.descripcion || "")}</textarea><p class="field__help ng-cuenta" id="g-desc-cuenta"></p></div>`, "ng-card--desc")}
+          ${tarjeta("ng-6", "pin", "Cómo llegar", "El link que abren tus clientes para llegar. Sale de tu dirección.", `
+            <div class="field campo campo--arriba"><label for="g-mapa">Link de Google Maps (opcional)</label><input id="g-mapa" type="url" inputmode="url" autocomplete="off" value="${esc(n.mapa || "")}" placeholder="https://maps.app.goo.gl/…" autocapitalize="none" spellcheck="false" aria-describedby="g-mapa-ayuda g-mapa-err" />
+              <p class="field__help" id="g-mapa-ayuda">En Google Maps tocá <b>Compartir</b> y pegá el link acá.</p>
+              <p class="field__err" id="g-mapa-err" hidden>Pegá un link de Google Maps: empieza con https://maps.app.goo.gl o https://www.google.com/maps</p></div>
+            <div class="mapa" id="g-mapa-ver"></div>`, "ng-card--ubi")}
       </form>`;
     const f = $("#f-neg");
     const msg = $("#g-msg");
@@ -1598,12 +1612,20 @@
       const nombre = $("#g-nombre").value.trim() || n.nombre, lugar = [$("#g-rubro").value.trim(), $("#g-ciudad").value.trim()].filter(Boolean).join(" · ");
       const precios = $$("#g-frs .pre input").map((i) => +i.value || 0).filter(Boolean), desde = precios.length ? Math.min(...precios) : 0;
       const pc = Math.min(100, Math.max(0, +$("#g-sena").value || 0)), desc = $("#g-desc").value.trim();
+      const dur = +$("#g-dur").value || n.duracion, hoyD = dow(ahora().fecha), filaHoy = $(`#g-hor .fila[data-dia="${hoyD}"]`), horas = [];
+      if (filaHoy && $("[data-abierto]", filaHoy).checked) {
+        const [a, c] = $$("select", filaHoy).map((x) => aMin(x.value)), hasta = c <= a ? c + 1440 : c; // cierra pasada la medianoche
+        for (let t = a; t + dur <= hasta && horas.length < 96; t += dur) horas.push(t % 1440);
+      }
+      const verHoras = horas.slice(0, 8);
       $("#g-prev").innerHTML = `
         <div class="prev__top"><div class="prev__foto">${foto ? `<img src="${foto}" alt="" />` : `<span aria-hidden="true">${esc(iniciales(nombre))}</span>`}</div>
           <div class="prev__t"><b>${esc(nombre)}</b><small>${esc(lugar || "Completá el rubro y la ciudad")}</small></div></div>
         ${desc ? `<p class="prev__desc">${esc(desc)}</p>` : ""}
-        <dl class="prev__datos"><div><dt>Turnos de</dt><dd>${durCorto(+$("#g-dur").value)}</dd></div><div><dt>Desde</dt><dd>${desde ? plata(desde) : "Sin precio"}</dd></div><div><dt>Seña</dt><dd>${desde ? plata(senaDe({ senaPct: pc }, desde)) : `${pc} %`}</dd></div></dl>
-        <p class="prev__link">${ico("afuera")}bookea.ar/${esc(slugDe($("#g-slug").value) || n.slug)}</p>`;
+        <div class="prev__hoy"><p>${horas.length ? `Hoy, ${DIAS[hoyD]}: ${plural(horas.length, "turno", "turnos")} de ${durCorto(dur)}` : `Hoy, ${DIAS[hoyD]}, está cerrado`}</p>
+          ${horas.length ? `<ul class="prev__horas">${verHoras.map((t) => `<li>${aHora(t)}</li>`).join("")}${horas.length > verHoras.length ? `<li class="prev__mas">+${horas.length - verHoras.length}</li>` : ""}</ul>` : ""}</div>
+        <dl class="prev__datos"><div><dt>Turnos de</dt><dd>${durCorto(+$("#g-dur").value)}</dd></div><div><dt>Desde</dt><dd>${desde ? plata(desde) : "Sin precio"}</dd></div><div><dt>Seña</dt><dd>${desde ? plata(senaDe({ senaPct: pc }, desde)) : `${pc} %`}</dd></div></dl>`;
+      $("#g-prev-link").innerHTML = `${ico("afuera")}<span>bookea.ar/<b>${esc(slugDe($("#g-slug").value) || n.slug)}</b></span>`;
     };
     const programar = (ms = 1100) => { pintarPrev(); clearTimeout(espera); espera = setTimeout(() => { espera = null; if (estado() !== inicial) guardar({ auto: true }); }, ms); };
     f.addEventListener("input", () => programar()); f.addEventListener("change", () => programar());
@@ -1751,7 +1773,7 @@
     if (!esDueno()) return ir(primeraVista());
     const v = $("#vista");
     const head = `<header class="vhead"><div><h1>Equipo</h1><p class="vhead__frase">Sumá a las personas que te ayudan con el negocio. Cada una entra con su email y su contraseña, y ve solo lo que vos le habilitás.</p></div>
-      <div class="vhead__acc"><button type="button" class="btn btn--ink" data-invitar>${ico("mas", "ico-mas")}Sumar a alguien</button></div></header>`;
+      <div class="vhead__acc"><button type="button" class="btn btn--naranja" data-invitar>${ico("mas", "ico-mas")}Sumar a alguien</button></div></header>`;
     if (!v.querySelector(".eqs")) {
       v.innerHTML = head + `<section class="card"><p class="card__sub">Cargando tu equipo…</p></section>`;
       $("[data-invitar]", v).addEventListener("click", dlgInvitar); // ya responde mientras carga la lista
@@ -1778,16 +1800,26 @@
           <button type="button" class="btn btn--line btn--sm" data-copiar-inv="${esc(i.token)}">${ico("copiar")}Copiar link</button>
           <button type="button" class="btn btn--warn btn--sm" data-anular="${esc(i.id)}" data-txt0="Anular">Anular</button></div>
       </li>`;
-    v.innerHTML = head + `
+    // a la derecha, en noche: qué puede hacer cada uno (los mismos permisos que se tildan al invitar)
+    const guia = `<aside class="card eq-guia" aria-labelledby="eq-3">
+        <h2 id="eq-3">Qué puede hacer cada uno</h2>
+        <p class="eq-guia__sub">Al sumar a alguien elegís qué ve y qué hace. Lo podés cambiar cuando quieras.</p>
+        <ul class="eq-guia__l">${PERMISOS.map((x) => `<li><b>${x.t}</b><span>${x.d}</span></li>`).join("")}
+          <li><b>Su cuenta</b><span>Su nombre y su contraseña los cambia cada uno. El equipo lo manejás solo vos.</span></li></ul>
+      </aside>`;
+    v.innerHTML = head + `<div class="eq-grid"><div class="eq-col">
       <section class="card" aria-labelledby="eq-1">
         <div class="card__head"><div><h2 id="eq-1">En el equipo</h2><p class="card__sub">${otros.length
           ? `${plural(r.miembros.length, "persona entra", "personas entran")} a este panel.`
           : "Por ahora solo vos. Tocá “Sumar a alguien” para invitar a quien te ayuda en el negocio."}</p></div></div>
         <ul class="eqs">${r.miembros.map(fila).join("")}</ul>
+        ${!otros.length && !r.invitaciones.length ? `<div class="eq-vacio"><h3>Así sumás a alguien</h3>
+          <ol><li>Tocá <b>Sumar a alguien</b> y escribí su nombre y su email.</li><li>Elegí qué puede ver y hacer en el panel.</li>
+          <li>Mandale el link por WhatsApp. Entra con su email y una contraseña que elige.</li></ol></div>` : ""}
       </section>
       ${r.invitaciones.length ? `<section class="card" aria-labelledby="eq-2">
         <div class="card__head"><div><h2 id="eq-2">Invitaciones sin usar</h2><p class="card__sub">Cada link sirve una sola vez, para ese email, y vence a los 7 días.</p></div></div>
-        <ul class="eqs">${r.invitaciones.map(filaInv).join("")}</ul></section>` : ""}`;
+        <ul class="eqs">${r.invitaciones.map(filaInv).join("")}</ul></section>` : ""}</div>${guia}</div>`;
     $("[data-invitar]", v).addEventListener("click", dlgInvitar);
     $$("[data-permisos]", v).forEach((b) => b.addEventListener("click", () => dlgPermisos(r.miembros.find((m) => m.id === b.dataset.permisos))));
     $$("[data-copiar-inv]", v).forEach((b) => b.addEventListener("click", () => { copiarTexto(linkInvitacion(b.dataset.copiarInv), b); aviso("Link copiado. Mandáselo por WhatsApp o por mail."); }));
@@ -1885,15 +1917,26 @@
     const local_ = store.modo === "local";
     $("#vista").innerHTML = `
       <header class="vhead"><div><h1>Cuenta</h1><p class="vhead__frase">Tus datos para entrar al panel. Cada administrador entra con su email y su contraseña.</p></div></header>
-      <div class="nform">
-        <section class="ajuste" aria-labelledby="cu-1"><div class="ajuste__r"><h2 id="cu-1">Tus datos</h2><p>Tu nombre aparece en el panel. El email es con el que entrás${local_ ? "" : " y adonde te llega el link si te olvidás la contraseña"}.</p></div>
-          <form class="ajuste__p" id="f-datos" novalidate>
+      <div class="cu">
+        <section class="card cu-yo" aria-labelledby="cu-0">
+          <div class="cu-yo__top"><span class="cu-yo__av" aria-hidden="true">${esc(iniciales(YO.nombre || YO.email))}</span>
+            <div class="cu-yo__q"><h2 id="cu-0">${esc(YO.nombre || "Tu cuenta")}</h2><p>${esDueno() ? "Podés hacer todo y manejar el equipo" : "Parte del equipo"}</p></div></div>
+          <div class="cu-yo__neg"><span class="mono" aria-hidden="true">${NEG.foto ? `<img src="${NEG.foto}" alt="" />` : esc(iniciales(NEG.nombre))}</span>
+            <div><p class="cu-yo__rol">${esDueno() ? "Dueño de" : "En el equipo de"}</p><b>${esc(NEG.nombre)}</b><small>${esc([NEG.rubro, NEG.ciudad].filter(Boolean).join(" · "))}</small></div></div>
+          <a class="cu-yo__link" href="reservar.html" target="_blank" rel="noopener">${ico("afuera")}<span>bookea.ar/<b>${esc(NEG.slug)}</b></span></a>
+          ${esDueno() ? `<div class="cu-yo__eq"><h3 id="cu-5">Tu equipo</h3><p>Sumá a las personas que te ayudan y elegí qué puede ver y hacer cada una.</p>
+            <button type="button" class="btn btn--crema" id="cu-equipo">${ico("equipo")}Ver y sumar personas</button></div>`
+          : `<div class="cu-yo__eq"><h3 id="cu-5">Tu lugar en el equipo</h3><p>Lo que podés hacer lo elige el dueño del negocio. En este panel podés:</p>
+            <div class="eq__p">${chipsPermisos(YO.permisos, YO.rol)}</div><p>Si necesitás algo más, pedíselo al dueño.</p></div>`}
+        </section>
+        <section class="card cu-c" aria-labelledby="cu-1"><div><h2 id="cu-1">Tus datos</h2><p class="card__sub">Tu nombre aparece en el panel. El email es con el que entrás${local_ ? "" : " y adonde te llega el link si te olvidás la contraseña"}.</p></div>
+          <form class="cu-f" id="f-datos" novalidate>
             <div class="field"><label for="cu-nombre">Tu nombre</label><input id="cu-nombre" value="${esc(YO.nombre)}" autocomplete="name" aria-describedby="cu-nombre-err" /><p class="field__err" id="cu-nombre-err" hidden>Escribí tu nombre.</p></div>
             <div class="field"><label for="cu-user">Email</label><input id="cu-user" type="email" value="${esc(YO.email)}" disabled aria-describedby="cu-user-ayuda" /><p class="field__help" id="cu-user-ayuda">El email no se puede cambiar desde acá.</p></div>
             <div class="acciones"><button type="submit" class="btn btn--ink">Guardar</button></div>
           </form></section>
-        <section class="ajuste" aria-labelledby="cu-2"><div class="ajuste__r"><h2 id="cu-2">Cambiar contraseña</h2><p>Usá al menos 8 caracteres. Cada vez que abrís o refrescás el panel te la pide de nuevo.</p></div>
-          <form class="ajuste__p" id="f-clave" novalidate>
+        <section class="card cu-c" aria-labelledby="cu-2"><div><h2 id="cu-2">Cambiar contraseña</h2><p class="card__sub">Usá al menos 8 caracteres. Cada vez que abrís o refrescás el panel te la pide de nuevo.</p></div>
+          <form class="cu-f" id="f-clave" novalidate>
             <input type="email" autocomplete="username" value="${esc(YO.email)}" hidden />
             <div class="field"><label for="cu-a">Contraseña actual</label><input id="cu-a" type="password" autocomplete="current-password" aria-describedby="cu-a-err" /><p class="field__err" id="cu-a-err" hidden>La contraseña actual no coincide.</p></div>
             <div class="field"><label for="cu-n">Contraseña nueva</label><input id="cu-n" type="password" autocomplete="new-password" aria-describedby="cu-n-err" /><p class="field__err" id="cu-n-err" hidden>Usá al menos 8 caracteres.</p></div>
@@ -1901,16 +1944,10 @@
             <p class="form__msg err" id="cu-msg" role="alert"></p>
             <div class="acciones"><button type="submit" class="btn btn--ink">Cambiar contraseña</button></div>
           </form></section>
-        ${esDueno() ? `<section class="ajuste" aria-labelledby="cu-5"><div class="ajuste__r"><h2 id="cu-5">Tu equipo</h2><p>Sumá a las personas que te ayudan y elegí qué puede ver y hacer cada una.</p></div>
-          <div class="ajuste__p"><button type="button" class="btn btn--ink" id="cu-equipo">${ico("equipo")}Ver y sumar personas</button></div></section>`
-        : `<section class="ajuste" aria-labelledby="cu-5"><div class="ajuste__r"><h2 id="cu-5">Tu lugar en el equipo</h2><p>Sos parte del equipo de ${esc(NEG.nombre)}. Lo que podés hacer lo elige el dueño del negocio.</p></div>
-          <div class="ajuste__p"><p>En este panel podés:</p><div class="eq__p">${chipsPermisos(YO.permisos, YO.rol)}</div>
-          <p class="field__help">Si necesitás algo más, pedíselo al dueño.</p></div></section>`}
-        ${YO.admin ? `<section class="ajuste" aria-labelledby="cu-4"><div class="ajuste__r"><h2 id="cu-4">Equipo de Bookea</h2><p>Los negocios que se registran esperan tu aprobación antes de poder usar el panel.</p></div>
-          <div class="ajuste__p"><button type="button" class="btn btn--ink" id="cu-sol">Ver solicitudes de negocios</button></div></section>` : ""}
-        ${local_ ? `<section class="ajuste" aria-labelledby="cu-3"><div class="ajuste__r"><h2 id="cu-3">Datos de prueba</h2><p>En esta vista de prueba, todo se guarda solo en este navegador.</p></div>
-          <div class="ajuste__p peligro"><p>Si borrás todo, vuelve el negocio de ejemplo y se pierden las cuentas que creaste.</p>
-          <button type="button" class="btn btn--warn" id="cu-reset">Borrar todo y volver al ejemplo</button></div></section>` : ""}
+        ${YO.admin ? `<section class="card cu-c" aria-labelledby="cu-4"><div><h2 id="cu-4">Equipo de Bookea</h2><p class="card__sub">Los negocios que se registran esperan tu aprobación antes de poder usar el panel.</p></div>
+          <button type="button" class="btn btn--ink" id="cu-sol">Ver solicitudes de negocios</button></section>` : ""}
+        ${local_ ? `<section class="card cu-c peligro" aria-labelledby="cu-3"><div><h2 id="cu-3">Datos de prueba</h2><p class="card__sub">En esta vista de prueba, todo se guarda solo en este navegador. Si borrás todo, vuelve el negocio de ejemplo y se pierden las cuentas que creaste.</p></div>
+          <button type="button" class="btn btn--warn" id="cu-reset">Borrar todo y volver al ejemplo</button></section>` : ""}
       </div>`;
     $("#f-datos").addEventListener("submit", async (e) => {
       e.preventDefault();

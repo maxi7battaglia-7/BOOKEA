@@ -236,7 +236,22 @@ const medir = () => {
       if (w === 1440) ok(await p.evaluate(() => document.querySelector('.fz').getBoundingClientRect().bottom <= innerHeight), `${w} finanzas: todas las tarjetas entran en la pantalla sin bajar`);
       await p.toca('.menu__i[data-vista="negocio"]'); await espera(p, 700);
       ok(await p.evaluate(() => { const d = [...document.querySelectorAll('#g-dur option')].map((o) => +o.value), h = [...document.querySelector('#g-hor select').options].map((o) => o.value); return d[0] === 10 && d.every((x, i) => !i || x - d[i - 1] === 10) && h.length === 144 && h[1] === '00:10'; }), `${w} mi negocio: la duración y los horarios van cada 10 minutos`);
-      if (w === 1440) ok(await p.evaluate(() => getComputedStyle(document.querySelector('.ng')).gridTemplateColumns.split(' ').length === 3 && document.documentElement.scrollHeight < 1250), `${w} mi negocio: tres columnas y casi todo en una pantalla`);
+      if (w === 1440) {
+        ok(await p.evaluate(() => getComputedStyle(document.querySelector('.ng')).gridTemplateColumns.split(' ').length === 3 && document.documentElement.scrollHeight < 1350), `${w} mi negocio: tres columnas y en menos de una pantalla y media`);
+        // Por filas (pedido del dueño, 19/11): en cada fila las tarjetas terminan a la misma altura,
+        // y en una pantalla de 1280×650 la primera fila entra entera; las de abajo se ven al bajar.
+        ok(await p.evaluate(() => { const g = {}; for (const c of document.querySelectorAll('.ng-card')) { const r = c.getBoundingClientRect(); (g[Math.round(r.top)] ||= []).push(r.bottom); } const f = Object.values(g); return f.length === 3 && f.every((b) => b.length > 1 && Math.max(...b) - Math.min(...b) < 1.5); }), `${w} mi negocio: tres filas y en cada una las tarjetas terminan a la misma altura`);
+        await p.setViewportSize({ width: 1280, height: 650 }); await espera(p, 400);
+        ok(await p.evaluate(() => { scrollTo(0, 0); const c = [...document.querySelectorAll('.ng-card')], top = Math.min(...c.map((x) => x.getBoundingClientRect().top)); const f1 = c.filter((x) => Math.abs(x.getBoundingClientRect().top - top) < 2); return f1.length === 3 && f1.every((x) => x.getBoundingClientRect().bottom <= innerHeight); }), '1280×650 mi negocio: la primera fila de tarjetas entra entera sin bajar');
+        await p.setViewportSize({ width: w, height: h }); await espera(p, 300);
+      }
+      // Más llamativo (pedido del dueño, 19/11): un bloque noche por vista y el naranja en la acción clave
+      if (w === 1440) {
+        await p.toca('.menu__i[data-vista="agenda"]'); await espera(p, 700);
+        ok(await p.evaluate(() => { const n = (s) => document.querySelector(s) && getComputedStyle(document.querySelector(s)).backgroundColor; return n('.lado') === 'rgb(17, 21, 28)' && n('.prox1') === 'rgb(17, 21, 28)' && n('[data-nuevo]') === 'rgb(204, 69, 32)'; }), `${w} panel: barra del costado y próximo turno en noche, "Cargar turno" en naranja`);
+        await p.toca('.menu__i[data-vista="finanzas"]'); await espera(p, 700);
+        ok(await p.evaluate(() => getComputedStyle(document.querySelector('.fz-cob')).backgroundColor === 'rgb(17, 21, 28)'), `${w} finanzas: lo cobrado en noche`);
+      }
 
       // ---------- Links viejos ----------
       await p.ir(B + 'index.html#sumate');

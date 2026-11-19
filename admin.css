@@ -617,13 +617,33 @@ html:has(#panel:not([hidden])) { scrollbar-gutter: stable; }
 .agregar { justify-self: start; }
 .peligro { display: grid; gap: 12px; justify-items: start; }
 
-/* ---------- Mi negocio en tarjetas (pedido del dueño, 19/11) ----------
-   Tres columnas en la compu: tu negocio y ubicación · qué se reserva y precios · horario y seña. Dos en pantallas medianas
-   (horario y seña abajo, una al lado de la otra) y una en el celular. Cada tarjeta lleva su ícono en verde agua, el título y
-   una línea; el rótulo va al costado del campo (arriba en los campos largos). Horarios y duración, cada 10 minutos. */
-.ng { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: start; }
-.ng__col { display: grid; gap: 16px; min-width: 0; align-items: start; }
-.ng-card { padding: 16px 18px 18px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; container-type: inline-size; }
+/* ---------- Mi negocio en tarjetas, por filas (pedido del dueño, 19/11) ----------
+   "La línea de abajo a la misma altura en todas" y "abrís y ves las primeras tarjetas completas, luego bajás y ves las de abajo":
+   fila 1: Tu negocio · Horario · Así te ven (entra entera en la primera pantalla, también a 1280×650);
+   fila 2: Qué se reserva · Turnos y precios · Seña; fila 3: Cómo es el lugar · Ubicación (dos de ancho).
+   Las tarjetas de una fila miden lo mismo. Dos columnas en pantallas medianas y una en el celular.
+   Cada tarjeta lleva su ícono en verde agua, el título y una línea; el rótulo va al costado del campo. */
+.ng { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: stretch; }
+.ng-card { padding: 16px 18px 18px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-content: start; container-type: inline-size; }
+/* la descripción va a lo ancho (dos columnas) y ocupa todo el alto de su tarjeta */
+.ng-card--desc { grid-column: span 2; display: flex; flex-direction: column; }
+.ng-desc { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+.pa .ng .ng-desc textarea { flex: 1; min-height: 120px; resize: none; }
+.ng-card--ubi { display: flex; flex-direction: column; }
+.ng-card--ubi .mapa { margin-top: auto; }
+/* "Así te ven", en noche: la ficha blanca, como la ven tus clientes, arriba de la tarjeta oscura */
+.card.ng-card--prev { background: var(--tx); border-color: var(--tx); color: #fff; grid-template-rows: auto 1fr auto; align-content: stretch; }
+.ng-card--prev .ng-card__h p { color: #b4bac3; }
+.ng-card--prev .prev { background: var(--caja); color: var(--tx); border-radius: 12px; padding: 14px; align-content: start; }
+.ng-card--prev .prev__link { color: var(--v200); text-decoration: none; justify-self: start; border-radius: 4px; }
+.ng-card--prev .prev__link b { color: #fff; font-weight: 600; }
+.ng-card--prev .prev__link:focus-visible { outline: 3px solid var(--v); outline-offset: 3px; }
+@media (hover: hover) and (pointer: fine) { .ng-card--prev .prev__link:hover { text-decoration: underline; text-underline-offset: 0.25em; } }
+.prev__hoy { display: grid; gap: 8px; }
+.prev__hoy p { font-size: 13px; font-weight: 600; color: var(--tx-2); }
+.prev__horas { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; }
+.prev__horas li { padding: 4px 10px; border-radius: 8px; background: var(--v50); border: 1px solid var(--v100); color: var(--v-tinta); font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; } /* taste-skill-ignore: horario libre, como en el sitio */
+.prev__horas .prev__mas { background: none; border-color: var(--borde); color: var(--tx-2); }
 .ng-card__h { display: flex; gap: 10px; align-items: flex-start; }
 .ng-card__h .ico { width: 20px; height: 20px; color: var(--v); margin-top: 1px; }
 .card .ng-card__h h2 { font-size: 16px; }
@@ -636,7 +656,7 @@ html:has(#panel:not([hidden])) { scrollbar-gutter: stable; }
 .pa .ng .field textarea { min-height: 76px; }
 .ng-cuenta { text-align: right; }
 .ng .perfil { gap: 14px; }
-.ng .perfil__foto { width: 64px; height: 64px; border-radius: 12px; font-size: 22px; }
+.ng .perfil__foto { width: 56px; height: 56px; border-radius: 12px; font-size: 20px; }
 .ng .perfil__acc { gap: 4px; }
 .ng .mapa { padding: 10px 12px; gap: 10px; }
 .ng .mapa__pin { width: 34px; height: 34px; }
@@ -708,9 +728,22 @@ html:has(#panel:not([hidden])) { scrollbar-gutter: stable; }
 .guardado.ok::before, .guardado.err::before { display: none; }
 .guardado .tilde { width: 16px; height: 16px; }
 
+/* Con mouse, los campos de Mi negocio miden 38px (en pantallas táctiles quedan de 44): así la primera fila entra entera */
+@media (hover: hover) and (pointer: fine) {
+  .pa .ng :is(.field, .fila) :is(input, select):not([type="checkbox"]) { min-height: 38px; padding-top: 7px; padding-bottom: 7px; font-size: 15px; }
+  .pa .ng .slug input, .pa .ng .pre input { min-height: 36px; }
+  .pa .ng .slug .btn { min-height: 30px; }
+  .ng .dia-chip { min-height: 38px; }
+  .ng .quitar { width: 38px; height: 38px; }
+  .ng .fila--rec { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 38px; }
+  .ng .fila--fr { grid-template-columns: minmax(74px, 1fr) auto minmax(74px, 1fr) minmax(88px, 1.1fr) 38px; gap: 6px; }
+  .ng .fila--hr { grid-template-columns: 76px minmax(0, 1fr) auto minmax(0, 1fr); gap: 6px; }
+  .ng .filas--hr { gap: 6px; }
+  .pa .ng .fila select { padding-right: 26px; background-position: right 6px center; }
+}
 /* Las tarjetas angostas (celular o columnas chicas) acomodan sus filas */
-@container (max-width: 355px) {
-  .fila--fr { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) 42px; padding-bottom: 8px; border-bottom: 1px solid var(--regla); } /* taste-skill-ignore: separa franjas */
+@container (max-width: 319px) {
+  .ng .fila--fr { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) 42px; padding-bottom: 8px; border-bottom: 1px solid var(--regla); } /* taste-skill-ignore: separa franjas */
   .fila--fr .pre { grid-column: 1 / 4; grid-row: 2; }
   .fila--fr .quitar { grid-column: 4; grid-row: 2; }
 }
@@ -720,11 +753,10 @@ html:has(#panel:not([hidden])) { scrollbar-gutter: stable; }
 }
 @media (max-width: 1199px) {
   .ng { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .ng__col--c { grid-column: 1 / -1; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ng-card--desc { grid-column: auto; }
 }
 @media (max-width: 760px) {
-  .ng, .ng__col--c { grid-template-columns: minmax(0, 1fr); }
-  .ng, .ng__col { gap: 12px; }
+  .ng { grid-template-columns: minmax(0, 1fr); gap: 12px; }
   .ng-card { padding: 14px; }
 }
 @media (max-width: 900px), (hover: none), (pointer: coarse) {
@@ -899,9 +931,14 @@ html:has(#panel:not([hidden])) { scrollbar-gutter: stable; }
   @keyframes trazo { from { stroke-dashoffset: 24; } to { stroke-dashoffset: 0; } }
 }
 @media (prefers-reduced-motion: reduce) {
-  .menu__i::before, .pa .btn--ink::before, .aviso, .seg__p, .slot, .menu__i .ico { transition: none !important; }
+  .menu__i::before, .pa .btn--ink::before, .pa .btn--naranja::before, .aviso, .seg__p, .slot, .menu__i .ico, .prox1 { transition: none !important; }
   .slot.recien { animation: none; }
+  .prox1:active { transform: none; }
 }
+/* Guías web: el toque responde enseguida (sin la espera del doble toque) y sin el recuadro gris del navegador:
+   la respuesta al toque ya la da toque.js */
+.pa { -webkit-tap-highlight-color: transparent; }
+.pa :is(button, a, input, select, textarea, label, summary) { touch-action: manipulation; }
 
 /* ---------- Barras de desplazamiento sutiles (pedido del dueño) ----------
    Cuando la grilla no entra a lo ancho, la barra es finita, sin flechas, en el tinte del verde agua,
@@ -1061,3 +1098,153 @@ html:has(#panel:not([hidden])) { scrollbar-gutter: stable; }
 .dlg__intro { color: var(--tx-2); }
 .slug--link input { font-size: 14px !important; color: var(--tx-2); }
 .nuevo .field-row { align-items: start; } /* un campo con ayuda abajo no desalinea al de al lado */
+
+/* ==========================================================================
+   Más vida con los colores de la marca (pedido del dueño, 19/11: "que se vea más llamativo y no tan apagado")
+   Noche, como la camiseta del Venezia y la pantalla de carga: la barra del costado en la compu y un bloque por vista con
+   lo más importante de esa vista (lo cobrado, el próximo turno, las cifras de clientes, "Así te ven", qué puede hacer cada
+   uno del equipo y tu cuenta). Naranja en la acción clave de la vista (Cargar turno, Sumar a alguien) y en la sección
+   elegida del menú, igual que la barra de abajo del sitio. Tarjetas con esquinas de 16px, como las del sitio.
+   Adentro de un bloque noche se cambian los tonos del panel por los de noche (mismos nombres), así cada pieza de adentro
+   (gráfico, tabla, rótulos) toma sola sus colores.
+   ========================================================================== */
+.pa { --r-caja: 16px; --noche-2: #1d232d; --noche-tx2: #b4bac3; --noche-linea: rgba(255, 255, 255, 0.1); }
+:is(.card.fz-cob, .kpis, .card.cu-yo, .card.eq-guia, .card.ng-card--prev, .prox1) {
+  background: var(--ink); border-color: var(--ink); color: #fff;
+  --tx: #fff; --tx-2: var(--noche-tx2); --tx-3: #949ca6; --regla: var(--noche-linea); --control: rgba(255, 255, 255, 0.24);
+  --v50: var(--noche-2); --v-tinta: var(--teal-200); --n-tinta: #ff9f82;
+}
+
+/* la ficha blanca de "Así te ven" vuelve a los tonos claros */
+.ng-card--prev .prev { --tx: var(--ink); --tx-2: var(--soft); --tx-3: #5e6672; --regla: #edf1f0; --control: #c5d0cd; --v50: var(--teal-pale); --v-tinta: var(--teal-deep); --n-tinta: var(--orange-ink); }
+
+/* Botón de la acción clave: naranja de la marca (el paso más fuerte, para que el blanco se lea) con el barrido a noche */
+.pa .btn--naranja { background: var(--orange-strong); color: #fff; }
+.pa .btn--naranja::before {
+  content: ""; position: absolute; inset: 0; z-index: -1; background: var(--ink);
+  clip-path: inset(0 100% 0 0); transition: clip-path 380ms var(--ease-out);
+}
+.pa .btn--naranja .ico-mas { transition: transform 320ms var(--ease-out); }
+@media (hover: hover) and (pointer: fine) {
+  .pa .btn--naranja:hover::before { clip-path: inset(0 0 0 0); }
+  .pa .btn--naranja:hover .ico-mas { transform: rotate(90deg); }
+}
+@media (hover: none), (pointer: coarse) {
+  .pa .btn--naranja::before { clip-path: none; opacity: 0; transition: opacity 360ms ease; }
+  .pa .btn--naranja:is(.is-apreta, .is-suelta)::before { opacity: 1; }
+}
+.pa .btn--crema { background: var(--cream); color: var(--ink); }
+@media (hover: hover) and (pointer: fine) { .pa .btn--crema:hover { background: #fff; } }
+
+/* La barra del costado en noche (compu con mouse). En el celular sigue siendo la barra clara del sitio. */
+@media (min-width: 901px) and (hover: hover) and (pointer: fine) {
+  .lado { background: var(--ink); color: #fff; }
+  .lado .brand { color: #fff; }
+  .quien { background: var(--noche-2); border-color: var(--noche-2); }
+  .quien .mono { background: var(--teal); color: var(--ink); }
+  .lado__neg { color: #fff; }
+  .lado__det { color: var(--noche-tx2); }
+  .menu__i { color: #c9ced6; }
+  .menu__i .ico { color: #a3abb5; }
+  .menu__i::before { background: rgba(255, 255, 255, 0.07); }
+  .menu__i[aria-current="page"] { color: #fff; }
+  .menu__i[aria-current="page"] .ico { color: var(--orange); }
+  .menu__i[aria-current="page"]::before { background: rgba(255, 255, 255, 0.11); }
+  .menu__i:hover, .menu__i:hover .ico { color: #fff; }
+  .menu__i[aria-current="page"]:hover .ico { color: var(--orange); }
+  .lado__pag { color: var(--teal-200); }
+  .lado__pag:hover { color: #fff; }
+  .yo { border-top-color: var(--noche-linea); }
+  .lado__user { color: var(--noche-tx2); }
+  .lado__user b { color: #fff; }
+  .lado__salir { color: var(--noche-tx2); }
+  .lado__salir:hover { background: rgba(228, 87, 46, 0.2); color: #ffb39e; }
+  .lado:hover, .lado:has(:focus-visible) { box-shadow: 18px 0 44px rgba(17, 21, 28, 0.22); }
+  .lado :focus-visible { outline-color: var(--teal); }
+  /* recién elegida una sección con el mouse: la barra se cierra aunque el cursor siga arriba (ver admin.js) */
+  .lado.is-cerrada, .lado.is-cerrada:hover { width: 72px; box-shadow: none; transition-delay: 0ms; }
+  .lado.is-cerrada :is(.brand__word, .lado__neg, .lado__det, .menu__i span, .lado__txt, .lado__user, .lado__user *) { opacity: 0; transition: opacity 80ms ease; }
+}
+
+/* Finanzas: lo cobrado en noche. Columnas en verde agua; hoy, un verde agua apagado; el promedio en crema. */
+.fz-cob .chart .prom { stroke: var(--cream); }
+.fz-cob .chart .barra--hoy, .fz-cob .ley .ley__hoy { fill: #2b5a53; background: #2b5a53; }
+.fz-cob .ley .ley__prom { border-top-color: var(--cream); }
+.fz-cob .tip { background: #fff; color: var(--ink); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28); }
+.fz-cob .tip small { color: var(--teal-deep); }
+.fz-cob .chart svg:focus-visible { outline-color: var(--teal-200); }
+
+/* Clientes: las cuatro cifras en una franja noche */
+.kpis .kpi__v { color: #fff; }
+
+/* Agenda: el próximo turno, grande y en noche, arriba de "Para cerrar" */
+.riel__ya { gap: 0; }
+.prox1 {
+  width: 100%; display: grid; gap: 2px; text-align: left; font: inherit; border: 0; border-radius: var(--r-caja);
+  padding: 16px 18px 18px; transition: transform var(--t-rapido) var(--ease-out), background-color var(--t-ui) ease;
+}
+.prox1__top { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--tx-2); }
+.prox1__en { background: var(--orange-strong); color: #fff; border-radius: 999px; padding: 2px 10px; font-size: 13px; font-weight: 700; white-space: nowrap; }
+.prox1__h {
+  font-family: var(--f-display); font-stretch: var(--display-ancho); font-weight: 600; font-size: 44px; letter-spacing: -0.03em;
+  line-height: 1.05; font-variant-numeric: tabular-nums; margin-top: 6px;
+}
+.prox1__q { display: grid; min-width: 0; }
+.prox1__q b { font-size: 17px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prox1__q small { font-size: 13px; color: var(--tx-2); }
+.prox1 .punto { margin-top: 8px; }
+.prox1:active { transform: scale(0.98); }
+.prox1:focus-visible { outline: 3px solid var(--teal); outline-offset: 3px; }
+@media (hover: hover) and (pointer: fine) { .prox1:hover { background: var(--noche-2); } }
+@media (max-width: 1180px) { .riel__ya { display: none; } }
+
+/* Equipo: la lista arriba y, abajo, una franja noche con qué puede hacer cada uno (de a tres por fila) */
+.eq-grid, .eq-col { display: grid; gap: 16px; min-width: 0; }
+.card.eq-guia { display: grid; gap: 4px; align-content: start; }
+.card .eq-guia h2 { font-size: 18px; }
+.eq-guia__sub { font-size: 14px; color: var(--tx-2); }
+.eq-guia__l { list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 28px; margin-top: 8px; }
+.eq-guia__l li { display: grid; gap: 2px; align-content: start; padding: 12px 0 4px; border-top: 1px solid var(--regla); } /* taste-skill-ignore: filas de la lista */
+.eq-guia__l b { font-size: 15px; font-weight: 600; }
+.eq-guia__l span { font-size: 14px; color: var(--tx-2); }
+@media (max-width: 1000px) { .eq-guia__l { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px) { .eq-guia__l { grid-template-columns: minmax(0, 1fr); } }
+
+/* Cuenta en tarjetas: tu cuenta en noche, tus datos y la contraseña al lado (las tres del mismo alto) */
+.cu { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: stretch; }
+.cu-c { display: grid; gap: 16px; align-content: start; }
+.cu-c.peligro { justify-items: start; }
+.cu-f { display: grid; gap: 14px; }
+.card.cu-yo { display: flex; flex-direction: column; gap: 14px; }
+.cu-yo__top { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.cu-yo__av { flex: none; width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; background: var(--cream); color: var(--ink); font-weight: 700; font-size: 20px; }
+.cu-yo__q { min-width: 0; }
+.card .cu-yo__q h2 { font-size: 20px; }
+.cu-yo__q p { font-size: 14px; color: var(--tx-2); overflow-wrap: anywhere; }
+.cu-yo__neg { display: flex; align-items: center; gap: 12px; padding: 12px; background: var(--noche-2); border-radius: 12px; min-width: 0; }
+.cu-yo__neg .mono { width: 44px; height: 44px; border-radius: 10px; background: var(--teal); color: var(--ink); font-size: 15px; }
+.cu-yo__neg > div { display: grid; min-width: 0; }
+.cu-yo__neg b { font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cu-yo__neg small { font-size: 13px; color: var(--tx-2); }
+.cu-yo__rol { font-size: 13px; color: var(--tx-2); }
+.cu-yo__link { display: inline-flex; align-items: center; gap: 6px; justify-self: start; align-self: flex-start; font-size: 14px; font-weight: 600; color: var(--teal-200); text-decoration: none; border-radius: 4px; }
+.cu-yo__link b { color: #fff; font-weight: 600; }
+.cu-yo__link .ico { width: 16px; height: 16px; }
+.cu-yo__link:focus-visible { outline: 3px solid var(--teal); outline-offset: 3px; }
+@media (hover: hover) and (pointer: fine) { .cu-yo__link:hover { text-decoration: underline; text-underline-offset: 0.25em; } }
+/* en pantallas táctiles, los links de la página de reservas también miden 44px para el dedo */
+@media (hover: none), (pointer: coarse) { .prev__link, .cu-yo__link { min-height: 44px; align-items: center; } }
+/* Equipo con una sola persona: los pasos para sumar a alguien, en una franja verde pálido */
+.eq-vacio { display: grid; gap: 10px; margin-top: 14px; padding: 16px 20px; background: var(--v50); border-radius: 12px; container-type: inline-size; }
+.eq-vacio h3 { font-size: 16px; }
+.eq-vacio ol { list-style: decimal; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px 28px; padding-left: 20px; font-size: 15px; color: var(--tx-2); }
+.eq-vacio li { padding-left: 2px; }
+.eq-vacio li::marker { color: var(--v-tinta); font-weight: 700; }
+.eq-vacio b { color: var(--tx); }
+@container (max-width: 640px) { .eq-vacio ol { grid-template-columns: minmax(0, 1fr); } }
+.cu-yo__eq { margin-top: auto; display: grid; gap: 8px; justify-items: start; padding-top: 14px; border-top: 1px solid var(--regla); } /* taste-skill-ignore: separa el equipo */
+.cu-yo__eq h3 { font-size: 16px; }
+.cu-yo__eq p { font-size: 14px; color: var(--tx-2); }
+.cu-yo .chip-p { background: var(--noche-2); color: #fff; box-shadow: none; }
+@media (max-width: 1100px) { .cu { grid-template-columns: repeat(2, minmax(0, 1fr)); } .cu-yo { grid-column: 1 / -1; } }
+@media (max-width: 760px) { .cu { grid-template-columns: minmax(0, 1fr); } }
