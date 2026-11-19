@@ -172,6 +172,17 @@
     }
     // cuentas de antes, creadas con usuario: entran con el usuario o con el email de ejemplo
     for (const c of DB.cuentas) if (!c.email) c.email = c.usuario === "losalamos" ? "demo@example.com" : c.usuario;
+    if (completarCuentas(DB)) guardar();
+  };
+  // Cuentas guardadas antes de que existiera Equipo (16/11): no tenían "rol" y eran todas dueñas. Se completa al cargar y
+  // al releer los datos (si no, al volver a la pestaña el panel creía que el dueño ya no tenía permisos y dejaba solo Cuenta).
+  const completarCuentas = (db) => {
+    let cambio = false;
+    for (const c of (db && db.cuentas) || []) {
+      if (!c.rol) { c.rol = "dueno"; cambio = true; }
+      if (!Array.isArray(c.permisos)) { c.permisos = []; cambio = true; }
+    }
+    return cambio;
   };
   // ids únicos en cualquier dispositivo (la base los usa como clave de cada reserva)
   const nuevoId = () => {
@@ -432,6 +443,7 @@
   document.addEventListener("visibilitychange", () => { if (store.modo === "local" && document.visibilityState === "visible" && NEG) recargarLocal(); });
   const recargarLocal = async () => {
     try { DB = JSON.parse(local.get(CLAVE)) || DB; } catch { /* queda lo que había */ }
+    if (completarCuentas(DB)) guardar();
     if (!YO) return;
     const c = DB.cuentas.find((x) => x.email === YO.email);
     if (!c || !c.negocio || !DB.negocios[c.negocio]) { await salir({ vencida: true }); aviso("Ya no estás en el equipo de este negocio."); return; }

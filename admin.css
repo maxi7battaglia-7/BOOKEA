@@ -164,6 +164,8 @@
 }
 
 /* ---------- Estructura ---------- */
+/* El lugar de la barra de desplazamiento queda siempre reservado: así una vista corta (Equipo) no se ve más ancha que las otras */
+html:has(.pa) { scrollbar-gutter: stable; }
 .panel { min-height: 100dvh; display: grid; grid-template-columns: 248px minmax(0, 1fr); }
 .lado {
   position: sticky; top: 0; height: 100dvh; overflow-y: auto; background: var(--fondo);
@@ -775,7 +777,7 @@
   .lado:has(:focus-visible) :is(.brand__word, .lado__neg, .lado__det, .menu__i span, .lado__txt, .lado__user, .lado__user *) { opacity: 1; transition: opacity 220ms ease 120ms; }
 }
 @media (max-width: 900px), (hover: none), (pointer: coarse) {
-  .panel { grid-template-columns: minmax(0, 1fr); }
+  .panel { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; } /* la barra de arriba no se estira cuando la vista es corta (Equipo) */
   .lado {
     position: sticky; top: 0; z-index: 20; width: auto; height: auto; overflow: visible; flex-direction: row; align-items: center;
     gap: 10px; padding: 8px max(16px, env(safe-area-inset-right, 0px)) 8px max(16px, env(safe-area-inset-left, 0px));

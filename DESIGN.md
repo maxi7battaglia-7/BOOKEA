@@ -257,6 +257,8 @@ textos que se entiendan en cada cuadro.
     arriba, cada sección con su ícono de 20px y el nombre chiquito (11px) debajo, gris, y la elegida en naranja. Están todas las
     secciones que la persona puede ver, Equipo incluido (5 o 6 botones). Se probó antes un menú que bajaba desde un botón arriba
     y se descartó: era poco intuitivo.
+    La barra de arriba mide lo mismo en todas las secciones (antes se estiraba en Equipo, que es corta), y el lugar de la barra
+    de desplazamiento queda reservado, así ninguna sección se ve más ancha que otra (pedido del dueño, 19/11).
 - **Costado (antes del 19/11):** sobre el fondo, sin color. Logo con el barrido del sitio, la tarjeta del negocio (iniciales en verde agua,
   rubro · ciudad), el menú con íconos de línea propios (16-22px) y el barrido verde pálido al pasar el cursor, abajo "Ver tu
   página de reservas" y la cuenta con "Salir". En celular y tablet (≤900px): barra arriba (logo + negocio + Salir) y el mismo

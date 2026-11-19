@@ -37,6 +37,8 @@ const ok = (c, m) => { hechas++; if (!c) fallas++; console.log((c ? 'OK    ' : '
       if (movil) { await p.waitForTimeout(450); ok((await p.getAttribute('.menu__i[data-vista="equipo"]', 'aria-current')) === 'page' && await p.evaluate(() => getComputedStyle(document.querySelector('.menu__i[data-vista="equipo"]')).color === 'rgb(228, 87, 46)'), `${w}: la sección elegida queda en naranja, como en el sitio`); }
       await p.waitForTimeout(600);
       ok((await p.textContent('#vista h1')) === 'Equipo', `${w}: abre Equipo`);
+      // con poco contenido (Equipo) la barra de arriba del celular no se estira (pedido del dueño, 19/11)
+      if (movil) ok(await p.evaluate(() => document.querySelector('.lado').getBoundingClientRect().height < 70), `${w}: en Equipo la barra de arriba mide lo mismo que en las otras secciones`);
       // Mi negocio: una cancha agregada sin tocar "Guardar cambios" se guarda sola al ir a la Agenda (pedido del dueño, 19/11)
       await irA('negocio'); await p.waitForTimeout(500);
       ok(!(await p.isVisible('#g-guardar')), `${w}: Mi negocio ya no tiene el botón "Guardar cambios"`);
@@ -117,6 +119,14 @@ const ok = (c, m) => { hechas++; if (!c) fallas++; console.log((c ? 'OK    ' : '
       // un link usado no sirve
       await p.goto(link, { waitUntil: 'load' }); await p.waitForTimeout(700);
       ok((await p.textContent('#t-unirse')) === 'Este link ya no sirve' && !(await p.isVisible('#u-crear')), `${w}: el link ya usado no sirve`);
+      // datos guardados por una versión vieja (cuentas sin "rol"): al volver a la pestaña el dueño sigue viendo todo (19/11)
+      await p.goto(B, { waitUntil: 'load' }); await p.waitForTimeout(400);
+      await p.evaluate(() => { const k = 'bookea:panel:v1', db = JSON.parse(localStorage.getItem(k)); db.cuentas.forEach((c) => { if (c.email === 'demo@example.com') { delete c.rol; delete c.permisos; } }); localStorage.setItem(k, JSON.stringify(db)); });
+      await p.reload({ waitUntil: 'load' }); await p.waitForTimeout(500);
+      await p.fill('#i-email', 'demo@example.com'); await p.fill('#i-clave', 'bookea2026'); await toca('#f-ingresar button[type="submit"]'); await p.waitForTimeout(3600);
+      await irA('equipo'); await p.waitForTimeout(500);
+      await p.evaluate(() => document.dispatchEvent(new Event('visibilitychange'))); await p.waitForTimeout(500);
+      ok((await p.textContent('#vista h1')) === 'Equipo' && (await p.$$eval('.menu__i', (l) => l.filter((b) => !b.hidden).length)) === 6, `${w}: con datos viejos, al volver a la pestaña el dueño sigue en Equipo con las seis secciones`);
       const sw = await p.evaluate(() => document.documentElement.scrollWidth);
       ok(sw <= w, `${w}: sin desborde (${sw})`);
       ok(errs.length === 0, `${w}: sin errores ${errs.join(' | ')}`);
