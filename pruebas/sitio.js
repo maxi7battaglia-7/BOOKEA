@@ -106,6 +106,10 @@ const medir = () => {
       ok((await p.locator('#f-rubros .rubro:not(.rubro--molde)').count()) === 1 && (await p.getAttribute('#f-secs [data-k="servicios"]', 'aria-pressed')) === 'true' && await p.evaluate(() => [...document.querySelectorAll('.collage img')].some((i) => /barber/.test(i.getAttribute('src')))), `${w} inicio: el buscador y las fotos de al lado también pasan a Servicios`);
       ok(await p.evaluate(() => { const r = [...document.querySelectorAll('#f-rubros .rubro')].map((e) => e.getBoundingClientRect().height); return Math.abs(r[0] - r[1]) < 2; }), `${w} inicio: con un solo rubro, la fila de fotos mide lo mismo`);
       ok((await p.locator('#rail-now .now').count()) > 0, `${w} inicio: hay turnos en "Libres ahora"`);
+      if (!cel) ok(await p.evaluate(() => { const r = document.querySelector('#rail-now'), rr = r.getBoundingClientRect(); return r.scrollWidth <= r.clientWidth + 1 && [...r.querySelectorAll('.now')].filter((e) => e.offsetParent).every((e) => e.getBoundingClientRect().right <= rr.right + 1); }), `${w} "Libres ahora": en la compu no se desliza ni queda ninguna tarjeta cortada`);
+      // ninguna fila que se desliza de costado se puede mover para arriba o para abajo (pedido del dueño, 19/11)
+      const sinVertical = () => p.evaluate(() => [...document.querySelectorAll('.rail, .switch-rubro, .rbar__row, .reserva .cupos')].filter((e) => e.offsetParent).every((e) => !/auto|scroll/.test(getComputedStyle(e).overflowY)));
+      ok(await sinVertical(), `${w} inicio: "Libres ahora" no se mueve para arriba ni para abajo`);
       await p.toca('#rail-now .now >> nth=0'); await espera(p);
       ok((await p.pagina()) === 'ficha' && (await p.locator('#book .slot.is-on').count()) === 1, `${w} "Libres ahora": abre el lugar con ese horario elegido`);
       await p.toca('.back'); await espera(p);
@@ -132,6 +136,7 @@ const medir = () => {
       await p.toca('#r-rubros .pill[data-act="techada-h"]'); await espera(p, 200);
       await p.toca('#r-franjas .pill[data-k=""]'); await espera(p, 200);
       await p.limpio('resultados con filtros');
+      ok(await sinVertical(), `${w} resultados: las filas de filtros no se mueven para arriba ni para abajo`);
       await p.toca('.qslot >> nth=0'); await espera(p);
       ok((await p.pagina()) === 'ficha' && (await p.locator('#book .slot.is-on').count()) === 1 && await p.isVisible('#ir-pagar [data-act="reservar"]'), `${w} resultados: el horario rápido abre la ficha con el aviso verde "Ir a pagar"`);
       ok(await p.evaluate(() => getComputedStyle(document.querySelector('#ir-pagar')).backgroundColor === 'rgb(31, 160, 140)'), `${w} ficha: el aviso "Ir a pagar" es verde agua`);
