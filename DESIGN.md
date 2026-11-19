@@ -252,9 +252,11 @@ textos que se entiendan en cada cuadro.
     Al pasar el cursor se despliega a 248px con los nombres, **por encima** de la pantalla (no la empuja), con una sombra suave; al sacar
     el cursor se vuelve a cerrar (abre en 40 ms, cierra a los 180 ms, así no parpadea al pasar de largo). Los nombres aparecen cuando la
     barra ya se abrió. Con el teclado se abre igual. Las solicitudes pendientes (equipo de Bookea) se ven como globito sobre su ícono.
-  - **Celular y tablet (o cualquier pantalla táctil):** sin barra de abajo. Arriba, el logo, el negocio y el botón **"☰ Agenda ▾"**
-    (dice en qué sección estás). Al tocarlo, el menú baja desde arriba a todo el ancho, con las secciones (Equipo incluido), "Ver tu
-    página de reservas", la cuenta y Salir; atrás se oscurece la pantalla. Se cierra al elegir, al tocar afuera o con Escape.
+  - **Celular y tablet (o cualquier pantalla táctil), pedido del dueño 19/11 ("que sea exactamente igual al de la página principal"):**
+    arriba el logo, el negocio y Salir; abajo **la misma barra de la página principal**: fondo blanco translúcido con desenfoque, línea
+    arriba, cada sección con su ícono de 20px y el nombre chiquito (11px) debajo, gris, y la elegida en naranja. Están todas las
+    secciones que la persona puede ver, Equipo incluido (5 o 6 botones). Se probó antes un menú que bajaba desde un botón arriba
+    y se descartó: era poco intuitivo.
 - **Costado (antes del 19/11):** sobre el fondo, sin color. Logo con el barrido del sitio, la tarjeta del negocio (iniciales en verde agua,
   rubro · ciudad), el menú con íconos de línea propios (16-22px) y el barrido verde pálido al pasar el cursor, abajo "Ver tu
   página de reservas" y la cuenta con "Salir". En celular y tablet (≤900px): barra arriba (logo + negocio + Salir) y el mismo
@@ -272,6 +274,9 @@ textos que se entiendan en cada cuadro.
   se ve enseguida y queda con "Guardar cambios"; también aparece en el costado en lugar de las iniciales) y descripción del lugar
   (hasta 300 letras, con contador). Ubicación: dirección, ciudad y un link de Google Maps opcional (solo acepta links de Maps).
   Abajo, una tarjeta con el pin naranja y "Abrir en Google Maps": usa el link pegado o arma uno con nombre, dirección y ciudad.
+- **Mi negocio se guarda solo (pedido del dueño, 19/11):** sin botón "Guardar cambios". Cada cambio se guarda un segundo después
+  de dejar de escribir (agregar o quitar una cancha o franja, y la foto, enseguida); abajo una línea dice "Guardando…" y "✓ Guardado".
+  Si un dato está mal, avisa al lado del campo sin mover la pantalla. Al salir de Mi negocio con algo pendiente, se guarda antes de cambiar.
 - **Ajustes (Mi negocio y Cuenta):** dos columnas, a la izquierda el título y para qué sirve, a la derecha el panel blanco.
   "Copiar" al lado del link de reservas. Barra de guardar fija abajo.
 - **Movimiento (solo como respuesta, nunca entradas de pantalla):** barrido verde del sitio en el botón principal y el menú;

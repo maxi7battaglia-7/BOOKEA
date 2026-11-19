@@ -26,17 +26,29 @@ const ok = (c, m) => { hechas++; if (!c) fallas++; console.log((c ? 'OK    ' : '
       const p = await ctx.newPage();
       const errs = []; p.on('pageerror', (e) => errs.push(e.message)); p.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
       const toca = (s) => (movil ? p.tap(s) : p.click(s));
-      // en el celular el menú se despliega desde el botón de arriba; en la compu, la barra de íconos se abre al pasar el cursor
-      const irA = async (v) => { if (await p.isVisible('#menu-boton')) { await toca('#menu-boton'); await p.waitForTimeout(450); } await toca(`.menu__i[data-vista="${v}"]`); };
+      // en el celular el menú es la barra de abajo (como la del sitio); en la compu, la barra de íconos se abre al pasar el cursor
+      const irA = (v) => toca(`.menu__i[data-vista="${v}"]`);
       const entrar = async (email, clave) => { await p.fill('#i-email', email); await p.fill('#i-clave', clave); await toca('#f-ingresar button[type="submit"]'); await p.waitForTimeout(3600); };
       await p.goto(B, { waitUntil: 'load' }); await p.waitForTimeout(500);
       await entrar('demo@example.com', 'bookea2026');
-      // dueño: Equipo está en el menú (en el celular, en el menú que baja desde arriba)
-      if (movil) { ok(!(await p.isVisible('.menu__i[data-vista="agenda"]')) && await p.isVisible('#menu-boton'), `${w}: en el celular el menú está cerrado, con el botón arriba`); await toca('#menu-boton'); await p.waitForTimeout(450); ok((await p.getAttribute('#menu-boton', 'aria-expanded')) === 'true', `${w}: el botón despliega el menú desde arriba`); }
+      // dueño: Equipo está en el menú (en el celular, en la barra de abajo, igual a la del sitio)
+      if (movil) ok(await p.evaluate(() => { const m = document.querySelector('.menu'), r = m.getBoundingClientRect(); return getComputedStyle(m).position === 'fixed' && Math.abs(r.bottom - innerHeight) < 2 && [...m.querySelectorAll('.menu__i')].filter((b) => !b.hidden).every((b) => b.getBoundingClientRect().height >= 44); }), `${w}: en el celular el menú es la barra de abajo, con íconos y nombres`);
       ok(await p.isVisible('.menu__i[data-vista="equipo"]'), `${w}: el dueño ve Equipo en el menú`); await toca('.menu__i[data-vista="equipo"]');
-      if (movil) { await p.waitForTimeout(450); ok(!(await p.isVisible('.menu__i[data-vista="agenda"]')) && /Equipo/.test(await p.textContent('#menu-boton')), `${w}: al elegir, el menú se cierra y el botón dice "Equipo"`); }
+      if (movil) { await p.waitForTimeout(450); ok((await p.getAttribute('.menu__i[data-vista="equipo"]', 'aria-current')) === 'page' && await p.evaluate(() => getComputedStyle(document.querySelector('.menu__i[data-vista="equipo"]')).color === 'rgb(228, 87, 46)'), `${w}: la sección elegida queda en naranja, como en el sitio`); }
       await p.waitForTimeout(600);
       ok((await p.textContent('#vista h1')) === 'Equipo', `${w}: abre Equipo`);
+      // Mi negocio: una cancha agregada sin tocar "Guardar cambios" se guarda sola al ir a la Agenda (pedido del dueño, 19/11)
+      await irA('negocio'); await p.waitForTimeout(500);
+      ok(!(await p.isVisible('#g-guardar')), `${w}: Mi negocio ya no tiene el botón "Guardar cambios"`);
+      await toca('#g-rec-mas'); await p.waitForTimeout(1600);
+      ok(/Guardado/.test(await p.textContent('#g-msg')), `${w}: la cancha nueva se guarda sola`);
+      await irA('agenda'); await p.waitForTimeout(900);
+      ok((await p.locator('.dia__rec').count()) === 4 && (await p.textContent('.dia')).includes('Cancha 4'), `${w}: la cancha nueva aparece en la Agenda aunque no se haya tocado "Guardar cambios"`);
+      await irA('negocio'); await p.waitForTimeout(500);
+      await toca('#g-recs .fila:last-child [data-quitar]'); await p.waitForTimeout(200);
+      await irA('agenda'); await p.waitForTimeout(900);
+      ok((await p.locator('.dia__rec').count()) === 3, `${w}: y al quitarla, la Agenda vuelve a tener 3`);
+      await irA('equipo'); await p.waitForTimeout(600);
       await toca('[data-invitar]'); await p.waitForTimeout(400);
       await toca('#f-invitar button[type="submit"]'); await p.waitForTimeout(200);
       ok(await p.isVisible('#iv-nombre-err') && await p.isVisible('#iv-email-err'), `${w}: invitar vacío marca nombre y email`);

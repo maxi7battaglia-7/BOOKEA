@@ -517,7 +517,7 @@
     if (n) aviso(n === 1 ? "Hay 1 negocio nuevo esperando tu aprobación." : `Hay ${n} negocios nuevos esperando tu aprobación.`);
     if (NEG && NEG.estado !== "aprobado") aviso("Tu propio negocio también está pendiente: aprobalo en Solicitudes para poder guardar.");
   };
-  $("#ir-solicitudes").addEventListener("click", () => ir("solicitudes"));
+  $("#ir-solicitudes").addEventListener("click", async () => { if (await dejarNegocio("solicitudes")) ir("solicitudes"); });
 
   const pintarLado = () => {
     $("#lado-neg").textContent = NEG.nombre;
@@ -722,30 +722,19 @@
     $$(".menu__i").forEach((b) => (b.hidden = !puedeVer(b.dataset.vista)));
     // "Ver tu página de reservas" sirve a todos; "Solicitudes", solo al equipo de Bookea (lo maneja avisarSolicitudes)
   };
-  // Celular y tablet: el menú baja desde el botón de arriba ("☰ Agenda ▾"); se cierra al elegir, al tocar afuera o con Escape
-  const abrirMenu = (si) => {
-    const pn = $("#panel"), fondo = $("#menu-fondo");
-    pn.classList.toggle("menu-abierto", si);
-    $("#menu-boton").setAttribute("aria-expanded", String(si));
-    if (si) { fondo.hidden = false; requestAnimationFrame(() => fondo.classList.add("is-on")); }
-    else { fondo.classList.remove("is-on"); fondo.hidden = true; }
-  };
-  $("#menu-boton").addEventListener("click", () => abrirMenu(!$("#panel").classList.contains("menu-abierto")));
-  $("#menu-fondo").addEventListener("click", () => abrirMenu(false));
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && $("#panel").classList.contains("menu-abierto")) { abrirMenu(false); $("#menu-boton").focus(); } });
-  $$(".lado__pag").forEach((a) => a.addEventListener("click", () => abrirMenu(false)));
+  // Si se sale de Mi negocio con cambios sin guardar, primero se guardan; si hay un dato mal cargado, se queda ahí
+  let salirNegocio = null;
+  const dejarNegocio = async (v) => !(salirNegocio && vistaActual === "negocio" && v !== "negocio") || (await salirNegocio());
   const ir = (v, { foco = true } = {}) => {
     if (!VISTAS[v] || !puedeVer(v)) v = primeraVista();
     vistaActual = v;
-    abrirMenu(false);
+    salirNegocio = null;
     $$(".menu__i").forEach((b) => (b.dataset.vista === v ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current")));
-    const bv = $(`.menu__i[data-vista="${v}"]`);
-    $("#menu-actual").textContent = bv ? ($(".menu__largo", bv) || bv).textContent.trim() : v === "solicitudes" ? "Solicitudes" : "Menú";
     VISTAS[v]();
     if (foco) { window.scrollTo(0, 0); $("#vista").focus({ preventScroll: true }); }
   };
-  $$(".menu__i").forEach((b) => b.addEventListener("click", () => ir(b.dataset.vista)));
-  $("#salir").addEventListener("click", () => { abrirMenu(false); salir(); });
+  $$(".menu__i").forEach((b) => b.addEventListener("click", async () => { if (await dejarNegocio(b.dataset.vista)) ir(b.dataset.vista); }));
+  $("#salir").addEventListener("click", async () => { await dejarNegocio(""); salir(); }); // intenta guardar lo pendiente, pero Salir nunca se traba
 
   // ---------- Diálogo ----------
   const dlg = $("#dlg");
@@ -1477,7 +1466,7 @@
             <div class="field"><label for="g-canc">Pueden cancelar hasta (horas antes)</label><input id="g-canc" type="number" inputmode="numeric" min="0" max="72" value="${n.cancelarHoras}" /></div>
             <label class="chk ancho"><input type="checkbox" id="g-dev" ${n.devolverSena ? "checked" : ""} /> Si cancelan a tiempo, se les devuelve la seña</label>
           </div>`)}
-        <div class="guardar-barra"><p class="form__msg" id="g-msg" role="status" aria-live="polite"></p><button type="submit" class="btn btn--ink btn--lg" id="g-guardar">Guardar cambios</button></div>
+        <div class="guardar-barra"><p class="form__msg" id="g-msg" role="status" aria-live="polite">Los cambios se guardan solos.</p></div>
       </form>`;
     const f = $("#f-neg");
     $("#g-copiar").addEventListener("click", async (e) => {
@@ -1486,7 +1475,7 @@
       b.innerHTML = tilde() + "Copiado"; aviso(`Link copiado: ${link}`);
       setTimeout(() => { if (b.isConnected) b.innerHTML = ico("copiar") + "Copiar"; }, 2200);
     });
-    // foto: se ve enseguida y se guarda con "Guardar cambios"
+    // foto: se ve enseguida y se guarda sola
     let foto = n.foto || "";
     const pintarFoto = () => {
       $("#g-foto-ver").innerHTML = foto ? `<img src="${foto}" alt="Foto de perfil de ${esc($("#g-nombre").value || n.nombre)}" />` : `<span aria-hidden="true">${esc(iniciales($("#g-nombre").value || n.nombre))}</span>`;
@@ -1498,11 +1487,11 @@
       if (!a) return;
       if (!/^image\//.test(a.type)) { err.textContent = "Elegí una imagen (JPG o PNG)."; err.hidden = false; return; }
       if (a.size > 15 * 1024 * 1024) { err.textContent = "La imagen pesa más de 15 MB. Probá con otra."; err.hidden = false; return; }
-      try { foto = await achicarFoto(a); pintarFoto(); $("#g-foto-ver").classList.remove("recien"); void $("#g-foto-ver").offsetWidth; $("#g-foto-ver").classList.add("recien"); $("#g-msg").className = "form__msg"; $("#g-msg").textContent = "Foto lista. Tocá Guardar cambios para que quede."; }
+      try { foto = await achicarFoto(a); pintarFoto(); $("#g-foto-ver").classList.remove("recien"); void $("#g-foto-ver").offsetWidth; $("#g-foto-ver").classList.add("recien"); programar(0); }
       catch { err.textContent = "No pudimos abrir esa imagen. Probá con otra."; err.hidden = false; }
       e.target.value = "";
     });
-    $("#g-foto-quitar").addEventListener("click", () => { foto = ""; pintarFoto(); $("#g-foto").focus(); $("#g-msg").className = "form__msg"; $("#g-msg").textContent = "Foto quitada. Tocá Guardar cambios para que quede."; });
+    $("#g-foto-quitar").addEventListener("click", () => { foto = ""; pintarFoto(); $("#g-foto").focus(); programar(0); });
     const cuentaDesc = () => { const l = $("#g-desc").value.length; $("#g-desc-cuenta").textContent = `${l} de 300 letras`; };
     cuentaDesc(); $("#g-desc").addEventListener("input", cuentaDesc);
     // ubicación: el botón de Google Maps se arma mientras escribís
@@ -1519,13 +1508,19 @@
     const ayudaSena = () => { const p = n.franjas[0] ? +n.franjas[0].precio : 0, pc = +$("#g-sena").value || 0; $("#g-sena-ayuda").textContent = p ? `Con un turno de ${plata(p)}, la seña es de ${plata(Math.round((p * pc) / 100 / 100) * 100)}.` : ""; };
     ayudaSena(); $("#g-sena").addEventListener("input", ayudaSena);
     f.addEventListener("click", (e) => {
-      const q = e.target.closest("[data-quitar]"); if (q) { const fila = q.closest(".fila"), cont = fila.parentElement; fila.remove(); const sig = $("input", cont); sig && sig.focus(); }
+      const q = e.target.closest("[data-quitar]"); if (q) { const fila = q.closest(".fila"), cont = fila.parentElement; fila.remove(); const sig = $("input", cont); sig && sig.focus(); programar(0); }
     });
-    $("#g-rec-mas").addEventListener("click", () => { const c = $("#g-recs"); c.insertAdjacentHTML("beforeend", filaRec({ id: "", nombre: `${U} ${c.children.length + 1}`, detalle: "" })); $("input", c.lastElementChild).select(); });
+    $("#g-rec-mas").addEventListener("click", () => { const c = $("#g-recs"); c.insertAdjacentHTML("beforeend", filaRec({ id: "", nombre: `${U} ${c.children.length + 1}`, detalle: "" })); $("input", c.lastElementChild).select(); programar(0); });
     $("#g-fr-mas").addEventListener("click", () => { const c = $("#g-frs"); c.insertAdjacentHTML("beforeend", filaFr({ desde: "", hasta: "", precio: "" })); $("input", c.lastElementChild).focus(); });
     $$("[data-abierto]", f).forEach((c) => c.addEventListener("change", () => $$('input[type="time"]', c.closest(".fila")).forEach((i) => (i.disabled = !c.checked))));
-    f.addEventListener("submit", async (e) => {
-      e.preventDefault();
+    // lo que hay en pantalla al abrir: si al salir cambió algo, se guarda solo (ver salirNegocio)
+    const estado = () => JSON.stringify([foto, ...$$("input, select, textarea", f).map((e) => (e.type === "checkbox" ? e.checked : e.value))]);
+    let inicial = estado();
+    // cada cambio se guarda solo, un segundo después de que se deja de escribir (pedido del dueño, 19/11: sin "Guardar cambios")
+    let espera = null;
+    const programar = (ms = 1100) => { clearTimeout(espera); espera = setTimeout(() => { espera = null; if (estado() !== inicial) guardar({ auto: true }); }, ms); };
+    f.addEventListener("input", () => programar()); f.addEventListener("change", () => programar());
+    const guardar = async ({ auto = false } = {}) => {
       const msg = $("#g-msg"); msg.className = "form__msg"; msg.textContent = "";
       const slugAntes = n.slug;
       const nombre = $("#g-nombre").value.trim(), slug = slugDe($("#g-slug").value);
@@ -1544,7 +1539,7 @@
       if (!recs.length) { eR.textContent = "Necesitás al menos uno para tomar reservas."; eR.hidden = false; ok.push(false); }
       else if (conTurnos.length) { eR.textContent = `${conTurnos.map((r) => r.nombre).join(" y ")} tiene turnos de hoy en adelante. Cancelalos antes de quitarlo.`; eR.hidden = false; ok.push(false); }
       if (!frs.length || frs.some((x) => !x.desde || !x.hasta)) { eF.textContent = "Cada franja necesita hora de inicio, de fin y precio."; eF.hidden = false; ok.push(false); }
-      if (ok.includes(false)) { msg.className = "form__msg err"; msg.textContent = "Revisá los campos marcados."; const p = $(".is-invalid", f) || $(".field__err:not([hidden])", f); p && p.scrollIntoView({ block: "center" }); return; }
+      if (ok.includes(false)) { msg.className = "form__msg err"; msg.textContent = "Revisá los campos marcados."; const p = $(".is-invalid", f) || $(".field__err:not([hidden])", f); if (!auto && p) p.scrollIntoView({ block: "center" }); return false; }
       Object.assign(n, {
         nombre, rubro: $("#g-rubro").value.trim(), ciudad: $("#g-ciudad").value.trim(), direccion: $("#g-dir").value.trim(),
         whatsapp: $("#g-wa").value.trim(), slug, recursos: recs, franjas: frs, duracion: +$("#g-dur").value,
@@ -1553,31 +1548,31 @@
         devolverSena: $("#g-dev").checked,
       });
       $$("#g-hor .fila").forEach((fila) => { const d = +fila.dataset.dia, [a, b] = $$('input[type="time"]', fila); n.horario[d] = { abre: a.value || "09:00", cierra: b.value || "21:00", cerrado: !$("[data-abierto]", fila).checked }; });
-      const g = $("#g-guardar");
-      ocupado(g, true, "Guardando…");
+      msg.className = "form__msg"; msg.textContent = "Guardando…";
       let r = await sincronizar();
       if (!r.ok && r.error === "slug") {
         // el link ya es de otro negocio: se deja el de antes y se guarda todo lo demás
         n.slug = slugAntes;
         r = await sincronizar();
-        ocupado(g, false);
         pintarLado();
         marcar($("#g-slug"), "g-slug-err", "Ese link ya lo usa otro negocio. Probá con otro.");
         msg.className = "form__msg err";
         msg.textContent = r.ok ? "Guardamos todo menos el link." : "No se pudo guardar. " + (MENSAJES[r.error] || MENSAJES.otro);
-        $("#g-slug").scrollIntoView({ block: "center" });
-        return;
+        if (!auto) $("#g-slug").scrollIntoView({ block: "center" });
+        inicial = estado(); // lo demás quedó guardado: el link se queda como estaba y no traba el salir
+        return r.ok;
       }
-      ocupado(g, false);
-      if (!r.ok) { msg.className = "form__msg err"; msg.textContent = "No se pudo guardar. " + (MENSAJES[r.error] || MENSAJES.otro); return; }
+      if (!r.ok) { msg.className = "form__msg err"; msg.textContent = "No se pudo guardar. " + (MENSAJES[r.error] || MENSAJES.otro); return false; }
       if (store.modo === "local" && local.get(CLAVE) && foto && !local.get(CLAVE).includes(foto.slice(-40))) { n.foto = ""; aviso("No entró la foto en este navegador. Probá con una más chica."); }
       pintarLado();
-      VISTAS.negocio();
-      const m2 = $("#g-msg"); m2.className = "form__msg ok"; m2.textContent = "Cambios guardados.";
-      const g2 = $("#g-guardar"); g2.classList.add("is-ok"); g2.innerHTML = tilde() + "Guardado";
-      setTimeout(() => { if (g2.isConnected) { g2.classList.remove("is-ok"); g2.textContent = "Guardar cambios"; } }, 2400);
-      aviso("Cambios guardados.");
-    });
+      // las filas nuevas quedan con su id: el próximo guardado no las toma como otras
+      $$("#g-recs .fila").forEach((fila, i) => { if (recs[i]) fila.dataset.id = recs[i].id; });
+      inicial = estado();
+      msg.className = "form__msg ok"; msg.innerHTML = tilde() + "Guardado";
+      return true;
+    };
+    f.addEventListener("submit", (e) => { e.preventDefault(); guardar(); });
+    salirNegocio = async () => { clearTimeout(espera); return estado() === inicial ? true : guardar(); };
   };
 
   // ---------- Solicitudes (solo el equipo de Bookea) ----------

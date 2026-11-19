@@ -13,8 +13,8 @@
   <link rel="icon" href="marca/isotipo.svg" type="image/svg+xml" />
   <link rel="icon" href="marca/isotipo-32.png" sizes="32x32" type="image/png" />
   <link rel="apple-touch-icon" href="marca/isotipo-192.png" />
-  <link rel="stylesheet" href="styles.css?v=8" />
-  <link rel="stylesheet" href="admin.css?v=8" />
+  <link rel="stylesheet" href="styles.css?v=9" />
+  <link rel="stylesheet" href="admin.css?v=9" />
 </head>
 <body class="pa">
   <a class="skip" href="#vista">Saltar al contenido</a>
@@ -40,7 +40,6 @@
     <symbol id="i-camara" viewBox="0 0 24 24"><path d="M3.5 8.5a2 2 0 0 1 2-2h2.2L9.3 4h5.4l1.6 2.5h2.2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z"/><circle cx="12" cy="13" r="3.5"/></symbol>
     <symbol id="i-equipo" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M19 8v6M16 11h6"/></symbol>
     <symbol id="i-candado" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></symbol>
-    <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
     <symbol id="i-bandeja" viewBox="0 0 24 24"><path d="M3.5 13.5 6 5.5h12l2.5 8v5a1.5 1.5 0 0 1-1.5 1.5H5a1.5 1.5 0 0 1-1.5-1.5Z"/><path d="M3.5 13.5H8l1.5 2.5h5l1.5-2.5h4.5"/></symbol>
     <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11Z"/><circle cx="12" cy="10" r="2.4"/></symbol>
   </svg>
@@ -73,8 +72,6 @@
         <span class="mono" id="lado-mono" aria-hidden="true"></span>
         <div><p class="lado__neg" id="lado-neg"></p><p class="lado__det" id="lado-det"></p></div>
       </div>
-      <!-- celular y tablet: el menú se despliega desde arriba con este botón (dice en qué sección estás) -->
-      <button type="button" class="menu-boton" id="menu-boton" aria-expanded="false" aria-controls="menu-caja"><svg class="ico" aria-hidden="true"><use href="#i-menu"/></svg><span class="sr-only">Menú, estás en </span><span id="menu-actual">Agenda</span><svg class="ico menu-boton__fl" aria-hidden="true"><use href="#i-abajo"/></svg></button>
       <div class="menu-caja" id="menu-caja">
       <nav class="menu" aria-label="Secciones">
         <button type="button" class="menu__i" data-vista="agenda"><svg class="ico" aria-hidden="true"><use href="#i-agenda"/></svg><span>Agenda</span></button>
@@ -95,7 +92,6 @@
       </div>
       </div>
     </aside>
-    <div class="menu-fondo" id="menu-fondo" hidden></div>
     <main class="vista" id="vista" tabindex="-1"></main>
   </div>
 
@@ -288,9 +284,9 @@
   <dialog class="dlg" id="dlg" aria-labelledby="dlg-t"><div class="dlg__in" id="dlg-in"></div></dialog>
   <p class="aviso" id="aviso" role="status" aria-live="polite"></p>
 
-  <script src="config.js?v=8"></script>
-  <script src="nube.js?v=8"></script>
-  <script src="admin.js?v=8"></script>
-  <script src="toque.js?v=8"></script>
+  <script src="config.js?v=9"></script>
+  <script src="nube.js?v=9"></script>
+  <script src="admin.js?v=9"></script>
+  <script src="toque.js?v=9"></script>
 </body>
 </html>

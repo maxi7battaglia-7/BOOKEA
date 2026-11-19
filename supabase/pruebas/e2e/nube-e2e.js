@@ -78,7 +78,7 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
 
     // ---------- Mi negocio: guardar cambios ----------
     await a.fill('#g-ciudad', 'Tunuyán'); await a.fill('#g-desc', 'Tres canchas, una techada.');
-    await a.click('#g-guardar'); await a.waitForFunction(() => /guardados/.test(document.querySelector('#g-msg').textContent));
+    await a.waitForFunction(() => /Guardado/.test(document.querySelector('#g-msg').textContent), null, { timeout: 10000 }); // se guarda solo
     const n1 = (await sql(`select row_to_json(n) from negocios n where slug = 'losalamospadel'`));
     ok(n1.ciudad === 'Tunuyán' && n1.descripcion === 'Tres canchas, una techada.', 'Mi negocio: ciudad y descripción guardadas en la base');
 
@@ -122,7 +122,7 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
     // ---------- Link repetido ----------
     await a.click('[data-vista="negocio"]'); await a.waitForTimeout(300);
     await a.fill('#g-slug', 'losalamospadel'); await a.fill('#g-ciudad', 'Tupungato');
-    await a.click('#g-guardar'); await a.waitForFunction(() => document.querySelector('#g-msg').textContent.length > 0);
+    await a.waitForFunction(() => /link|guardar/i.test(document.querySelector('#g-msg').textContent), null, { timeout: 10000 }); // se guarda solo
     ok(await a.isVisible('#g-slug-err') && (await a.textContent('#g-slug-err')).includes('ya lo usa otro negocio'), 'link de otro negocio: avisa al lado del campo');
     const nb = await sql(`select row_to_json(n) from negocios n where n.email_dueno = 'beto@prueba.com'`);
     ok(nb.slug === 'losalamospadel2' && nb.ciudad === 'Tupungato', 'se guardó todo menos el link (' + nb.slug + ', ' + nb.ciudad + ')');

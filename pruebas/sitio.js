@@ -227,7 +227,6 @@ const medir = () => {
       ok(await p.isVisible('#panel'), `${w} panel: entra con la cuenta de prueba`);
       ok(await p.evaluate(() => [...document.querySelectorAll('a.brand')].every((l) => l.getAttribute('href') === './')), `${w} panel: el logo vuelve a bookea.ar/ (no a /index.html)`);
       for (const v of ['agenda', 'finanzas', 'clientes', 'negocio', 'cuenta']) {
-        if (await p.isVisible('#menu-boton')) { await p.toca('#menu-boton'); await espera(p, 450); }
         await p.toca(`.menu__i[data-vista="${v}"]`); await espera(p, 700);
         await p.limpio(`panel, ${v}`);
       }
@@ -293,7 +292,8 @@ const medir = () => {
       await q.waitForFunction(() => document.documentElement.classList.contains('is-ready'), null, { timeout: 6000 });
       const espero = Date.now() - t0;
       ok(espero >= 700 && espero < 4500, `movimiento: la pantalla de carga sube después de ~1,5 s (${espero} ms desde que se vio)`);
-      await q.waitForTimeout(1400);
+      // espera a que termine la entrada (con tope), en vez de mirar en un momento fijo: no depende de lo rápida que esté la máquina
+      await q.waitForFunction(() => !document.querySelector('.splash') && getComputedStyle(document.querySelector('.hero h1 .ln > span')).transform === 'none' && getComputedStyle(document.querySelector('.finder')).opacity === '1', null, { timeout: 4000 }).catch(() => {});
       ok(!(await q.$('.splash')) && await q.evaluate(() => getComputedStyle(document.querySelector('.hero h1 .ln > span')).transform === 'none' && getComputedStyle(document.querySelector('.finder')).opacity === '1'), 'movimiento: después entra el título renglón por renglón y el buscador');
       const antes = await q.evaluate(() => { const el = document.querySelector('#grid-dest .vcard'); return el.classList.contains('rise') && !el.classList.contains('is-in'); });
       await q.evaluate(() => document.querySelector('#grid-dest').scrollIntoView({ block: 'center', behavior: 'instant' })); await q.waitForTimeout(1300);
