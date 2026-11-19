@@ -26,12 +26,15 @@ const ok = (c, m) => { hechas++; if (!c) fallas++; console.log((c ? 'OK    ' : '
       const p = await ctx.newPage();
       const errs = []; p.on('pageerror', (e) => errs.push(e.message)); p.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
       const toca = (s) => (movil ? p.tap(s) : p.click(s));
+      // en el celular el menú se despliega desde el botón de arriba; en la compu, la barra de íconos se abre al pasar el cursor
+      const irA = async (v) => { if (await p.isVisible('#menu-boton')) { await toca('#menu-boton'); await p.waitForTimeout(450); } await toca(`.menu__i[data-vista="${v}"]`); };
       const entrar = async (email, clave) => { await p.fill('#i-email', email); await p.fill('#i-clave', clave); await toca('#f-ingresar button[type="submit"]'); await p.waitForTimeout(3600); };
       await p.goto(B, { waitUntil: 'load' }); await p.waitForTimeout(500);
       await entrar('demo@example.com', 'bookea2026');
-      // dueño: Equipo (en compu desde el menú, en celular desde Cuenta)
-      if (movil) { await toca('.menu__i[data-vista="cuenta"]'); await p.waitForTimeout(400); ok(!(await p.isVisible('.menu__i[data-vista="equipo"]')), `${w}: en el celular Equipo no ocupa lugar en el menú de abajo`); await toca('#cu-equipo'); }
-      else { ok(await p.isVisible('.menu__i[data-vista="equipo"]'), `${w}: el dueño ve Equipo en el menú`); await toca('.menu__i[data-vista="equipo"]'); }
+      // dueño: Equipo está en el menú (en el celular, en el menú que baja desde arriba)
+      if (movil) { ok(!(await p.isVisible('.menu__i[data-vista="agenda"]')) && await p.isVisible('#menu-boton'), `${w}: en el celular el menú está cerrado, con el botón arriba`); await toca('#menu-boton'); await p.waitForTimeout(450); ok((await p.getAttribute('#menu-boton', 'aria-expanded')) === 'true', `${w}: el botón despliega el menú desde arriba`); }
+      ok(await p.isVisible('.menu__i[data-vista="equipo"]'), `${w}: el dueño ve Equipo en el menú`); await toca('.menu__i[data-vista="equipo"]');
+      if (movil) { await p.waitForTimeout(450); ok(!(await p.isVisible('.menu__i[data-vista="agenda"]')) && /Equipo/.test(await p.textContent('#menu-boton')), `${w}: al elegir, el menú se cierra y el botón dice "Equipo"`); }
       await p.waitForTimeout(600);
       ok((await p.textContent('#vista h1')) === 'Equipo', `${w}: abre Equipo`);
       await toca('[data-invitar]'); await p.waitForTimeout(400);
@@ -72,12 +75,12 @@ const ok = (c, m) => { hechas++; if (!c) fallas++; console.log((c ? 'OK    ' : '
       await toca('.dlg__x'); await p.waitForTimeout(300);
       await p.evaluate(() => document.querySelector('#salir').click()); await p.waitForTimeout(400);
       await entrar('lucia@prueba.com', 'lucia-2026');
-      await toca('.menu__i[data-vista="cuenta"]'); await p.waitForTimeout(400);
+      await irA('cuenta'); await p.waitForTimeout(400);
       ok((await p.textContent('#vista')).includes('Tu lugar en el equipo'), `${w}: en Cuenta ve qué puede hacer`);
       // el dueño le da "cargar turnos" y Finanzas
       await p.evaluate(() => document.querySelector('#salir').click()); await p.waitForTimeout(400);
       await entrar('demo@example.com', 'bookea2026');
-      if (movil) { await toca('.menu__i[data-vista="cuenta"]'); await p.waitForTimeout(300); await toca('#cu-equipo'); } else await toca('.menu__i[data-vista="equipo"]');
+      await irA('equipo');
       await p.waitForTimeout(600);
       ok((await p.locator('.eq').count()) === 2 && (await p.textContent('.eqs')).includes('Lucía'), `${w}: Lucía aparece en el equipo`);
       await toca('[data-permisos="lucia@prueba.com"]'); await p.waitForTimeout(400);
@@ -86,11 +89,11 @@ const ok = (c, m) => { hechas++; if (!c) fallas++; console.log((c ? 'OK    ' : '
       ok((await p.textContent('.eqs')).includes('Cargar turnos') && (await p.textContent('.eqs')).includes('Finanzas'), `${w}: los permisos nuevos se ven en la lista`);
       await p.evaluate(() => document.querySelector('#salir').click()); await p.waitForTimeout(400);
       await entrar('lucia@prueba.com', 'lucia-2026');
-      ok(await p.isVisible('[data-nuevo]') && await p.isVisible('.menu__i[data-vista="finanzas"]'), `${w}: Lucía ahora carga turnos y ve Finanzas`);
+      ok(await p.isVisible('[data-nuevo]') && await p.$eval('.menu__i[data-vista="finanzas"]', (b) => !b.hidden), `${w}: Lucía ahora carga turnos y ve Finanzas en su menú`);
       // el dueño la saca
       await p.evaluate(() => document.querySelector('#salir').click()); await p.waitForTimeout(400);
       await entrar('demo@example.com', 'bookea2026');
-      if (movil) { await toca('.menu__i[data-vista="cuenta"]'); await p.waitForTimeout(300); await toca('#cu-equipo'); } else await toca('.menu__i[data-vista="equipo"]');
+      await irA('equipo');
       await p.waitForTimeout(600);
       await toca('[data-quitar="lucia@prueba.com"]'); await p.waitForTimeout(200);
       ok((await p.textContent('[data-quitar="lucia@prueba.com"]')).includes('Tocá de nuevo'), `${w}: sacar del equipo pide un segundo toque`);

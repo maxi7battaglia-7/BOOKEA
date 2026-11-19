@@ -227,6 +227,7 @@ const medir = () => {
       ok(await p.isVisible('#panel'), `${w} panel: entra con la cuenta de prueba`);
       ok(await p.evaluate(() => [...document.querySelectorAll('a.brand')].every((l) => l.getAttribute('href') === './')), `${w} panel: el logo vuelve a bookea.ar/ (no a /index.html)`);
       for (const v of ['agenda', 'finanzas', 'clientes', 'negocio', 'cuenta']) {
+        if (await p.isVisible('#menu-boton')) { await p.toca('#menu-boton'); await espera(p, 450); }
         await p.toca(`.menu__i[data-vista="${v}"]`); await espera(p, 700);
         await p.limpio(`panel, ${v}`);
       }

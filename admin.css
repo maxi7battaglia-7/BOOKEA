@@ -181,6 +181,9 @@
 .lado__neg { font-weight: 600; font-size: 14px; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lado__det { font-size: 13px; color: var(--tx-2); line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+.menu-caja { display: flex; flex-direction: column; gap: 20px; flex: 1; min-height: 0; }
+.menu-boton { display: none; }
+.menu-fondo { display: none; }
 .menu { display: grid; gap: 2px; }
 .menu__i {
   position: relative; isolation: isolate; display: flex; align-items: center; gap: 10px; text-align: left;
@@ -205,7 +208,7 @@
 .menu__corto { display: none; }
 
 .lado__pie { margin-top: auto; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; } /* minmax(0): un email largo se corta con "…" y no empuja "Salir" afuera */
-.lado__pag { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: var(--v-tinta); text-decoration: none; padding: 4px 12px; }
+.lado__pag { display: inline-flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 600; color: var(--v-tinta); text-decoration: none; padding: 4px 12px; }
 .lado__pag .ico { width: 16px; height: 16px; transition: transform 260ms var(--ease-out); }
 @media (hover: hover) and (pointer: fine) { .lado__pag:hover { color: var(--tx); } .lado__pag:hover .ico { transform: translate(2px, -2px); } }
 .yo { display: flex; align-items: center; gap: 10px; padding: 12px 12px 0; border-top: 1px solid var(--borde); } /* taste-skill-ignore: separa la cuenta */
@@ -213,7 +216,7 @@
 .lado__user { font-size: 13px; color: var(--tx-2); line-height: 1.3; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .lado__user b { display: block; color: var(--tx); font-size: 14px; }
 .lado__salir {
-  margin-left: auto; display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; color: var(--tx-2);
+  justify-self: start; display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; color: var(--tx-2);
   min-height: 36px; padding: 0 8px; border-radius: var(--r-ctl); font-size: 14px; font-weight: 500; transition: background-color var(--t-ui) ease, color var(--t-ui) ease;
 }
 .lado__salir .ico { width: 16px; height: 16px; }
@@ -582,35 +585,80 @@
   .ajuste__r p { max-width: 60ch; }
 }
 
-/* ---------- Teléfono y tablet: barra arriba, menú abajo ---------- */
-@media (max-width: 900px) {
+/* ---------- Menú del costado (pedido del dueño, 19/11) ----------
+   Compu (con mouse): una barra de íconos de 72px; al pasar el cursor se despliega con los nombres por encima de la pantalla
+   (no la empuja) y al sacarlo se vuelve a cerrar. Con el teclado se abre igual (:focus-visible). Ahorra 176px de ancho.
+   Celular y tablet (o cualquier pantalla táctil): barra arriba con el logo, el negocio y el botón "☰ Agenda ▾", que
+   despliega el menú desde arriba con todo lo del costado (secciones, página de reservas, la cuenta y Salir). */
+@media (min-width: 901px) and (hover: hover) and (pointer: fine) {
+  .panel { grid-template-columns: 72px minmax(0, 1fr); }
+  .lado {
+    width: 72px; z-index: 30; padding: 20px 12px 18px; overflow-x: hidden;
+    transition: width 280ms var(--ease-out) 180ms, box-shadow 280ms ease 180ms;
+  }
+  .lado:hover { width: 248px; box-shadow: 18px 0 44px rgba(17, 21, 28, 0.08), 1px 0 0 var(--borde); transition-delay: 40ms; }
+  .lado:has(:focus-visible) { width: 248px; box-shadow: 18px 0 44px rgba(17, 21, 28, 0.08), 1px 0 0 var(--borde); transition-delay: 0ms; }
+  /* cerrada, cada ícono queda centrado en la barra */
+  .lado .brand { padding: 6px; margin-left: 2px; }
+  .quien { padding: 6px; }
+  .menu { grid-template-columns: minmax(0, 1fr); } /* el nombre escondido no ensancha el botón: el resaltado queda dentro de la barra */
+  .menu__i { padding: 0 14px; white-space: nowrap; }
+  .lado__pag { padding: 4px 16px; white-space: nowrap; min-height: 36px; position: relative; }
+  .yo { padding: 12px 8px 0; }
+  .lado__salir { padding: 0 16px; white-space: nowrap; }
+  /* las solicitudes pendientes se ven como globito sobre el ícono, aun con la barra cerrada */
+  .lado__sol .chip-n { position: absolute; left: 30px; top: -4px; margin: 0; padding: 0 6px; font-size: 11px; line-height: 17px; }
+  /* los nombres aparecen cuando la barra ya se abrió y se van enseguida al cerrarla */
+  .lado :is(.brand__word, .lado__neg, .lado__det, .menu__i span, .lado__txt, .lado__user, .lado__user *) { opacity: 0; transition: opacity 120ms ease; }
+  .lado:hover :is(.brand__word, .lado__neg, .lado__det, .menu__i span, .lado__txt, .lado__user, .lado__user *) { opacity: 1; transition: opacity 220ms ease 170ms; }
+  .lado:has(:focus-visible) :is(.brand__word, .lado__neg, .lado__det, .menu__i span, .lado__txt, .lado__user, .lado__user *) { opacity: 1; transition: opacity 220ms ease 120ms; }
+}
+@media (max-width: 900px), (hover: none), (pointer: coarse) {
   .panel { grid-template-columns: minmax(0, 1fr); }
   .lado {
-    position: sticky; top: 0; z-index: 20; height: auto; overflow: visible; flex-direction: row; align-items: center;
-    gap: 10px; padding: 8px max(16px, env(safe-area-inset-left, 0px)); background: rgba(244, 247, 246, 0.96);
+    position: sticky; top: 0; z-index: 40; width: auto; height: auto; overflow: visible; flex-direction: row; align-items: center;
+    gap: 10px; padding: 8px max(16px, env(safe-area-inset-right, 0px)) 8px max(16px, env(safe-area-inset-left, 0px));
+    background: rgba(244, 247, 246, 0.96); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
     border-bottom: 1px solid var(--borde); /* taste-skill-ignore: barra de arriba */
   }
   .lado .brand__word { display: none; }
   .lado .brand { padding: 4px; }
-  .quien { padding: 0; border: 0; background: none; min-width: 0; }
+  .quien { flex: 1; padding: 0; border: 0; background: none; min-width: 0; }
   .quien .mono { display: none; }
   .lado__det { display: none; }
   .lado__neg { font-size: 15px; }
-  .lado__pie { margin: 0 0 0 auto; display: flex; gap: 4px; }
-  .lado__pag { display: none; }
-  .yo { padding: 0; border: 0; }
-  .yo__av, .lado__user { display: none; }
-  .menu {
-    position: fixed; z-index: 40; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0;
-    background: #fff; border-top: 1px solid var(--borde); padding: 4px 4px max(4px, env(safe-area-inset-bottom, 0px)); /* taste-skill-ignore: menú de abajo */
+  .menu-boton {
+    display: inline-flex; align-items: center; gap: 8px; flex: none; min-height: 44px; padding: 0 12px 0 10px; border: 1px solid var(--borde);
+    border-radius: var(--r-ctl); background: #fff; color: var(--tx); font-size: 15px; font-weight: 600; cursor: pointer; /* taste-skill-ignore: botón del menú */
   }
-  .menu__i { flex-direction: column; justify-content: center; gap: 2px; min-height: 56px; padding: 4px 2px; font-size: 12px; text-align: center; }
+  .menu-boton .ico { width: 20px; height: 20px; color: var(--tx-2); }
+  .menu-boton__fl { width: 16px !important; height: 16px !important; transition: transform 300ms var(--ease-out); }
+  .panel.menu-abierto .menu-boton { border-color: var(--v200); background: var(--v50); color: var(--v-tinta); }
+  .panel.menu-abierto .menu-boton__fl { transform: rotate(180deg); }
+  /* el menú baja desde la barra de arriba, a todo el ancho */
+  .menu-caja {
+    position: absolute; left: 0; right: 0; top: 100%; z-index: 45; flex: none; display: grid; gap: 12px;
+    max-height: calc(100dvh - 64px); overflow-y: auto; overscroll-behavior: contain;
+    padding: 10px max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+    background: #fff; border-bottom: 1px solid var(--borde); border-radius: 0 0 18px 18px; box-shadow: 0 24px 48px rgba(17, 21, 28, 0.14); /* taste-skill-ignore: menú desplegado */
+    clip-path: inset(0 0 100% 0); opacity: 0; visibility: hidden;
+    transition: clip-path 300ms var(--ease-out), opacity 200ms ease, visibility 0s linear 300ms;
+  }
+  .panel.menu-abierto .menu-caja { clip-path: inset(0 0 -60px 0); opacity: 1; visibility: visible; transition: clip-path 380ms var(--ease-out), opacity 160ms ease, visibility 0s; }
+  .menu { gap: 2px; }
+  .menu__i { min-height: 50px; font-size: 16px; gap: 12px; }
   .menu__i .ico { width: 22px; height: 22px; }
-  .menu__i::before { inset: 4px 10%; }
-  .menu__largo { display: none; }
-  .menu__corto { display: inline; }
-  .vista { padding: 20px 16px 104px; gap: 16px; }
-  .aviso { bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
+  .lado__pie { margin: 0; display: grid; gap: 6px; padding-top: 10px; border-top: 1px solid var(--borde); } /* taste-skill-ignore: separa la cuenta */
+  .lado__pag { min-height: 44px; }
+  .yo { padding: 6px 12px 0; border: 0; }
+  .lado__salir { min-height: 44px; padding: 0 12px; }
+  .menu-fondo { display: block; position: fixed; inset: 0; z-index: 35; background: rgba(17, 21, 28, 0.32); opacity: 0; transition: opacity 260ms ease; }
+  .menu-fondo.is-on { opacity: 1; }
+}
+
+/* ---------- Teléfono y tablet: el resto de la pantalla ---------- */
+@media (max-width: 900px) {
+  .vista { padding: 20px 16px 48px; gap: 16px; }
   .grid2 { grid-template-columns: 1fr; }
   .entrada { grid-template-columns: 1fr; }
   .entrada__lado { gap: 24px; padding: 24px 16px 32px; }
@@ -806,11 +854,6 @@
 }
 
 /* ---------- Equipo: personas del negocio y sus permisos ---------- */
-/* El menú de abajo del celular se arma con los botones que cada uno puede ver (4 o 5) */
-@media (max-width: 900px) {
-  .menu { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
-  .menu__i--pc { display: none !important; } /* Equipo, en el celular, se abre desde Cuenta */
-}
 .eqs { list-style: none; display: grid; }
 .eq { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px 14px; padding: 14px 0; border-top: 1px solid var(--regla); } /* taste-skill-ignore: filas de la lista */
 .eq:first-child { border-top: 0; padding-top: 0; }

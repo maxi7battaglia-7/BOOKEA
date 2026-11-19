@@ -247,7 +247,15 @@ textos que se entiendan en cada cuadro.
   la semana). Sus tintes pálidos (#eef7f5, #dcf0eb, #b5e0d6) hacen el área: fila activa del menú, huecos libres, turnos con seña,
   calor de la semana. Naranja solo para alertas (no vino, cancelar, baja). Noche: texto, botón principal y píldoras de cancha.
   Crema: el palo de la B y la etiqueta "Fijo". **Nada de beige en líneas ni rayas de color al costado de los turnos.**
-- **Costado:** sobre el fondo, sin color. Logo con el barrido del sitio, la tarjeta del negocio (iniciales en verde agua,
+- **Menú del costado (pedido del dueño, 19/11: "que se despliegue cuando el cursor pase cerca… esto nos ahorra espacio"):**
+  - **Compu (con mouse):** una barra de 72px con los íconos (logo, iniciales del negocio, las secciones, "Ver tu página", el avatar y Salir).
+    Al pasar el cursor se despliega a 248px con los nombres, **por encima** de la pantalla (no la empuja), con una sombra suave; al sacar
+    el cursor se vuelve a cerrar (abre en 40 ms, cierra a los 180 ms, así no parpadea al pasar de largo). Los nombres aparecen cuando la
+    barra ya se abrió. Con el teclado se abre igual. Las solicitudes pendientes (equipo de Bookea) se ven como globito sobre su ícono.
+  - **Celular y tablet (o cualquier pantalla táctil):** sin barra de abajo. Arriba, el logo, el negocio y el botón **"☰ Agenda ▾"**
+    (dice en qué sección estás). Al tocarlo, el menú baja desde arriba a todo el ancho, con las secciones (Equipo incluido), "Ver tu
+    página de reservas", la cuenta y Salir; atrás se oscurece la pantalla. Se cierra al elegir, al tocar afuera o con Escape.
+- **Costado (antes del 19/11):** sobre el fondo, sin color. Logo con el barrido del sitio, la tarjeta del negocio (iniciales en verde agua,
   rubro · ciudad), el menú con íconos de línea propios (16-22px) y el barrido verde pálido al pasar el cursor, abajo "Ver tu
   página de reservas" y la cuenta con "Salir". En celular y tablet (≤900px): barra arriba (logo + negocio + Salir) y el mismo
   menú como barra de 5 botones abajo (Agenda, Finanzas, Clientes, Negocio, Cuenta).

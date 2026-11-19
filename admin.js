@@ -722,15 +722,30 @@
     $$(".menu__i").forEach((b) => (b.hidden = !puedeVer(b.dataset.vista)));
     // "Ver tu página de reservas" sirve a todos; "Solicitudes", solo al equipo de Bookea (lo maneja avisarSolicitudes)
   };
+  // Celular y tablet: el menú baja desde el botón de arriba ("☰ Agenda ▾"); se cierra al elegir, al tocar afuera o con Escape
+  const abrirMenu = (si) => {
+    const pn = $("#panel"), fondo = $("#menu-fondo");
+    pn.classList.toggle("menu-abierto", si);
+    $("#menu-boton").setAttribute("aria-expanded", String(si));
+    if (si) { fondo.hidden = false; requestAnimationFrame(() => fondo.classList.add("is-on")); }
+    else { fondo.classList.remove("is-on"); fondo.hidden = true; }
+  };
+  $("#menu-boton").addEventListener("click", () => abrirMenu(!$("#panel").classList.contains("menu-abierto")));
+  $("#menu-fondo").addEventListener("click", () => abrirMenu(false));
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && $("#panel").classList.contains("menu-abierto")) { abrirMenu(false); $("#menu-boton").focus(); } });
+  $$(".lado__pag").forEach((a) => a.addEventListener("click", () => abrirMenu(false)));
   const ir = (v, { foco = true } = {}) => {
     if (!VISTAS[v] || !puedeVer(v)) v = primeraVista();
     vistaActual = v;
+    abrirMenu(false);
     $$(".menu__i").forEach((b) => (b.dataset.vista === v ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current")));
+    const bv = $(`.menu__i[data-vista="${v}"]`);
+    $("#menu-actual").textContent = bv ? ($(".menu__largo", bv) || bv).textContent.trim() : v === "solicitudes" ? "Solicitudes" : "Menú";
     VISTAS[v]();
     if (foco) { window.scrollTo(0, 0); $("#vista").focus({ preventScroll: true }); }
   };
   $$(".menu__i").forEach((b) => b.addEventListener("click", () => ir(b.dataset.vista)));
-  $("#salir").addEventListener("click", () => salir());
+  $("#salir").addEventListener("click", () => { abrirMenu(false); salir(); });
 
   // ---------- Diálogo ----------
   const dlg = $("#dlg");
