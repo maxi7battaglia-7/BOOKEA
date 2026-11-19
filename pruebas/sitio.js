@@ -111,7 +111,7 @@ const medir = () => {
       const sinVertical = () => p.evaluate(() => [...document.querySelectorAll('.rail, .switch-rubro, .rbar__row, .reserva .cupos')].filter((e) => e.offsetParent).every((e) => !/auto|scroll/.test(getComputedStyle(e).overflowY)));
       ok(await sinVertical(), `${w} inicio: "Libres ahora" no se mueve para arriba ni para abajo`);
       await p.toca('#rail-now .now >> nth=0'); await espera(p);
-      ok((await p.pagina()) === 'ficha' && (await p.locator('#book .slot.is-on').count()) === 1, `${w} "Libres ahora": abre el lugar con ese horario elegido`);
+      ok((await p.pagina()) === 'ficha' && (await p.locator('#book .slot.is-on[data-act="f-slot"]').count()) === 1, `${w} "Libres ahora": abre el lugar con ese horario elegido`);
       await p.toca('.back'); await espera(p);
       ok((await p.pagina()) === 'home', `${w} ficha: "Volver" vuelve al inicio`);
       await p.toca('#grid-dest .vcard >> nth=0'); await espera(p);
@@ -138,18 +138,29 @@ const medir = () => {
       await p.limpio('resultados con filtros');
       ok(await sinVertical(), `${w} resultados: las filas de filtros no se mueven para arriba ni para abajo`);
       await p.toca('.qslot >> nth=0'); await espera(p);
-      ok((await p.pagina()) === 'ficha' && (await p.locator('#book .slot.is-on').count()) === 1 && await p.isVisible('#ir-pagar [data-act="reservar"]'), `${w} resultados: el horario rápido abre la ficha con el aviso verde "Ir a pagar"`);
+      ok((await p.pagina()) === 'ficha' && (await p.locator('#book .slot.is-on[data-act="f-slot"]').count()) === 1 && await p.isVisible('#ir-pagar [data-act="reservar"]'), `${w} resultados: el horario rápido abre la ficha con el aviso verde "Ir a pagar"`);
       ok(await p.evaluate(() => getComputedStyle(document.querySelector('#ir-pagar')).backgroundColor === 'rgb(31, 160, 140)'), `${w} ficha: el aviso "Ir a pagar" es verde agua`);
 
       // ---------- Ficha: elegir y reservar ----------
       await p.toca('#book .cupo[data-i="3"]'); await espera(p, 300);
       ok((await p.getAttribute('#book .cupo[data-i="3"]', 'aria-pressed')) === 'true' && (await p.locator('#book .cupo.is-on').count()) === 1, `${w} ficha: cambia el día`);
       await p.toca('#book .slot:not([disabled]) >> nth=0'); await espera(p, 200);
-      if (await p.locator('#book .unit').count()) { await p.toca('#book .unit >> nth=1'); await espera(p, 150); }
+      // Con dos o más canchas libres a esa hora se elige cuál, justo debajo del horario elegido (pedido del dueño, 19/11)
+      const conVarias = await p.evaluate(() => [...document.querySelectorAll('#book .slot[data-act="f-slot"]:not([disabled])')].findIndex((x) => /libres/.test(x.textContent)));
+      let uElegida = null;
+      if (conVarias >= 0) {
+        await p.toca(`#book .slot[data-act="f-slot"]:not([disabled]) >> nth=${conVarias}`); await espera(p, 800);
+        ok(await p.evaluate(() => { const e = document.querySelector('#f-eleccion'), s = document.querySelector('#book .slot.is-on[data-act="f-slot"]'), ir = document.querySelector('#ir-pagar'); return !!e && !!s && e.previousElementSibling.contains(s) && document.querySelectorAll('#f-eleccion .slot--u').length >= 2 && document.querySelectorAll('#f-eleccion .slot--u.is-on').length === 1 && e.getBoundingClientRect().bottom <= ir.getBoundingClientRect().top + 1; }), `${w} ficha: con dos o más canchas libres, se elige cuál justo debajo del horario (y el aviso verde no la tapa)`);
+        const u2 = await p.getAttribute('#f-eleccion .slot--u >> nth=1', 'data-u');
+        await p.toca('#f-eleccion .slot--u >> nth=1'); await espera(p, 200);
+        ok((await p.textContent('#ir-pagar')).includes(u2) && (await p.getAttribute('#f-eleccion .slot--u >> nth=1', 'aria-pressed')) === 'true', `${w} ficha: la cancha elegida queda marcada y el aviso verde la nombra (${u2})`);
+        uElegida = u2;
+      }
       ok(/seña \$/.test(await p.textContent('#ir-pagar')) && await p.isVisible('#ir-pagar'), `${w} ficha: el aviso muestra el día, la hora y la seña`);
       await p.limpio('ficha con horario');
       await p.toca('#ir-pagar [data-act="reservar"]'); await espera(p);
       ok((await p.pagina()) === 'pago' && (await p.locator('#pago-root .chk__turno').count()) === 1 && /Confirmá tu turno/.test(await p.textContent('#pago-root h1')), `${w} reservar: va directo a pagar la seña de ese turno`);
+      if (uElegida) ok((await p.textContent('#pago-root')).includes(uElegida.split(' · ')[0]), `${w} pago: el turno es en la cancha que eligió (${uElegida})`);
       const reloj0 = await p.textContent('#pago-root .reloj b');
       ok(/^(10:00|09:5\d)$/.test(reloj0), `${w} pago: el turno queda guardado 10 minutos (${reloj0})`);
       ok(await p.evaluate(() => !document.querySelector('[data-tab="carrito"], #t-carrito, [data-count="carrito"]') && !/carrito/i.test(document.body.innerText)), `${w} sin carrito: ni pestaña, ni ícono, ni la palabra`);

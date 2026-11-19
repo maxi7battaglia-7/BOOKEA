@@ -396,7 +396,11 @@
     const v = venue(S.f.v), f = S.f, R = RUBROS[v.rubro], di = dayInfo(f.dia), svc = curSvc();
     const sl = slotsFor(v, f.dia), sel = f.abierto ? sl.find((s) => s.t === f.t && s.libres.length) : null;
     if (!sel) f.t = null;
-    if (sel && f.unit !== "any" && !sel.libres.includes(f.unit)) f.unit = "any";
+    if (sel && !sel.libres.includes(f.unit)) f.unit = sel.libres[0]; // la primera libre queda elegida, y se ve cuál es
+    // Con más de una cancha (o barbero) libre a esa hora, se elige cuál justo debajo del horario elegido (pedido del dueño, 19/11)
+    const qu = v.rubro === "barberia" ? "con quién" : `${R.un.toLowerCase()}`;
+    const eleccion = sel && sel.libres.length > 1 ? `<div class="eleccion" id="f-eleccion"><p class="slots__g">${v.rubro === "barberia" ? "¿Con quién?" : `¿En qué ${qu}?`} · ${sel.t}</p>
+      <div class="slots" role="group" aria-label="Elegí ${v.rubro === "barberia" ? qu : `la ${qu}`} para las ${sel.t}">${sel.libres.map((u) => { const [nom, det] = u.split(" · "); return `<button type="button" class="slot slot--u${f.unit === u ? " is-on" : ""}" data-act="f-unit" data-u="${esc(u)}" aria-pressed="${f.unit === u}"><b>${esc(nom)}</b><small>${det ? esc(cap(det)) : "Libre"}</small></button>`; }).join("")}</div></div>` : "";
     const dias = Array.from({ length: 7 }, (_, i) => {
       const s7 = slotsFor(v, i), n = s7.filter((s) => s.libres.length).length, tot = s7.length || 1, d = dayInfo(i), on = f.abierto && i === f.dia;
       return `<button type="button" class="cupo${on ? " is-on" : ""}${n ? "" : " is-zero"}" data-act="f-dia" data-i="${i}" aria-pressed="${on}"><span>${i === 0 ? "Hoy" : i === 1 ? "Mañana" : DOW3[d.dow]}</span><b>${d.d}</b><i style="--p:${Math.round((n / tot) * 100)}%"></i><small>${n ? `${n} ${n === 1 ? "libre" : "libres"}` : "Completo"}</small></button>`;
@@ -406,8 +410,7 @@
     const panel = !f.abierto ? `<p class="reserva__hint">Tocá un día para ver sus horarios libres.</p>` : `
       <div class="reserva__panel" id="book-panel">
         <div class="reserva__ph"><h3>${titulo}</h3>${v.svcs.length > 1 ? `<label class="reserva__svc"><span class="eyebrow">Servicio</span><select class="sel" id="f-svc">${v.svcs.map((s) => `<option value="${s.id}"${s.id === f.svc ? " selected" : ""}>${s.n} · ${s.min} min · ${money(precioDe(s, di, 18 * 60))}</option>`).join("")}</select></label>` : ""}</div>
-        ${sl.length ? grupos.map(([g, a]) => `${grupos.length > 1 ? `<p class="slots__g">${FRANJAS[g]}</p>` : ""}<div class="slots">${a.map((s) => `<button type="button" class="slot${s.t === f.t ? " is-on" : ""}" data-act="f-slot" data-t="${s.t}" ${s.libres.length ? "" : "disabled"} aria-pressed="${s.t === f.t}"><b>${s.t}</b><small class="${s.libres.length === 1 ? "last" : ""}">${s.libres.length ? quedan(s, v) : "Completo"}</small></button>`).join("")}</div>`).join("") : `<p class="book__empty">Ya no quedan turnos para ${dayFull(f.dia).toLowerCase()}. Probá otro día.</p>`}
-        ${sel && sel.libres.length > 1 ? `<div class="reserva__units"><span class="eyebrow">${R.un}</span><div class="units" role="group" aria-label="${R.un}"><button type="button" class="unit${f.unit === "any" ? " is-on" : ""}" data-act="f-unit" data-u="any">Cualquiera</button>${sel.libres.map((u) => `<button type="button" class="unit${f.unit === u ? " is-on" : ""}" data-act="f-unit" data-u="${esc(u)}">${esc(u)}</button>`).join("")}</div></div>` : ""}
+        ${sl.length ? grupos.map(([g, a]) => `${grupos.length > 1 ? `<p class="slots__g">${FRANJAS[g]}</p>` : ""}<div class="slots">${a.map((s) => `<button type="button" class="slot${s.t === f.t ? " is-on" : ""}" data-act="f-slot" data-t="${s.t}" ${s.libres.length ? "" : "disabled"} aria-pressed="${s.t === f.t}"><b>${s.t}</b><small class="${s.libres.length === 1 ? "last" : ""}">${s.libres.length ? quedan(s, v) : "Completo"}</small></button>`).join("")}</div>${sel && a.includes(sel) ? eleccion : ""}`).join("") : `<p class="book__empty">Ya no quedan turnos para ${dayFull(f.dia).toLowerCase()}. Probá otro día.</p>`}
       </div>`;
     $("#book").innerHTML = `
       <div class="reserva__top"><div><p class="eyebrow">Reservá tu turno</p><h2 id="book-t">Elegí el día</h2></div><p class="reserva__nota">Cada horario tiene su propio cupo. Al reservar, te lo guardamos 10 minutos para pagar la seña.</p></div>
@@ -626,7 +629,16 @@
           if (pn) { pn.classList.add("aparece"); pn.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "nearest" }); }
           break;
         }
-        case "f-slot": S.f.t = d.t; S.f.unit = "any"; renderBook(); break;
+        case "f-slot": {
+          S.f.t = d.t; S.f.unit = "any"; renderBook();
+          // la elección de cancha no queda abajo del aviso verde ni fuera de la pantalla
+          const el = $("#f-eleccion"), ir = $("#ir-pagar");
+          if (el) requestAnimationFrame(() => {
+            const tope = innerHeight - (ir && !ir.hidden ? ir.offsetHeight + 28 : 12), abajo = el.getBoundingClientRect().bottom;
+            if (abajo > tope) window.scrollBy({ top: abajo - tope, behavior: reduce ? "auto" : "smooth" });
+          });
+          break;
+        }
         case "f-unit": S.f.unit = d.u; renderBook(); break;
         case "reservar": reservar(); break;
         case "pay": pagar(); break;
