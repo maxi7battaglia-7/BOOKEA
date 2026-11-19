@@ -1,7 +1,7 @@
 // Prueba del frente (index.html) y del registro en el navegador (Playwright), en modo de prueba (sin base):
-//   - inicio: rubros con foto, dónde/cuándo/hora y "Buscar turnos"; "Libres ahora" con su switch; lugares
+//   - inicio: pestañas Deportes | Servicios, rubros con foto, dónde/cuándo/hora y "Buscar turnos"; "Libres ahora"; lugares
 //   - resultados: rubro, día, franja y zona; horarios rápidos; "Solo techadas"
-//   - ficha del lugar: día, horario, cancha o barbero, "Reservar turno" (y la barra de abajo en el celular)
+//   - ficha del lugar: fotos a lo ancho, días; al tocar uno, sus horarios; al elegir horario, el aviso verde "Ir a pagar"
 //   - pagar la seña (sin carrito): el turno guardado 10 minutos, el aviso "Pagar seña" en las otras pantallas,
 //     avisos al lado de cada campo, pago simulado → Mis turnos → cancelar con su diálogo
 //   - turno guardado: a los 10 minutos se libera y se puede volver a reservar (con el reloj de Playwright)
@@ -84,7 +84,7 @@ const medir = () => {
 
       // ---------- Inicio ----------
       await p.ir(B);
-      ok((await p.pagina()) === 'home' && (await p.locator('#f-rubros .rubro').count()) === 4, `${w} inicio: los cuatro rubros con foto`);
+      ok((await p.pagina()) === 'home' && (await p.locator('#f-rubros .rubro').count()) === 3 && (await p.getAttribute('#f-secs [data-k="deportes"]', 'aria-pressed')) === 'true', `${w} inicio: arranca en Deportes, con sus tres rubros con foto`);
       ok(await p.evaluate(() => [...document.fonts].some((f) => f.family.includes('Inter Tight') && f.status === 'loaded')), `${w} inicio: la letra Inter Tight cargó desde bookea.ar`);
       ok(await p.evaluate(() => [...document.images].every((i) => !i.complete || i.naturalWidth > 0)), `${w} inicio: ninguna foto rota`);
       ok(await p.evaluate(() => { const t = [...document.querySelectorAll('.top a, .top button')].filter((e) => e.offsetParent).map((e) => e.textContent.trim()); return !t.some((x) => /Reservar turno/.test(x)) && t.some((x) => x === 'Ingresar'); }), `${w} barra de arriba: sin "Reservar turno", con "Ingresar"`);
@@ -98,9 +98,11 @@ const medir = () => {
       await p.goBack(); await espera(p);
       ok((await p.pagina()) === 'home', `${w} resultados: "atrás" del navegador vuelve al inicio`);
 
-      // Libres ahora y lugares
-      await p.toca('#hs-switch .pill[data-k="barberia"]'); await espera(p, 200);
-      ok((await p.textContent('#dest-t')) === 'Barbería: para reservar hoy' && (await p.locator('#grid-dest .vcard').count()) === 3, `${w} inicio: el switch cambia "Libres ahora" y los lugares a Barbería`);
+      // Libres ahora y lugares: la pestaña Servicios cambia toda la página
+      await p.toca('#hs-switch .secs [data-k="servicios"]'); await espera(p, 300);
+      ok((await p.textContent('#dest-t')) === 'Barbería: para reservar hoy' && (await p.locator('#grid-dest .vcard').count()) === 3, `${w} inicio: Servicios cambia "Libres ahora" y los lugares a Barbería`);
+      ok((await p.locator('#f-rubros .rubro:not(.rubro--molde)').count()) === 1 && (await p.getAttribute('#f-secs [data-k="servicios"]', 'aria-pressed')) === 'true' && await p.evaluate(() => [...document.querySelectorAll('.collage img')].some((i) => /barber/.test(i.getAttribute('src')))), `${w} inicio: el buscador y las fotos de al lado también pasan a Servicios`);
+      ok(await p.evaluate(() => { const r = [...document.querySelectorAll('#f-rubros .rubro')].map((e) => e.getBoundingClientRect().height); return Math.abs(r[0] - r[1]) < 2; }), `${w} inicio: con un solo rubro, la fila de fotos mide lo mismo`);
       ok((await p.locator('#rail-now .now').count()) > 0, `${w} inicio: hay turnos en "Libres ahora"`);
       await p.toca('#rail-now .now >> nth=0'); await espera(p);
       ok((await p.pagina()) === 'ficha' && (await p.locator('#book .slot.is-on').count()) === 1, `${w} "Libres ahora": abre el lugar con ese horario elegido`);
@@ -108,6 +110,9 @@ const medir = () => {
       ok((await p.pagina()) === 'home', `${w} ficha: "Volver" vuelve al inicio`);
       await p.toca('#grid-dest .vcard >> nth=0'); await espera(p);
       ok((await p.pagina()) === 'ficha' && (await p.textContent('.ficha h1')).length > 2 && !(await p.textContent('#page-ficha')).match(/reseña/i), `${w} lugares: abre la ficha (sin reseñas inventadas)`);
+      ok((await p.locator('#book .cupo').count()) === 7 && (await p.locator('#book .slot').count()) === 0 && await p.isVisible('.reserva__hint') && !(await p.isVisible('#ir-pagar')) && /Servicios · Barbería/.test(await p.textContent('.ficha .eyebrow')), `${w} ficha: los siete días a lo ancho y todavía sin horarios ni aviso`);
+      await p.toca('#book .cupo[data-i="1"]'); await espera(p, 400);
+      ok((await p.locator('#book .slot').count()) > 0 && /Horarios de mañana/.test(await p.textContent('#book-panel h3')), `${w} ficha: al tocar un día aparecen sus horarios`);
       await p.limpio('ficha');
 
       // ---------- Resultados: filtros ----------
@@ -126,17 +131,17 @@ const medir = () => {
       await p.toca('#r-franjas .pill[data-k=""]'); await espera(p, 200);
       await p.limpio('resultados con filtros');
       await p.toca('.qslot >> nth=0'); await espera(p);
-      ok((await p.pagina()) === 'ficha' && (await p.locator('#book .slot.is-on').count()) === 1 && !(await p.isDisabled('#book [data-act="reservar"]')), `${w} resultados: el horario rápido abre la ficha listo para reservar`);
-      if (cel) ok(await p.isVisible('#mbar [data-act="reservar"]'), `${w} ficha: en el celular, la barra de abajo tiene "Reservar"`);
+      ok((await p.pagina()) === 'ficha' && (await p.locator('#book .slot.is-on').count()) === 1 && await p.isVisible('#ir-pagar [data-act="reservar"]'), `${w} resultados: el horario rápido abre la ficha con el aviso verde "Ir a pagar"`);
+      ok(await p.evaluate(() => getComputedStyle(document.querySelector('#ir-pagar')).backgroundColor === 'rgb(31, 160, 140)'), `${w} ficha: el aviso "Ir a pagar" es verde agua`);
 
       // ---------- Ficha: elegir y reservar ----------
-      await p.toca('#book .day[data-i="3"]'); await espera(p, 200);
-      ok((await p.getAttribute('#book .day[data-i="3"]', 'aria-pressed')) === 'true' && (await p.locator('#book .day.is-on').count()) === 1, `${w} ficha: cambia el día`);
+      await p.toca('#book .cupo[data-i="3"]'); await espera(p, 300);
+      ok((await p.getAttribute('#book .cupo[data-i="3"]', 'aria-pressed')) === 'true' && (await p.locator('#book .cupo.is-on').count()) === 1, `${w} ficha: cambia el día`);
       await p.toca('#book .slot:not([disabled]) >> nth=0'); await espera(p, 200);
       if (await p.locator('#book .unit').count()) { await p.toca('#book .unit >> nth=1'); await espera(p, 150); }
-      ok(/Seña ahora/.test(await p.textContent('#book .sum')), `${w} ficha: muestra la seña y lo que se paga en el lugar`);
+      ok(/seña \$/.test(await p.textContent('#ir-pagar')) && await p.isVisible('#ir-pagar'), `${w} ficha: el aviso muestra el día, la hora y la seña`);
       await p.limpio('ficha con horario');
-      await p.toca('#book [data-act="reservar"]'); await espera(p);
+      await p.toca('#ir-pagar [data-act="reservar"]'); await espera(p);
       ok((await p.pagina()) === 'pago' && (await p.locator('#pago-root .chk__turno').count()) === 1 && /Confirmá tu turno/.test(await p.textContent('#pago-root h1')), `${w} reservar: va directo a pagar la seña de ese turno`);
       const reloj0 = await p.textContent('#pago-root .reloj b');
       ok(/^(10:00|09:5\d)$/.test(reloj0), `${w} pago: el turno queda guardado 10 minutos (${reloj0})`);
@@ -246,7 +251,7 @@ const medir = () => {
           envivo: Math.floor(document.querySelector('#libres .eyebrow').getBoundingClientRect().top) };
       });
       ok(r.fin <= r.ve && r.rotulo, `${w}x${h} primer pantallazo: "¿Qué querés reservar?" y "Buscar turnos" entran sin bajar (termina en ${r.fin}, se ve hasta ${r.ve})`);
-      if (w <= 820) ok(r.envivo >= r.ve - 1, `${w}x${h} celular: la pantalla termina justo después del buscador, "En vivo" aparece al bajar (empieza en ${r.envivo})`);
+      ok(r.envivo >= r.ve - 1, `${w}x${h} la pantalla termina en el buscador, "En vivo" aparece al bajar (empieza en ${r.envivo})`);
       await q.context().close();
     }
 
@@ -256,7 +261,7 @@ const medir = () => {
       await q.clock.install();
       await q.ir(B + 'reservar.html?rubro=padel&dia=1');
       await q.toca('.qslot >> nth=0'); await espera(q, 300);
-      await q.toca('#book [data-act="reservar"]'); await espera(q);
+      await q.toca('#ir-pagar [data-act="reservar"]'); await espera(q);
       await q.clock.fastForward('08:30'); await espera(q, 300);
       const poco = await q.evaluate(() => ({ t: document.querySelector('#pago-root .reloj b').textContent, naranja: document.querySelector('#pago-root .reloj').classList.contains('is-poco') }));
       ok(/^01:[23]\d$/.test(poco.t) && poco.naranja, `${w} turno guardado: a los 8 minutos y medio quedan ${poco.t} y el reloj se pone naranja`);
@@ -319,7 +324,7 @@ const medir = () => {
     p = await abrir(390, 844, { reducedMotion: 'reduce' });
     await p.ir(B + 'reservar.html?rubro=barberia&dia=1');
     await p.tap('.qslot >> nth=0'); await espera(p, 200);
-    await p.tap('#book [data-act="reservar"]'); await espera(p, 200);
+    await p.tap('#ir-pagar [data-act="reservar"]'); await espera(p, 200);
     await p.fill('#c-nombre', 'Leo'); await p.fill('#c-wa', '261 555 1234');
     await p.tap('[data-act="pay"]'); await p.waitForSelector('#page-turnos:not([hidden]) .tcard', { timeout: 3000 });
     ok(p.errs.length === 0, 'movimiento reducido: reserva completa y rápida, sin errores');

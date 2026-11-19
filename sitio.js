@@ -85,6 +85,13 @@
     tenis: { n: "Tenis", img: "tenis", un: "Cancha", uns: "canchas" },
     barberia: { n: "Barbería", img: "barberia", un: "Barbero", uns: "barberos" },
   };
+  // ---------- Secciones: Deportes y Servicios (pedido del dueño, 19/11) ----------
+  // Dos pestañas arriba del buscador que cambian toda la página: rubros, fotos, "Libres ahora", lugares y resultados.
+  const SECCIONES = {
+    deportes: { n: "Deportes", rubros: ["padel", "futbol", "tenis"], collage: ["canchas", "tenis2", "futbolnoche"] },
+    servicios: { n: "Servicios", rubros: ["barberia"], collage: ["barbero", "peine", "barberia"] },
+  };
+  const secDe = (rubro) => Object.keys(SECCIONES).find((k) => SECCIONES[k].rubros.includes(rubro)) || "deportes";
   const ZONAS = { tunuyan: "Tunuyán", tupungato: "Tupungato", "san-carlos": "San Carlos" };
   const P = (dia, noche, finde) => ({ dia, noche, finde });
   const cs = (n, techadas = []) => Array.from({ length: n }, (_, i) => `Cancha ${i + 1}` + (techadas.includes(i + 1) ? " · techada" : ""));
@@ -120,7 +127,7 @@
   // res: el turno que se está por pagar (uno solo). Queda guardado HOLD (10 minutos) mientras se paga la seña.
   // vencida: el último que se venció sin pagar (para ofrecer volver a reservarlo).
   const HOLD = 10 * 60e3;
-  const S = { page: "home", hs: "padel", rubro: "padel", zona: "", dia: 0, franja: "", techada: false, svc: "", nav: 0, ys: {}, f: null, res: store.get("reserva", null), vencida: null, turnos: store.get("turnos", []) };
+  const S = { page: "home", hs: "padel", rubro: "padel", zona: "", dia: 0, franja: "", techada: false, svc: "", nav: 0, ys: {}, f: null, sec: "deportes", ult: { deportes: "padel", servicios: "barberia" }, res: store.get("reserva", null), vencida: null, turnos: store.get("turnos", []) };
   const hoyKey = () => dayInfo(0).key;
   const diaDe = (key) => Math.round((Date.parse(key) - Date.parse(hoyKey())) / 864e5); // 0 = hoy
   const vigente = () => (S.res && S.res.vence > Date.now() ? S.res : null);
@@ -175,10 +182,11 @@
     if (page === "ficha") {
       const v = venue(st.v); if (!v) return go("home", {}, true);
       const svc0 = v.svcs.find((s) => s.id === S.svc) || v.svcs[0];
-      S.f = { v: v.id, dia: st.dia ?? 0, svc: svc0.id, t: st.t || null, unit: "any" };
+      S.f = { v: v.id, dia: st.dia ?? 0, abierto: st.dia != null, svc: svc0.id, t: st.t || null, unit: "any" };
       if (S.f.t && !slotsFor(v, S.f.dia).some((s) => s.t === S.f.t && s.libres.length)) S.f.t = null;
     }
     S.page = page;
+    document.body.classList.remove("con-irpagar");
     $$(".page").forEach((el) => (el.hidden = el.dataset.page !== page));
     ({ home: renderHome, resultados: renderResultados, ficha: renderFicha, pago: renderPago, turnos: renderTurnos, negocios: () => {} })[page](st);
     pintarHold();
@@ -205,16 +213,43 @@
   };
   const franjaOpts = (rubro) => `<option value="">Todo el día</option>` + franjasDe(rubro).map((f) => `<option value="${f}">${FRANJAS[f]}</option>`).join("");
   // Buscador del home (selects)
+  // Las dos secciones (Deportes | Servicios): el mismo control en el buscador, en "Libres ahora" y en los resultados
+  const secsHTML = () => `<div class="secs" role="group" aria-label="Sección">${Object.entries(SECCIONES).map(([k, s]) => `<button type="button" data-act="sec" data-k="${k}" aria-pressed="${k === S.sec}">${s.n}</button>`).join("")}</div>`;
   function renderBuscador() {
-    $("#f-rubros").innerHTML = Object.entries(RUBROS).map(([k, r]) => `<button type="button" class="rubro" data-act="tile" data-k="${k}" aria-pressed="${k === S.rubro}">${img(r.img, "")}<span class="rubro__n">${r.n}</span></button>`).join("");
+    const rs = SECCIONES[S.sec].rubros, fr = $("#f-rubros");
+    fr.dataset.n = rs.length;
+    // la fila de fotos mide siempre lo mismo: con tres rubros el primero va más ancho; con uno o dos, un molde invisible fija el alto
+    fr.innerHTML = rs.map((k) => `<button type="button" class="rubro" data-act="tile" data-k="${k}" aria-pressed="${k === S.rubro}">${img(RUBROS[k].img, "")}<span class="rubro__n">${RUBROS[k].n}</span></button>`).join("")
+      + (rs.length <= 2 ? `<span class="rubro rubro--molde" aria-hidden="true"></span>` : "");
+    $("#f-secs").innerHTML = secsHTML();
     $("#f-zona").innerHTML = zonaOpts(S.rubro); $("#f-zona").value = S.zona;
     $("#f-dia").innerHTML = Array.from({ length: 7 }, (_, i) => `<option value="${i}">${dayFull(i)}</option>`).join(""); $("#f-dia").value = S.dia;
     $("#f-franja").innerHTML = franjaOpts(S.rubro); $("#f-franja").value = S.franja;
+    pintarCollage();
+  }
+  // Las tres fotos de al lado del buscador son de la sección elegida
+  let collageDe = "";
+  function pintarCollage() {
+    if (S.sec === collageDe) return;
+    const primera = !collageDe; collageDe = S.sec;
+    $$(".collage img").forEach((im, i) => {
+      const src = IMG[SECCIONES[S.sec].collage[i]];
+      if (im.getAttribute("src") === src) return;
+      im.src = src;
+      if (!primera) { im.classList.remove("is-cambia"); void im.offsetWidth; im.classList.add("is-cambia"); }
+    });
+  }
+  function elegirSeccion(k) {
+    if (!SECCIONES[k]) return;
+    elegirRubro(S.ult[k]);
+    S.hs = S.rubro;
+    if (S.page === "home") renderDestacados();
   }
   // Libres ahora + lugares, con switch de categoría
   function renderDestacados() {
+    if (!SECCIONES[S.sec].rubros.includes(S.hs)) S.hs = S.rubro;
     const k = S.hs, R = RUBROS[k];
-    $("#hs-switch").innerHTML = Object.entries(RUBROS).map(([key, r]) => `<button type="button" class="pill" data-act="hs" data-k="${key}" aria-pressed="${key === k}">${r.n}</button>`).join("");
+    $("#hs-switch").innerHTML = secsHTML() + `<span class="sep" aria-hidden="true"></span>` + SECCIONES[S.sec].rubros.map((key) => `<button type="button" class="pill" data-act="hs" data-k="${key}" aria-pressed="${key === k}">${RUBROS[key].n}</button>`).join("");
     const vs = VENUES.filter((v) => v.rubro === k);
     $("#rail-now").innerHTML = proximos(k).map(slotCard).join("") || `<p style="color:var(--ink-500)">Por ahora no quedan turnos de ${R.n.toLowerCase()}. Probá con otro día en el buscador.</p>`;
     $("#dest-t").textContent = `${R.n}: para reservar hoy`;
@@ -253,7 +288,7 @@
   function renderResultados() { listaResultados(); revelar($("#r-list")); }
   function listaResultados() {
     const R = RUBROS[S.rubro], vs0 = VENUES.filter((v) => v.rubro === S.rubro);
-    $("#r-rubros").innerHTML = Object.entries(RUBROS).map(([k, r]) => `<button type="button" class="pill" data-act="tile" data-k="${k}" aria-pressed="${k === S.rubro}">${r.n}</button>`).join("")
+    $("#r-rubros").innerHTML = secsHTML() + `<span class="sep" aria-hidden="true"></span>` + SECCIONES[S.sec].rubros.map((k) => `<button type="button" class="pill" data-act="tile" data-k="${k}" aria-pressed="${k === S.rubro}">${RUBROS[k].n}</button>`).join("")
       + (extraHTML() ? `<span class="sep" aria-hidden="true"></span>${extraHTML().replace(/chipx/g, "pill")}` : "");
     $("#r-dias").innerHTML = Array.from({ length: 7 }, (_, i) => { const d = dayInfo(i); return `<button type="button" class="day${i === S.dia ? " is-on" : ""}" data-act="dia-h" data-i="${i}" aria-pressed="${i === S.dia}"><span>${dayShort(i)}</span><b>${d.d}</b></button>`; }).join("");
     $("#r-franjas").innerHTML = franjasHTML(S.rubro).replace(/chipx/g, "pill");
@@ -277,6 +312,7 @@
         <div class="rcard__foot"><button type="button" class="link" data-act="ficha" data-v="${v.id}" data-dia="${S.dia}">${sl.length > 6 ? `Ver los ${sl.length} horarios` : "Ver el lugar"}</button></div></div></article>`).join("");
   }
   function elegirRubro(k) {
+    S.sec = secDe(k); S.ult[S.sec] = k;
     if (S.rubro !== k) { S.rubro = k; S.techada = false; S.svc = ""; S.franja = ""; if (S.zona && !VENUES.some((v) => v.rubro === k && v.zona === S.zona)) S.zona = ""; }
     S.page === "resultados" ? renderResultados() : renderBuscador();
   }
@@ -297,22 +333,23 @@
     const filas = v.rubro === "barberia"
       ? v.svcs.map((s) => `<tr><th scope="row">${s.n}<small>${s.min} min</small></th><td>${money(s.p.dia)}</td></tr>`).join("")
       : `<tr><th scope="row">Lun a vie · hasta las 20<small>seña ${money(senaDe(sv0.p.dia))}</small></th><td>${money(sv0.p.dia)}</td></tr><tr><th scope="row">Lun a vie · desde las 20<small>seña ${money(senaDe(sv0.p.noche))}</small></th><td>${money(sv0.p.noche)}</td></tr><tr><th scope="row">Sáb y dom<small>seña ${money(senaDe(sv0.p.finde))}</small></th><td>${money(sv0.p.finde)}</td></tr>`;
+    // Todo a lo ancho (pedido del dueño, 19/11): fotos, días y, al tocar un día, sus horarios. El resto, en dos columnas.
     $("#ficha-root").innerHTML = `
       <a class="back" href="#" data-act="back"><svg class="icon"><use href="#i-back"/></svg>Volver</a>
       <div class="ficha">
         <div class="ficha__head">
-          <p class="eyebrow">${R.n}</p><h1>${esc(v.name)}</h1>
-          <div class="facts"><span><svg class="icon"><use href="#i-pin"/></svg>${ZONAS[v.zona]}</span><span><svg class="icon"><use href="#i-clock"/></svg>Turnos de ${v.dur} min</span><span><svg class="icon"><use href="#i-shield"/></svg>Seña ${Math.round(SENA * 100)} %</span></div>
-          <div class="gal${fotos.length < 2 ? " is-solo" : fotos.length === 2 ? " is-duo" : ""}">${fotos.map((k) => `<figure>${img(k, "")}</figure>`).join("")}</div>
+          <div><p class="eyebrow">${SECCIONES[secDe(v.rubro)].n} · ${R.n}</p><h1>${esc(v.name)}</h1>
+          <div class="facts"><span><svg class="icon"><use href="#i-pin"/></svg>${ZONAS[v.zona]}</span><span><svg class="icon"><use href="#i-clock"/></svg>Turnos de ${v.dur} min</span><span><svg class="icon"><use href="#i-shield"/></svg>Seña ${Math.round(SENA * 100)} %</span></div></div>
+          <p class="ficha__desde"><small>desde</small><b>${money(minPrecio(v))}</b><span>por turno</span></p>
         </div>
-        <aside class="ficha__side"><div class="book" id="book"></div></aside>
+        <div class="gal${fotos.length < 2 ? " is-solo" : fotos.length === 2 ? " is-duo" : ""}">${fotos.map((k) => `<figure>${img(k, "")}</figure>`).join("")}</div>
+        <section class="reserva" id="book" aria-labelledby="book-t"></section>
         <div class="ficha__rest">
-          <div class="blk"><h2>Cupos de la semana</h2><div class="cupos" id="cupos"></div><p class="note">Tocá un día para ver sus horarios. Cada horario tiene su propio cupo.</p></div>
           <div class="blk"><h2>Sobre el lugar</h2><p>${esc(v.desc)} ${v.units.length} ${R.uns}: ${v.units.map(esc).join(", ")}.</p></div>
           <div class="blk"><h2>Lo que ofrece</h2><ul class="ame">${v.ame.map((k) => `<li>${AMI}${AM[k]}</li>`).join("")}</ul></div>
           <div class="blk"><h2>${v.rubro === "barberia" ? "Servicios y precios" : "Precios por horario"}</h2><table class="ptable"><caption class="sr-only">Precios</caption><tbody>${filas}</tbody></table></div>
           <div class="blk"><h2>Dónde queda</h2><div class="mapbox">${mapSVG(v.id)}<div class="mapbox__t"><b>${ZONAS[v.zona]}</b>Valle de Uco, Mendoza</div></div><p class="mapnote">Ubicación aproximada. La dirección exacta te llega al confirmar el turno.</p></div>
-          <div class="blk"><h2>Información adicional</h2><dl class="dl">
+          <div class="blk blk--ancho"><h2>Información adicional</h2><dl class="dl">
             <div><dt>Horarios</dt><dd>Todos los días · ${horarios(v)}</dd></div>
             <div><dt>Llegada</dt><dd>Llegá 10 minutos antes para empezar a horario.</dd></div>
             <div><dt>Pagos</dt><dd>Seña del ${Math.round(SENA * 100)} % online con Mercado Pago. El resto lo abonás en el lugar.</dd></div>
@@ -321,39 +358,39 @@
             <span class="demo">Negocio de ejemplo · demo</span></div>
         </div>
       </div>
-      <div class="mbar" id="mbar"></div>`;
+      <div class="irpagar" id="ir-pagar" role="region" aria-label="Turno elegido" hidden></div>`;
     renderBook();
   }
-  function renderCupos() {
-    const v = venue(S.f.v);
-    $("#cupos").innerHTML = Array.from({ length: 7 }, (_, i) => {
-      const sl = slotsFor(v, i), n = sl.filter((s) => s.libres.length).length, tot = sl.length || 1, d = dayInfo(i);
-      return `<button type="button" class="cupo${i === S.f.dia ? " is-on" : ""}${n ? "" : " is-zero"}" data-act="f-dia" data-i="${i}" aria-pressed="${i === S.f.dia}"><span>${i === 0 ? "Hoy" : i === 1 ? "Mañ" : DOW3[d.dow]}</span><b>${d.d}</b><i style="--p:${Math.round((n / tot) * 100)}%"></i><small>${n ? `${n} libres` : "completo"}</small></button>`;
-    }).join("");
-  }
+  // Días a todo el ancho (con su cupo); al tocar uno, sus horarios abajo; con un horario elegido, el aviso verde "Ir a pagar"
   function renderBook() {
     const v = venue(S.f.v), f = S.f, R = RUBROS[v.rubro], di = dayInfo(f.dia), svc = curSvc();
-    const sl = slotsFor(v, f.dia), sel = sl.find((s) => s.t === f.t && s.libres.length);
+    const sl = slotsFor(v, f.dia), sel = f.abierto ? sl.find((s) => s.t === f.t && s.libres.length) : null;
     if (!sel) f.t = null;
-    const grupos = ["manana", "tarde", "noche"].map((g) => [g, sl.filter((s) => s.franja === g)]).filter(([, a]) => a.length);
-    const precio = sel ? precioDe(svc, di, sel.start) : null, sena = precio ? senaDe(precio) : 0;
     if (sel && f.unit !== "any" && !sel.libres.includes(f.unit)) f.unit = "any";
-    const unitTxt = sel ? (f.unit === "any" ? sel.libres[0] : f.unit) : "";
+    const dias = Array.from({ length: 7 }, (_, i) => {
+      const s7 = slotsFor(v, i), n = s7.filter((s) => s.libres.length).length, tot = s7.length || 1, d = dayInfo(i), on = f.abierto && i === f.dia;
+      return `<button type="button" class="cupo${on ? " is-on" : ""}${n ? "" : " is-zero"}" data-act="f-dia" data-i="${i}" aria-pressed="${on}"><span>${i === 0 ? "Hoy" : i === 1 ? "Mañana" : DOW3[d.dow]}</span><b>${d.d}</b><i style="--p:${Math.round((n / tot) * 100)}%"></i><small>${n ? `${n} ${n === 1 ? "libre" : "libres"}` : "Completo"}</small></button>`;
+    }).join("");
+    const grupos = ["manana", "tarde", "noche"].map((g) => [g, sl.filter((s) => s.franja === g)]).filter(([, a]) => a.length);
+    const titulo = f.dia < 2 ? `Horarios de ${diaCorto(f.dia)}` : `Horarios del ${DOWL[di.dow]} ${di.d}/${di.m}`;
+    const panel = !f.abierto ? `<p class="reserva__hint">Tocá un día para ver sus horarios libres.</p>` : `
+      <div class="reserva__panel" id="book-panel">
+        <div class="reserva__ph"><h3>${titulo}</h3>${v.svcs.length > 1 ? `<label class="reserva__svc"><span class="eyebrow">Servicio</span><select class="sel" id="f-svc">${v.svcs.map((s) => `<option value="${s.id}"${s.id === f.svc ? " selected" : ""}>${s.n} · ${s.min} min · ${money(precioDe(s, di, 18 * 60))}</option>`).join("")}</select></label>` : ""}</div>
+        ${sl.length ? grupos.map(([g, a]) => `${grupos.length > 1 ? `<p class="slots__g">${FRANJAS[g]}</p>` : ""}<div class="slots">${a.map((s) => `<button type="button" class="slot${s.t === f.t ? " is-on" : ""}" data-act="f-slot" data-t="${s.t}" ${s.libres.length ? "" : "disabled"} aria-pressed="${s.t === f.t}"><b>${s.t}</b><small class="${s.libres.length === 1 ? "last" : ""}">${s.libres.length ? quedan(s, v) : "Completo"}</small></button>`).join("")}</div>`).join("") : `<p class="book__empty">Ya no quedan turnos para ${dayFull(f.dia).toLowerCase()}. Probá otro día.</p>`}
+        ${sel && sel.libres.length > 1 ? `<div class="reserva__units"><span class="eyebrow">${R.un}</span><div class="units" role="group" aria-label="${R.un}"><button type="button" class="unit${f.unit === "any" ? " is-on" : ""}" data-act="f-unit" data-u="any">Cualquiera</button>${sel.libres.map((u) => `<button type="button" class="unit${f.unit === u ? " is-on" : ""}" data-act="f-unit" data-u="${esc(u)}">${esc(u)}</button>`).join("")}</div></div>` : ""}
+      </div>`;
     $("#book").innerHTML = `
-      <div class="book__price"><b>${money(precio ?? minPrecio(v))}</b><span>${precio ? "el turno" : "desde, por turno"}</span></div>
-      <span class="eyebrow book__l" style="margin-top:0">Día</span>
-      <div class="days" role="group" aria-label="Día">${Array.from({ length: 7 }, (_, i) => { const d = dayInfo(i); return `<button type="button" class="day${i === f.dia ? " is-on" : ""}" data-act="f-dia" data-i="${i}" aria-pressed="${i === f.dia}"><span>${dayShort(i)}</span><b>${d.d}</b></button>`; }).join("")}</div>
-      ${v.svcs.length > 1 ? `<label class="book__l eyebrow" for="f-svc" style="margin-bottom:6px">Servicio</label><select class="sel" id="f-svc">${v.svcs.map((s) => `<option value="${s.id}"${s.id === f.svc ? " selected" : ""}>${s.n} · ${s.min} min · ${money(precioDe(s, di, 18 * 60))}</option>`).join("")}</select>` : ""}
-      <span class="eyebrow book__l">Horario</span>
-      ${sl.length ? grupos.map(([g, a]) => `${grupos.length > 1 ? `<p class="slots__g">${FRANJAS[g]}</p>` : ""}<div class="slots">${a.map((s) => `<button type="button" class="slot${s.t === f.t ? " is-on" : ""}" data-act="f-slot" data-t="${s.t}" ${s.libres.length ? "" : "disabled"} aria-pressed="${s.t === f.t}"><b>${s.t}</b><small class="${s.libres.length === 1 ? "last" : ""}">${s.libres.length ? quedan(s, v) : "Completo"}</small></button>`).join("")}</div>`).join("") : `<p class="book__empty">Ya no quedan turnos para ${dayFull(f.dia).toLowerCase()}. Probá otro día.</p>`}
-      ${sel && sel.libres.length > 1 ? `<span class="eyebrow book__l">${R.un}</span><div class="units" role="group" aria-label="${R.un}"><button type="button" class="unit${f.unit === "any" ? " is-on" : ""}" data-act="f-unit" data-u="any">Cualquiera</button>${sel.libres.map((u) => `<button type="button" class="unit${f.unit === u ? " is-on" : ""}" data-act="f-unit" data-u="${esc(u)}">${esc(u)}</button>`).join("")}</div>` : ""}
-      ${sel ? `<div class="sum"><div><span>${esc(unitTxt)} · ${keyLabel(di.key)} · ${sel.t}–${sel.end}</span></div><div><span>Seña ahora (${Math.round(SENA * 100)} %)</span><b>${money(sena)}</b></div><div><span>En el lugar</span><b>${money(precio - sena)}</b></div></div>` : ""}
-      <button type="button" class="btn btn--primary btn--lg btn--block" data-act="reservar" ${sel ? "" : "disabled"}>${sel ? "Reservar turno" : "Elegí un horario"}</button>
-      <p class="book__hint">Todavía no se cobra nada.</p>`;
-    $("#mbar").innerHTML = sel
-      ? `<div class="mbar__t"><b>${money(sena)} <span style="display:inline;font-weight:400">de seña</span></b><span>${keyLabel(di.key)} · ${sel.t} · ${esc(unitTxt)}</span></div><button type="button" class="btn btn--primary" data-act="reservar">Reservar</button>`
-      : `<div class="mbar__t"><b>Desde ${money(minPrecio(v))}</b><span>Elegí día y horario</span></div><button type="button" class="btn btn--primary" data-act="scroll-book">Ver horarios</button>`;
-    renderCupos();
+      <div class="reserva__top"><div><p class="eyebrow">Reservá tu turno</p><h2 id="book-t">Elegí el día</h2></div><p class="reserva__nota">Cada horario tiene su propio cupo. Al reservar, te lo guardamos 10 minutos para pagar la seña.</p></div>
+      <div class="cupos" role="group" aria-label="Día">${dias}</div>${panel}`;
+    // El aviso verde de abajo: aparece solo con un horario elegido y no tapa la lectura
+    const ir = $("#ir-pagar");
+    if (sel) {
+      const precio = precioDe(svc, di, sel.start), sena = senaDe(precio), unitTxt = f.unit === "any" ? sel.libres[0] : f.unit;
+      ir.innerHTML = `<div class="irpagar__t"><b>${keyLabel(di.key)} · ${sel.t}</b><span>${esc(unitTxt)}${v.svcs.length > 1 ? " · " + esc(svc.n) : ""} · seña ${money(sena)} · ${money(precio)} el turno · hasta las ${sel.end}</span></div><button type="button" class="btn irpagar__btn" data-act="reservar">Ir a pagar<svg class="icon" aria-hidden="true"><use href="#i-back"/></svg></button>`;
+      if (ir.hidden) { ir.hidden = false; void ir.offsetWidth; }
+      ir.classList.add("is-on");
+    } else { ir.hidden = true; ir.classList.remove("is-on"); }
+    document.body.classList.toggle("con-irpagar", !!sel);
   }
   function reservar() {
     const v = venue(S.f.v), f = S.f, di = dayInfo(f.dia), svc = curSvc(), r = vigente();
@@ -543,20 +580,25 @@
       switch (a) {
         case "tile": elegirRubro(d.k); break;
         case "hs": S.hs = d.k; renderDestacados(); break;
+        case "sec": elegirSeccion(d.k); break;
         case "dia-h": S.dia = +d.i; refrescar(); break;
         case "franja-h": S.franja = d.k; refrescar(); break;
         case "zona-h": S.zona = d.k; refrescar(); break;
         case "techada-h": S.techada = !S.techada; refrescar(); break;
         case "svc-h": S.svc = d.k; refrescar(); break;
         case "reset-f": S.zona = ""; S.franja = ""; S.techada = false; S.svc = ""; S.dia = 0; refrescar(); break;
-        case "ficha": go("ficha", { v: d.v, dia: d.dia ? +d.dia : 0 }); break;
+        case "ficha": go("ficha", { v: d.v, dia: d.dia !== undefined ? +d.dia : null }); break;
         case "open-slot": go("ficha", { v: d.v, dia: +d.dia, t: d.t }); break;
         case "back": e.preventDefault(); if (S.nav > 0) history.back(); else go("home", { restore: true }); break;
-        case "f-dia": S.f.dia = +d.i; renderBook(); break;
+        case "f-dia": {
+          S.f.dia = +d.i; S.f.abierto = true; renderBook();
+          const pn = $("#book-panel");
+          if (pn) { pn.classList.add("aparece"); pn.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "nearest" }); }
+          break;
+        }
         case "f-slot": S.f.t = d.t; S.f.unit = "any"; renderBook(); break;
         case "f-unit": S.f.unit = d.u; renderBook(); break;
         case "reservar": reservar(); break;
-        case "scroll-book": $("#book").scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" }); break;
         case "pay": pagar(); break;
         case "cambiar": { const x = vigente(); if (x) go("ficha", { v: x.vid, dia: diaDe(x.key), t: x.t }); break; }
         case "otra-vez": otraVez(); break;
@@ -630,7 +672,7 @@
   const inicial = (() => {
     const q = new URLSearchParams(location.search), h = location.hash.slice(1);
     if (RUBROS[q.get("rubro")]) {
-      S.rubro = S.hs = q.get("rubro");
+      S.rubro = S.hs = q.get("rubro"); S.sec = secDe(S.rubro); S.ult[S.sec] = S.rubro;
       if (ZONAS[q.get("zona")]) S.zona = q.get("zona");
       const d = parseInt(q.get("dia"), 10); if (d >= 0 && d < 7) S.dia = d;
       if (q.get("franja") && FRANJAS[q.get("franja")]) S.franja = q.get("franja");

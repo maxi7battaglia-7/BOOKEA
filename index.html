@@ -10,7 +10,7 @@
   <link rel="icon" href="marca/isotipo-32.png" sizes="32x32" type="image/png" />
   <link rel="apple-touch-icon" href="marca/isotipo-192.png" />
   <link rel="preload" href="assets/fuentes/inter-tight.woff2" as="font" type="font/woff2" crossorigin />
-  <link rel="stylesheet" href="sitio.css?v=13" />
+  <link rel="stylesheet" href="sitio.css?v=14" />
 </head>
 <body>
   <script>document.documentElement.classList.add("js");</script>
@@ -96,7 +96,7 @@
             <p class="hero__lead">Los horarios libres de canchas, barberías y otros negocios con turnos, en un solo lugar.<span class="lead__mas"> Elegís, pagás la seña y listo: sin llamar, sin esperar respuesta.</span></p>
 
             <form class="finder" id="finder" aria-label="Buscar turnos">
-              <span class="eyebrow finder__k" id="f-k">¿Qué querés reservar?</span>
+              <div class="finder__top"><span class="eyebrow finder__k" id="f-k">¿Qué querés reservar?</span><div id="f-secs"></div></div>
               <div class="rubros" role="group" aria-labelledby="f-k" id="f-rubros"></div>
               <noscript><p class="finder__note">Para buscar y reservar turnos, activá JavaScript en tu navegador.</p></noscript>
               <div class="frow">
@@ -341,7 +341,7 @@
   <dialog id="dlg"><h2 id="dlg-t"></h2><p id="dlg-p"></p><div class="row"><button class="btn btn--line" type="button" id="dlg-no">Volver</button><button class="btn btn--primary" type="button" id="dlg-si">Confirmar</button></div></dialog>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-  <script src="sitio.js?v=13"></script>
-  <script src="toque.js?v=13"></script>
+  <script src="sitio.js?v=14"></script>
+  <script src="toque.js?v=14"></script>
 </body>
 </html>

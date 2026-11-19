@@ -204,8 +204,60 @@ h1, h2, h3 { font-weight: 600; letter-spacing: -.03em; line-height: 1.05; text-w
 /* ---------- Ficha del lugar ---------- */
 .back { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 500; color: var(--ink-600); padding: 18px 0 14px; }
 .back:hover { color: var(--ink-900); }
-.ficha { display: grid; gap: 8px 56px; padding-bottom: 120px; grid-template-areas: 'head' 'side' 'rest'; grid-template-columns: minmax(0, 1fr); }
-.ficha__head { grid-area: head; min-width: 0; } .ficha__rest { grid-area: rest; min-width: 0; } .ficha__side { grid-area: side; margin-block: 16px; }
+.ficha { display: grid; grid-template-columns: minmax(0, 1fr); padding-bottom: 150px; }
+.ficha > * { min-width: 0; }
+.ficha__head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 32px; }
+.ficha__desde { display: grid; justify-items: end; line-height: 1.1; padding-bottom: 2px; }
+.ficha__desde small { font: 500 11px var(--f-mono); letter-spacing: .07em; text-transform: uppercase; color: var(--ink-500); }
+.ficha__desde b { font: 600 clamp(26px, 2.6vw, 32px) var(--f-mono); letter-spacing: -.04em; }
+.ficha__desde span { font-size: 14px; color: var(--ink-500); }
+.ficha > .gal { margin: 22px 0 0; height: clamp(220px, min(30vw, 100vh - 500px), 460px); }
+@supports (height: 100svh) { .ficha > .gal { height: clamp(220px, min(30vw, 100svh - 500px), 460px); } }
+.ficha__rest { margin-top: 34px; }
+@media (min-width: 900px) { .ficha__rest { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 56px; } .ficha__rest .blk--ancho { grid-column: 1 / -1; } }
+@media (max-width: 600px) { .ficha__desde { justify-items: start; } }
+/* Reservar: días a lo ancho con su cupo; al tocar uno, sus horarios en un panel a lo ancho (no una tarjeta al costado) */
+.reserva { margin-top: 30px; }
+.reserva__top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 8px 32px; margin-bottom: 16px; }
+.reserva__top h2 { font-size: clamp(26px, 2.8vw, 34px); letter-spacing: -.035em; margin-top: 6px; }
+.reserva__nota { color: var(--ink-500); font-size: 14.5px; max-width: 46ch; }
+.reserva .cupos { max-width: none; gap: 10px; }
+.reserva .cupo { padding: 12px 8px 13px; background: var(--paper); }
+.reserva .cupo span { font-size: 11px; }
+.reserva .cupo b { font: 600 clamp(22px, 2.2vw, 28px) var(--f-mono); letter-spacing: -.04em; margin-top: 2px; }
+.reserva .cupo small { font-size: 12.5px; }
+.reserva__hint { margin-top: 14px; padding: 18px 16px; border: 1px dashed var(--ink-300); border-radius: var(--r-l); text-align: center; color: var(--ink-500); }
+.reserva__panel { margin-top: 14px; padding: clamp(16px, 2vw, 24px); border-radius: var(--r-l); background: var(--ink-50); border: 1px solid var(--ink-100); }
+.reserva__ph { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 24px; margin-bottom: 14px; }
+.reserva__ph h3 { font-size: 21px; letter-spacing: -.025em; }
+.reserva__svc { display: flex; align-items: center; gap: 10px; }
+.reserva__svc .sel { height: 44px; border: 1px solid var(--ink-200); border-radius: var(--r-m); padding: 0 12px; background: var(--paper); font-weight: 500; max-width: 100%; }
+.reserva .slots { grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 10px; }
+.reserva .slot { padding: 11px 6px; background: var(--paper); }
+.reserva .slot b { font-size: 18px; }
+.reserva .slot small { font-size: 12px; }
+.reserva .slot.is-on { background: var(--accent-50); }
+.reserva .slots__g { margin: 16px 0 8px; }
+.reserva .slots__g:first-of-type { margin-top: 0; }
+.reserva__units { margin-top: 18px; display: grid; gap: 8px; }
+.reserva .unit { background: var(--paper); padding: 9px 14px; }
+.reserva .unit.is-on { background: var(--ink-900); }
+@media (max-width: 760px) {
+  .reserva .cupos { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(78px, 1fr); overflow-x: auto; scrollbar-width: none; margin-inline: calc(var(--pad) * -1); padding: 2px var(--pad) 4px; scroll-padding-inline: var(--pad); }
+  .reserva .cupos::-webkit-scrollbar { display: none; }
+  .reserva__panel { margin-inline: calc(var(--pad) * -1); border-radius: 0; border-inline: 0; padding-inline: var(--pad); }
+  .reserva .slots { grid-template-columns: repeat(auto-fill, minmax(86px, 1fr)); gap: 8px; }
+  .reserva__svc { width: 100%; } .reserva__svc .sel { flex: 1; min-width: 0; }
+}
+/* Con un horario elegido: aviso verde abajo, flotando, con "Ir a pagar" (pedido del dueño, 19/11) */
+.irpagar { position: fixed; z-index: 58; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); width: min(780px, calc(100% - 24px)); display: flex; align-items: center; gap: 16px; padding: 12px 12px 12px 22px; border-radius: var(--r-l); background: var(--ok); color: var(--ink-900); box-shadow: 0 18px 48px rgba(15, 94, 82, .32); transform: translate(-50%, calc(100% + 40px)); transition: transform .45s var(--ease-expo); }
+.irpagar.is-on { transform: translate(-50%, 0); }
+.irpagar__t { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.irpagar__t b { font: 600 17px var(--f-mono); letter-spacing: -.03em; }
+.irpagar__t span { font-size: 14px; color: rgba(17, 21, 28, .78); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.irpagar__btn { flex: none; min-height: 48px; padding: 0 22px; font-size: 16px; background: var(--ink-900); color: #fff; }
+.irpagar__btn:hover { background: var(--ink-800); }
+.irpagar__btn .icon { transform: rotate(180deg); width: 18px; height: 18px; }
 .gal { display: grid; gap: 10px; grid-template-columns: 2fr 1fr; grid-template-rows: 1fr 1fr; height: clamp(220px, 28vw, 340px); margin-bottom: 22px; }
 .gal figure { overflow: hidden; background: var(--ink-100); }
 .gal figure:first-child { grid-row: span 2; border-radius: var(--r-l) 0 0 var(--r-l); }
@@ -262,12 +314,7 @@ h1, h2, h3 { font-weight: 600; letter-spacing: -.03em; line-height: 1.05; text-w
 .mbar__t { flex: 1; min-width: 0; }
 .mbar__t b { display: block; font: 600 16px var(--f-mono); letter-spacing: -.03em; }
 .mbar__t span { display: block; font-size: 12.5px; color: var(--ink-500); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-@media (min-width: 980px) {
-  .ficha { grid-template-columns: minmax(0, 1fr) 380px; grid-template-areas: 'head side' 'rest side'; align-items: start; padding-bottom: 96px; }
-  .ficha__side { margin-block: 0; position: sticky; top: calc(var(--header-h) + 14px); max-height: calc(100vh - var(--header-h) - 28px); overflow: auto; border-radius: var(--r-l); }
-  .mbar { display: none; }
-}
-@media (max-width: 979px) { .book { box-shadow: none; } #page-ficha .tabbar { display: none; } }
+@media (min-width: 980px) { .mbar { display: none; } }
 
 /* ---------- Pagar la seña y Mis turnos ---------- */
 .pg { padding-block: 32px 96px; }
@@ -498,6 +545,10 @@ dialog .row { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wr
   .hold-bar__t > b { color: #fff; font-size: 14.5px; }
   .hold-bar__t span b { font: 600 13px var(--f-mono); color: var(--accent-claro); }
   body.con-hold { padding-bottom: 140px; }
+  .irpagar { bottom: calc(var(--tabbar-h, 57px) + 8px); width: calc(100% - 20px); gap: 10px; padding: 10px 10px 10px 16px; }
+  .irpagar__t b { font-size: 15.5px; } .irpagar__t span { font-size: 13px; }
+  .irpagar__btn { min-height: 46px; padding: 0 16px; font-size: 15px; }
+  body.con-irpagar .toast { bottom: 160px; }
   body.con-hold .toast { bottom: 150px; }
 }
 @media (max-width: 520px) {
@@ -541,7 +592,7 @@ dialog .row { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wr
 .switch-rubro { display: flex; gap: 8px; flex-wrap: wrap; }
 .rbar .sep { width: 1px; height: 22px; background: var(--ink-200); flex: none; }
 .rhead { padding-top: 22px; } .rhead h1 { font-size: clamp(28px, 3.6vw, 42px); letter-spacing: -.04em; } .rhead p { color: var(--ink-500); margin-top: 4px; }
-.ficha__head .gal { margin: 22px 0 0; }
+
 @media (max-width: 640px) { .switch-rubro { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-inline: calc(var(--pad) * -1); padding-inline: var(--pad); width: calc(100% + var(--pad) * 2); } .switch-rubro::-webkit-scrollbar { display: none; } }
 
 /* ---------- Pantallas táctiles: todo lo que se toca mide 44px o más ---------- */
@@ -597,6 +648,7 @@ dialog .row { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wr
   .hero h1 { font-size: 28px; }
   .rubro { aspect-ratio: 16 / 10; }
   .ff { padding-block: 5px 4px; }
+  .finder .finder__top { margin-bottom: 6px; }
 }
 
 /* =========================================================
@@ -615,6 +667,35 @@ dialog .row { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wr
 .splash.is-out { opacity: 0; visibility: hidden; transition: opacity 300ms ease, visibility 0s linear 300ms; }
 
 /* ---------- La B del logo, hasta el verde agua del barrido ---------- */
+/* ---------- Secciones: Deportes | Servicios (pedido del dueño, 19/11) ---------- */
+.secs { display: inline-flex; gap: 3px; padding: 3px; border-radius: 999px; background: var(--ink-100); flex: none; }
+.secs button { min-height: 32px; padding: 0 15px; border-radius: 999px; font-size: 14px; font-weight: 600; color: var(--ink-500); white-space: nowrap; transition: background-color .2s, color .2s, box-shadow .2s; }
+.secs button:hover { color: var(--ink-900); }
+.secs button[aria-pressed="true"] { background: var(--paper); color: var(--ink-900); box-shadow: 0 1px 2px rgba(17,21,28,.08), 0 0 0 1px var(--ink-200); }
+.finder__top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; min-height: 30px; }
+.finder__top .finder__k { margin: 0 0 0 2px; }
+.switch-rubro, #r-rubros { align-items: center; }
+/* Con menos de cuatro rubros la fila de fotos mide lo mismo: con tres, el primero ocupa dos lugares;
+   con uno o dos, un molde invisible (una foto común) fija el alto y las fotos se estiran a lo ancho. */
+.rubros[data-n] .rubro img { position: absolute; inset: 0; }
+.rubros[data-n="3"] .rubro:first-child { grid-row: 1; grid-column: 1 / span 2; aspect-ratio: auto; }
+.rubros[data-n="2"] .rubro:nth-child(1) { grid-row: 1; grid-column: 1 / span 2; aspect-ratio: auto; }
+.rubros[data-n="2"] .rubro:nth-child(2) { grid-row: 1; grid-column: 3 / span 2; aspect-ratio: auto; }
+.rubros[data-n="1"] .rubro:not(.rubro--molde) { grid-row: 1; grid-column: 1 / -1; aspect-ratio: auto; }
+.rubros[data-n] .rubro--molde { grid-row: 1; grid-column: 1; visibility: hidden; pointer-events: none; z-index: -1; }
+.rubros[data-n="1"] .rubro__n { font-size: 17px; left: 14px; bottom: 11px; }
+@media (max-width: 520px) {
+  /* en el celular, las pestañas ya dicen qué elegir: el rótulo queda solo para lectores de pantalla */
+  .finder__top .finder__k { position: absolute; width: 1px; height: 1px; white-space: nowrap; clip-path: inset(50%); }
+  #f-secs { flex: 1; } #f-secs .secs { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }
+}
+@media (pointer: coarse) { .secs button { min-height: 40px; } }
+/* En la compu también: el inicio ocupa justo la pantalla y "En vivo" aparece al bajar (pedido del dueño, 19/11) */
+@media (min-width: 821px) {
+  .hero { display: flex; flex-direction: column; justify-content: center; min-height: calc(100vh - var(--header-h) - 1px); }
+  @supports (height: 100svh) { .hero { min-height: calc(100svh - var(--header-h) - 1px); } }
+}
+
 @media (prefers-reduced-motion: no-preference) {
   /* 1) crece el asta  2) baja el verde y sube el naranja hasta la diagonal  3) aparece el nombre */
   .sp-asta { transform-origin: 50% 100%; animation: sp-asta 520ms var(--ease-expo) both; }
@@ -642,6 +723,11 @@ dialog .row { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wr
   .js .hero__lead { transition-delay: 480ms; }
   .js .finder { transition-delay: 580ms; }
   .js.is-ready .hero .eyebrow, .js.is-ready .hero__lead, .js.is-ready .finder { opacity: 1; transform: none; }
+  /* al cambiar de sección, las fotos de al lado se funden; al tocar un día, sus horarios suben */
+  .collage img.is-cambia { animation: cambiaFoto 700ms var(--ease-expo) both; }
+  @keyframes cambiaFoto { from { opacity: 0; transform: scale(1.08); } }
+  .reserva__panel.aparece { animation: aparece 480ms var(--ease-expo); }
+  @keyframes aparece { from { opacity: 0; transform: translateY(12px); } }
   /* las fotos se destapan de izquierda a derecha y se asientan */
   .js .collage figure { clip-path: inset(0 0 100% 0); transition: clip-path 1000ms var(--ease-expo); }
   .js .collage figure:nth-child(1) { transition-delay: 320ms; }
