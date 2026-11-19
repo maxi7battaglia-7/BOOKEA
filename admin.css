@@ -165,7 +165,7 @@
 
 /* ---------- Estructura ---------- */
 /* El lugar de la barra de desplazamiento queda siempre reservado: así una vista corta (Equipo) no se ve más ancha que las otras */
-html:has(.pa) { scrollbar-gutter: stable; }
+html:has(#panel:not([hidden])) { scrollbar-gutter: stable; }
 .panel { min-height: 100dvh; display: grid; grid-template-columns: 248px minmax(0, 1fr); }
 .lado {
   position: sticky; top: 0; height: 100dvh; overflow-y: auto; background: var(--fondo);
