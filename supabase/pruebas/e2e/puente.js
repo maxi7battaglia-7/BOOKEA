@@ -53,7 +53,8 @@ const filtros = (fs_) => {
 };
 
 const FUNCIONES = new Set(['revisar_negocio', 'crear_invitacion', 'ver_invitacion', 'aceptar_invitacion', 'anular_invitacion', 'cambiar_permisos', 'quitar_miembro',
-  'guardar_mis_datos', 'reservar_turno', 'cancelar_turno', 'borrar_mi_cuenta']); // las de los clientes de bookea.ar (cuenta.js)
+  'guardar_mis_datos', 'reservar_turno', 'cancelar_turno', 'borrar_mi_cuenta', // las de los clientes de bookea.ar (cuenta.js)
+  'lugares_publicos', 'horarios_ocupados']); // las que la página pide sin cuenta (los negocios de verdad y sus horarios ocupados)
 const consulta = async (q) => {
   if (q.op === 'rpc') {
     if (!FUNCIONES.has(q.fn)) return { error: { code: 'PGRST202', message: 'función' } };
@@ -149,6 +150,11 @@ http.createServer(async (req, res) => {
     if (url.pathname.startsWith('/api/auth/')) return json(await auth(url.pathname.slice(10), b));
     if (url.pathname === '/api/confirmar') { CONFIRMAR = !!b.si; return json({ ok: true }); }
     if (url.pathname === '/api/sql') return json(await psql(b.sql)); // para que la prueba mire la base por dentro
+    // Como la API de Supabase (PostgREST): lo que cuenta.js pide directo con fetch, sin cuenta (rol anon)
+    if (url.pathname.startsWith('/rest/v1/rpc/')) {
+      const r = await consulta({ op: 'rpc', fn: url.pathname.slice('/rest/v1/rpc/'.length), args: b });
+      return r.error ? json(r.error, r.error.code === 'PGRST202' ? 404 : 400) : json(r.data);
+    }
     return json({ error: 'ruta' }, 404);
   }
   if (url.pathname === '/api/recuperos') return json(recuperos);
@@ -157,7 +163,11 @@ http.createServer(async (req, res) => {
     return res.end(`window.BOOKEA_CONFIG = { supabaseUrl: "http://localhost:${PUERTO}", supabaseAnonKey: "clave-publica-de-prueba" };`);
   }
   const archivo = path.join(RAIZ, path.normalize(url.pathname === '/' ? '/index.html' : url.pathname)); // como GitHub Pages
-  if (!archivo.startsWith(RAIZ) || !fs.existsSync(archivo) || fs.statSync(archivo).isDirectory()) { res.writeHead(404); return res.end(); }
+  if (!archivo.startsWith(RAIZ) || !fs.existsSync(archivo) || fs.statSync(archivo).isDirectory()) {
+    // como GitHub Pages: una dirección que no existe muestra 404.html (bookea.ar/su-link lleva a la ficha del negocio)
+    res.writeHead(404, { 'content-type': 'text/html' });
+    return fs.createReadStream(path.join(RAIZ, '404.html')).pipe(res);
+  }
   res.writeHead(200, { 'content-type': TIPOS[path.extname(archivo)] || 'application/octet-stream' });
   fs.createReadStream(archivo).pipe(res);
 }).listen(PUERTO, () => console.log('puente en', PUERTO));

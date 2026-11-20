@@ -145,14 +145,23 @@ do $$ begin
 end $$;
 -- Turno en un negocio real: el mail lleva su dirección, "Cómo llegar" y su WhatsApp, tal como los cargó en Mi negocio
 insert into auth.users (email, raw_user_meta_data) values ('martin@prueba.com', '{"nombre":"Martín","negocio":"Los Álamos Pádel","rubro":"Pádel"}');
-update public.negocios set estado = 'aprobado', direccion = 'Av. San Martín 1234', ciudad = 'Tupungato', whatsapp = '0261 555-1234', mapa = ''
+update public.negocios set estado = 'aprobado', direccion = 'Av. San Martín 1234', ciudad = 'Tupungato', whatsapp = '0261 555-1234', mapa = '',
+  ajustes = jsonb_build_object(
+    'recursos', jsonb_build_array(jsonb_build_object('id', 'r1', 'nombre', 'Cancha 1', 'detalle', ''), jsonb_build_object('id', 'r2', 'nombre', 'Cancha 2', 'detalle', ''),
+                                  jsonb_build_object('id', 'r3', 'nombre', 'Cancha 3', 'detalle', '')),
+    'duracion', 90,
+    'horario', (select jsonb_agg(jsonb_build_object('abre', '09:00', 'cierra', '00:30', 'cerrado', false)) from generate_series(0, 6)),
+    'franjas', jsonb_build_array(jsonb_build_object('desde', '09:00', 'hasta', '17:00', 'precio', 24000),
+                                 jsonb_build_object('desde', '17:00', 'hasta', '20:00', 'precio', 28000),
+                                 jsonb_build_object('desde', '20:00', 'hasta', '00:30', 'precio', 34000)),
+    'senaPct', 25, 'cancelarHoras', 6, 'devolverSena', true)
  where email_dueno = 'martin@prueba.com';
 select set_config('prueba.neg', (select id::text from public.negocios where email_dueno = 'martin@prueba.com'), false) \g /dev/null
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000e1', false) \g /dev/null
 set role authenticated;
 do $$ begin
-  perform public.reservar_turno(jsonb_build_object('negocio_id', current_setting('prueba.neg'), 'lugar_id', 'x', 'lugar', 'Otro nombre', 'rubro', 'Pádel',
-    'cancha', 'Cancha 1', 'fecha', current_date + 8, 'hora', '19:00', 'fin', '20:30', 'precio', 34000, 'sena', 8500, 'cancelar_horas', 6));
+  perform set_config('prueba.turno_neg', (public.reservar_turno(jsonb_build_object('negocio_id', current_setting('prueba.neg'), 'recurso', 'r1',
+    'fecha_agenda', current_date + 8, 'minuto', 1170))) ->> 'id', false);
 end $$;
 reset role;
 do $$
@@ -161,38 +170,81 @@ begin
   assert public.codificar_url('Los Álamos, Av. 1') = 'Los%20%C3%81lamos%2C%20Av.%201', 'codificar_url: ' || public.codificar_url('Los Álamos, Av. 1');
   assert public.link_whatsapp('0261 555-1234') = 'https://wa.me/5492615551234' and public.link_whatsapp('+54 9 261 555 1234') = 'https://wa.me/5492615551234'
      and public.link_whatsapp('') is null, 'link_whatsapp';
-  select * into e from net.enviados order by id desc limit 1;
+  select * into e from net.enviados where body -> 'to' ->> 0 = 'juli@prueba.com' order by id desc limit 1;
   assert e.body ->> 'subject' like 'Turno confirmado: Los Álamos Pádel, %', 'el nombre del lugar sale de la base: ' || (e.body ->> 'subject');
   assert e.body ->> 'html' like '%>Av. San Martín 1234<br>%' and e.body ->> 'html' like '%Los Álamos Pádel · Tupungato%'
      and e.body ->> 'html' like '%https://www.google.com/maps/search/?api=1&amp;query=Los%20%C3%81lamos%20P%C3%A1del%2C%20Av.%20San%20Mart%C3%ADn%201234%2C%20Tupungato%'
      and e.body ->> 'html' like '%>Cómo llegar<%', 'falta la dirección o "Cómo llegar": ' || (e.body ->> 'html');
   assert e.body ->> 'html' like '%href="https://wa.me/5492615551234"%' and e.body ->> 'html' like '%>0261 555-1234<%', 'falta el WhatsApp: ' || (e.body ->> 'html');
+  assert e.body ->> 'html' like '%de 19:30 a 21:00%' and e.body ->> 'html' like '%$&nbsp;7.000%' and e.body ->> 'html' like '%hasta 6 h antes%'
+     and e.body ->> 'html' like '%Bookea está en prueba: la seña no se cobró.%' and e.body ->> 'html' not like '%son de ejemplo%', 'datos del turno: ' || (e.body ->> 'html');
   raise notice 'OK  turno en un negocio real: el mail lleva la dirección, "Cómo llegar" (Google Maps) y el WhatsApp de Mi negocio';
+  -- 6. Al negocio: turno nuevo, con el cliente y su WhatsApp
+  select * into e from net.enviados where body -> 'to' ->> 0 = 'martin@prueba.com' and body ->> 'subject' like 'Turno nuevo%' order by id desc limit 1;
+  assert e.body ->> 'subject' = 'Turno nuevo: Juli Paz, ' || public.fecha_larga(current_date + 8) || ' a las 19:30', 'asunto al negocio: ' || coalesce(e.body::text, 'no llegó');
+  assert e.body ->> 'html' like '%Tenés un turno nuevo%' and e.body ->> 'html' like '%Hola, Martín:%' and e.body ->> 'html' like '%>Juli Paz<%'
+     and e.body ->> 'html' like '%href="https://wa.me/5492615551234"%' and e.body ->> 'html' like '%>261 555 1234<%'
+     and e.body ->> 'html' like '%$&nbsp;28.000%' and e.body ->> 'html' like '%No se cobró (Bookea está en prueba)%'
+     and e.body ->> 'html' like '%https://bookea.ar/admin.html%', 'mail al negocio: ' || (e.body ->> 'html');
+  raise notice 'OK  turno nuevo: al negocio le llega el mail con el día, la cancha, el cliente y su WhatsApp';
+end $$;
+-- 5 y 7. El cliente cancela: le llega a él y al negocio
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000e1', false) \g /dev/null
+set role authenticated;
+do $$ begin perform public.cancelar_turno(current_setting('prueba.turno_neg')::uuid); end $$;
+reset role;
+do $$
+declare e record;
+begin
+  select * into e from net.enviados where body -> 'to' ->> 0 = 'juli@prueba.com' order by id desc limit 1;
+  assert e.body ->> 'html' like '%Cancelaste tu turno%' and e.body ->> 'html' like '%href="https://bookea.ar/?lugar=losalamospadel"%', 'al cliente: ' || (e.body ->> 'html');
+  select * into e from net.enviados where body -> 'to' ->> 0 = 'martin@prueba.com' order by id desc limit 1;
+  assert e.body ->> 'subject' = 'Turno cancelado: Juli Paz, ' || public.fecha_larga(current_date + 8) || ' a las 19:30'
+     and e.body ->> 'html' like '%Se canceló un turno%' and e.body ->> 'html' like '%El horario ya está libre en tu agenda%', 'al negocio: ' || e.body::text;
+  raise notice 'OK  el cliente cancela: le llega a él y al negocio, que tiene el horario libre';
+end $$;
+-- 5. El negocio cancela desde su panel: al cliente le llega que lo canceló el lugar (y al negocio no le llega nada)
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000e1', false) \g /dev/null
+set role authenticated;
+do $$ begin
+  perform set_config('prueba.turno_neg2', (public.reservar_turno(jsonb_build_object('negocio_id', current_setting('prueba.neg'), 'recurso', 'r2',
+    'fecha_agenda', current_date + 8, 'minuto', 1170))) ->> 'id', false);
+end $$;
+reset role;
+select set_config('prueba.mails_antes', (select count(*)::text from net.enviados), false) \g /dev/null
+update public.reservas set estado = 'cancelada', retenida = false where id = (select reserva_id from public.turnos where id = current_setting('prueba.turno_neg2')::uuid);
+do $$
+declare e record;
+begin
+  assert (select count(*) from net.enviados) = current_setting('prueba.mails_antes')::int + 1, 'el negocio canceló y salieron otros mails que el del cliente';
+  select * into e from net.enviados order by id desc limit 1;
+  assert e.body -> 'to' ->> 0 = 'juli@prueba.com' and e.body ->> 'html' like '%Los Álamos Pádel</b> canceló tu turno%' and e.body ->> 'html' like '%se te devuelve%',
+    'el lugar canceló: ' || e.body::text;
+  raise notice 'OK  el negocio cancela desde su panel: al cliente le llega que lo canceló el lugar';
 end $$;
 -- Con su propio link de Google Maps, se usa ese; un link que no es de Maps (o sin WhatsApp) no aparece
 update public.negocios set mapa = 'https://maps.app.goo.gl/AbC123' where email_dueno = 'martin@prueba.com';
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000e1', false) \g /dev/null
 set role authenticated;
 do $$ begin
-  perform public.reservar_turno(jsonb_build_object('negocio_id', current_setting('prueba.neg'), 'lugar_id', 'x', 'lugar', 'x',
-    'cancha', 'Cancha 2', 'fecha', current_date + 8, 'hora', '19:00', 'fin', '20:30', 'precio', 34000, 'sena', 8500));
+  perform public.reservar_turno(jsonb_build_object('negocio_id', current_setting('prueba.neg'), 'recurso', 'r3', 'fecha_agenda', current_date + 8, 'minuto', 1170));
 end $$;
 reset role;
 do $$ begin
-  assert (select body ->> 'html' from net.enviados order by id desc limit 1) like '%href="https://maps.app.goo.gl/AbC123"%', 'no usó el link de Maps del dueño';
+  assert (select body ->> 'html' from net.enviados where body -> 'to' ->> 0 = 'juli@prueba.com' order by id desc limit 1) like '%href="https://maps.app.goo.gl/AbC123"%', 'no usó el link de Maps del dueño';
 end $$;
-update public.negocios set mapa = 'javascript:alert(1)', whatsapp = '', direccion = '', ciudad = '' where email_dueno = 'martin@prueba.com';
+update public.negocios set mapa = 'javascript:alert(1)', whatsapp = '', direccion = '', ciudad = '', ajustes = ajustes || '{"devolverSena": false}' where email_dueno = 'martin@prueba.com';
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000e1', false) \g /dev/null
 set role authenticated;
 do $$ begin
-  perform public.reservar_turno(jsonb_build_object('negocio_id', current_setting('prueba.neg'), 'lugar_id', 'x', 'lugar', 'x',
-    'cancha', 'Cancha 3', 'fecha', current_date + 8, 'hora', '19:00', 'fin', '20:30', 'precio', 34000, 'sena', 8500));
+  perform public.reservar_turno(jsonb_build_object('negocio_id', current_setting('prueba.neg'), 'recurso', 'r3', 'fecha_agenda', current_date + 8, 'minuto', 1260));
 end $$;
 reset role;
 do $$
-declare h text := (select body ->> 'html' from net.enviados order by id desc limit 1);
+declare h text := (select body ->> 'html' from net.enviados where body -> 'to' ->> 0 = 'juli@prueba.com' order by id desc limit 1);
 begin
   assert h not like '%javascript:%' and h not like '%wa.me%' and h not like '%Cómo llegar%' and h like '%Cancha 3%', 'con datos vacíos o un link raro: ' || h;
+  assert h like '%en este lugar la seña no se devuelve%', 'un lugar que no devuelve la seña: ' || h;
   raise notice 'OK  con su propio link de Google Maps usa ese; sin datos (o con un link que no es de Maps) no muestra esas filas';
 end $$;
 -- si pg_net falla, registrarse sigue funcionando

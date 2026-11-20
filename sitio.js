@@ -1,6 +1,7 @@
 // Bookea — frente público: buscar → resultados → ficha del lugar → pagar la seña (el turno queda guardado 10 minutos) → Mis turnos,
 // y la parte para negocios ("Sumá tu negocio" sigue en admin.html?alta=1, el registro del panel).
-// Sin frameworks. Los negocios son ejemplos y el pago con Mercado Pago está simulado: no se cobra nada.
+// Sin frameworks. Los lugares de la lista son ejemplos; los negocios de verdad (de la base) se abren con su link
+// (bookea.ar/su-link). El pago con Mercado Pago todavía está simulado: no se cobra nada.
 // Links que siguen andando: index.html?rubro=padel&zona=&dia=0&franja= (y reservar.html, que redirige acá)
 // abre los resultados; #sumate, #como-funciona, #funciones y #preguntas abren la parte para negocios.
 (() => {
@@ -91,7 +92,7 @@
     deportes: { n: "Deportes", rubros: ["padel", "futbol", "tenis"], collage: ["canchas", "tenis2", "futbolnoche"] },
     servicios: { n: "Servicios", rubros: ["barberia"], collage: ["barbero", "peine", "barberia"] },
   };
-  const secDe = (rubro) => Object.keys(SECCIONES).find((k) => SECCIONES[k].rubros.includes(rubro)) || "deportes";
+  const secDe = (rubro) => (RUBROS[rubro] && RUBROS[rubro].sec) || Object.keys(SECCIONES).find((k) => SECCIONES[k].rubros.includes(rubro)) || "deportes";
   const ZONAS = { tunuyan: "Tunuyán", tupungato: "Tupungato", "san-carlos": "San Carlos" };
   const P = (dia, noche, finde) => ({ dia, noche, finde });
   const cs = (n, techadas = []) => Array.from({ length: n }, (_, i) => `Cancha ${i + 1}` + (techadas.includes(i + 1) ? " · techada" : ""));
@@ -117,10 +118,107 @@
     { id: "gaucho", rubro: "barberia", name: "Barbería El Gaucho", zona: "tupungato", fotos: ["peine", "barberia", "barbero"], dur: 45, bloques: [["10:00", "13:00"], ["17:00", "21:00"]], units: ["Tomás", "Beto"], svcs: BARB(11000, 15000, 8000), ocup: 30, cancel: 6, desc: "Barbería de barrio en el Valle de Uco. Reservá y no esperes.", ame: ["wifi", "mate", "qr"] },
   ];
   VENUES.forEach((v) => { v.svcs = v.svcs || [{ id: "turno", n: `Turno de ${v.dur} min`, min: v.dur, p: v.p }]; });
-  const venue = (id) => VENUES.find((v) => v.id === id);
+  // SOLO_LINK: negocios de verdad que se abren con su link (bookea.ar/su-link) pero todavía no van en la lista
+  const SOLO_LINK = [];
+  const venue = (id) => VENUES.find((v) => v.id === id) || SOLO_LINK.find((v) => v.id === id);
   const minPrecio = (v) => Math.min(...v.svcs.flatMap((s) => Object.values(s.p)));
-  const senaDe = (p) => Math.round((p * SENA) / 50) * 50;
-  const precioDe = (svc, di, start) => (di.finde ? svc.p.finde : start >= 20 * 60 ? svc.p.noche : svc.p.dia);
+
+  // ---------- Negocios de verdad: los de la base, con lo que cargaron en Mi negocio ----------
+  // Llegan de cuenta.js (lugares_publicos de supabase/esquema.sql) con id "n-" + su link. Los que ya cobran la seña con
+  // Mercado Pago van a la lista junto a los de ejemplo (si su rubro es uno del buscador); el de un link se abre aunque
+  // todavía no esté en la lista. Sus horarios, precios, seña y cancelación son los de su panel, y los horarios ocupados
+  // son los de su agenda (la base los manda sin decir de quién son).
+  const sinTildes = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+  const RUBRO_BASE = (t) => { const x = sinTildes(t); return /padel/.test(x) ? "padel" : /futbol|\bf5\b/.test(x) ? "futbol" : /tenis/.test(x) ? "tenis" : /barber/.test(x) ? "barberia" : ""; };
+  // Un rubro que no está en el buscador (por ejemplo, peluquería) se muestra con su nombre, sin sumarse al buscador
+  const rubroDe = (t) => {
+    const k = RUBRO_BASE(t); if (k) return k;
+    const x = sinTildes(t) || "turnos", key = "x-" + x.replace(/[^a-z0-9]+/g, "-").slice(0, 24), dep = /cancha|voley|basquet|hockey|squash|golf|deport/.test(x);
+    if (!RUBROS[key]) RUBROS[key] = { n: cap(String(t || "Turnos").trim()), img: dep ? "canchas" : "peine", un: dep ? "Cancha" : "Lugar", uns: dep ? "canchas" : "lugares", sec: dep ? "deportes" : "servicios" };
+    return key;
+  };
+  // La ciudad que cargó: una de las zonas del buscador o una nueva ("Otras zonas")
+  const zonaDe = (ciudad) => {
+    const c = String(ciudad || "").trim(), x = sinTildes(c), k = Object.keys(ZONAS).find((z) => sinTildes(ZONAS[z]) === x);
+    if (k) return k;
+    const key = "z-" + (x.replace(/[^a-z0-9]+/g, "-").slice(0, 30) || "sin-ciudad");
+    if (!ZONAS[key]) { ZONAS[key] = c || "Sin ciudad"; (REG["Otras zonas"] = REG["Otras zonas"] || []).push(key); }
+    return key;
+  };
+  const MAPS = /^https:\/\/((www\.)?google\.[a-z.]+\/maps|maps\.google\.[a-z.]+|maps\.app\.goo\.gl|goo\.gl\/maps)/i; // como el panel y los mails
+  const hhmm = (t) => (/^\d{1,2}:\d{2}$/.test(t || "") ? toMin(t) : null);
+  const sumarDia = (key, n) => new Date(Date.parse(key + "T00:00:00Z") + n * 864e5).toISOString().slice(0, 10);
+  // Los horarios ocupados: "cancha|fecha de la agenda|minuto"
+  const ocupDe = (lista) => new Set((lista || []).map(([rec, fecha, min]) => `${rec}|${String(fecha).slice(0, 10)}|${+min}`));
+  const lugarDeFila = (f) => {
+    const id = "n-" + f.slug, rubro = rubroDe(f.rubro), dur = Math.max(5, Math.round(+f.duracion) || 60), units = [], recIds = {};
+    (f.recursos || []).forEach((r) => {
+      let u = String(r.nombre || "").trim() || RUBROS[rubro].un;
+      if (String(r.detalle || "").trim()) u += " · " + String(r.detalle).trim().toLowerCase();
+      while (recIds[u]) u += " (2)";
+      units.push(u); recIds[u] = String(r.id);
+    });
+    const franjas = (f.franjas || []).map((x) => ({ desde: x.desde, hasta: x.hasta, precio: Math.max(0, Math.round(+x.precio) || 0) }));
+    const foto = /^data:image\/(png|jpe?g|webp);base64,[a-z0-9+/=]+$/i.test(f.foto || "") ? f.foto : "";
+    if (foto) IMG[id] = foto;
+    const p = {}; (franjas.length ? franjas : [{ precio: 0 }]).forEach((x, i) => (p[i] = x.precio));
+    return {
+      id, real: true, nid: f.id, slug: f.slug, publicado: !!f.publicado, rubro, name: String(f.nombre || ""), zona: zonaDe(f.ciudad),
+      fotos: foto ? [id] : [], dur, units, recIds, horario: Array.isArray(f.horario) ? f.horario : [], bloques: [],
+      senaPct: Math.max(0, Math.min(100, +f.senaPct || 0)), cancel: Math.max(0, Math.round(+f.cancelarHoras) || 0), devuelve: f.devolverSena !== false,
+      desc: String(f.descripcion || "").trim(), ame: [], direccion: String(f.direccion || "").trim(), ciudad: String(f.ciudad || "").trim(),
+      mapa: MAPS.test(f.mapa || "") ? f.mapa : "", ocup: ocupDe(f.ocupados),
+      svcs: [{ id: "turno", n: `Turno de ${dur} min`, min: dur, p, franjas }],
+    };
+  };
+  // Los minutos en que empieza cada turno de un día (los de ejemplo tienen el mismo horario todos los días; los de
+  // verdad, el de su panel, y un turno de las 00:30 que sigue a la noche es de ese mismo día de la agenda)
+  const iniciosDe = (v, dow) => {
+    const out = [];
+    if (!v.real) { v.bloques.forEach(([a, b]) => { for (let t = toMin(a); t + v.dur <= toMin(b); t += v.dur) out.push(t); }); return out; }
+    const h = v.horario[dow], a = h && !h.cerrado ? hhmm(h.abre) : null; let c = h ? hhmm(h.cierra) : null;
+    if (a === null || c === null) return out;
+    if (c <= a) c += 1440;
+    for (let t = a; t + v.dur <= c; t += v.dur) out.push(t);
+    return out;
+  };
+  // Precio: los de ejemplo, por día, noche y fin de semana; los de verdad, por sus franjas (igual que el panel y la base)
+  const precioFr = (franjas, min) => {
+    const m = min % 1440;
+    for (const f of franjas) {
+      const d = hhmm(f.desde) || 0; let h = hhmm(f.hasta) || 0; if (h <= d) h += 1440;
+      const mm = m < d ? m + 1440 : m;
+      if (mm >= d && mm < h) return f.precio;
+    }
+    return franjas.length ? franjas[franjas.length - 1].precio : 0;
+  };
+  const precioDe = (svc, di, start) => (svc.franjas ? precioFr(svc.franjas, start) : di.finde ? svc.p.finde : start >= 20 * 60 ? svc.p.noche : svc.p.dia);
+  const senaDe = (p, v) => (v && v.real ? Math.round((p * v.senaPct) / 100 / 100) * 100 : Math.round((p * SENA) / 50) * 50);
+  const pctDe = (v) => (v && v.real ? v.senaPct : Math.round(SENA * 100));
+  // La regla para cancelar, como la lee el cliente
+  const reglaCancelar = (devuelve, horas) => (devuelve === false ? "Si cancelás, el horario se libera, pero en este lugar la seña no se devuelve."
+    : horas ? `Hasta ${horas} h antes, la seña se devuelve. Después, queda para el negocio.` : "Hasta que empiece el turno, la seña se devuelve.");
+  // "Lun a vie · 18:00 a 01:00", "Dom · Cerrado" (los de verdad) o "Todos los días · 17:00 a 00:30" (los de ejemplo)
+  const DIAC = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+  const horariosDe = (v) => {
+    if (!v.real) return [["Todos los días", v.bloques.map(([a, b]) => `${a} a ${fmt(toMin(b))}`).join(" y ")]];
+    const txt = (h) => (!h || h.cerrado || hhmm(h.abre) === null || hhmm(h.cierra) === null ? "Cerrado" : `${h.abre} a ${h.cierra}`), grupos = [];
+    [1, 2, 3, 4, 5, 6, 0].forEach((d) => { const t = txt(v.horario[d]), g = grupos[grupos.length - 1]; if (g && g.t === t) g.dias.push(d); else grupos.push({ t, dias: [d] }); });
+    if (grupos.length === 1) return [["Todos los días", grupos[0].t]];
+    return grupos.map(({ t, dias }) => [dias.length === 1 ? DIAC[dias[0]] : `${DIAC[dias[0]]} ${dias.length === 2 ? "y" : "a"} ${DIAC[dias[dias.length - 1]].toLowerCase()}`, t]);
+  };
+  // "Cómo llegar": su link de Google Maps, o uno armado con el nombre, la dirección y la ciudad (como el panel)
+  const comoLlegar = (v) => v.mapa || (v.direccion || v.ciudad ? "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent([v.name, v.direccion, v.ciudad].filter(Boolean).join(", ")) : "");
+  const dondeReal = (v) => `<div class="dir"><svg class="icon" aria-hidden="true"><use href="#i-pin"/></svg><div><b>${esc(v.direccion || ZONAS[v.zona])}</b>${v.direccion && v.ciudad ? `<span>${esc(v.ciudad)}</span>` : ""}</div></div>
+    ${comoLlegar(v) ? `<a class="btn btn--line btn--s dir__ir" href="${esc(comoLlegar(v))}" target="_blank" rel="noopener">Cómo llegar</a>` : ""}`;
+  // La foto de tapa de un lugar en las tarjetas: la suya, o (uno de verdad sin foto) sus iniciales en noche y crema.
+  // Nunca la foto genérica del rubro, que haría pensar que es su lugar.
+  const portada = (v, alt = "", extra = "") => (v.fotos.length ? img(v.fotos[0], alt, extra) : `<span class="portada" aria-hidden="true">${esc(iniciales(v.name))}</span>`);
+  // Un turno de un lugar que la página no tiene cargado (por ejemplo, el de un negocio que todavía no está en la lista)
+  const lugarDeTurno = (it) => venue(it.vid) || (() => {
+    const rubro = rubroDe(it.rubro);
+    return { id: it.vid, real: true, name: it.lugar || "Lugar", rubro, zona: zonaDe(it.zona), fotos: [], units: [], svcs: [{ id: it.svc, n: it.servicio || "Turno", min: 0, p: {} }] };
+  })();
 
 
   // ---------- Estado ----------
@@ -140,21 +238,45 @@
   try { localStorage.removeItem("bookea:carrito"); } catch {} // ya no hay carrito: cada turno se paga al reservarlo
   const guardar = () => { store.set("reserva", S.res); badges(); }; // los turnos los guarda cuenta.js
 
+  // Los negocios de verdad se piden a la base al abrir la página (con config.js; en modo de prueba no hay ninguno).
+  // ?lugar=su-link (adonde lleva bookea.ar/su-link, ver 404.html) pide también ese, aunque no esté en la lista.
+  const LINK = sinTildes(new URLSearchParams(location.search).get("lugar") || "").replace(/[^a-z0-9]/g, "").slice(0, 30);
+  let realesOk = false;
+  const cargaReales = CU.lugares(LINK).then((r) => {
+    if (!r.ok) return;
+    r.lista.forEach((f) => {
+      const v = lugarDeFila(f);
+      if (venue(v.id)) return;
+      (v.publicado && RUBRO_BASE(f.rubro) ? VENUES : SOLO_LINK).push(v);
+    });
+  }).catch(() => {}).finally(() => { realesOk = true; });
+  // Al abrir la ficha de uno de verdad (y después de un "ya lo reservó otro"), sus horarios ocupados al momento
+  const refrescarOcupados = (v) => CU.ocupados(v.slug).then((r) => {
+    if (!r.ok) return;
+    v.ocup = ocupDe(r.lista);
+    if (S.page === "ficha" && S.f && S.f.v === v.id) renderBook();
+  });
+
   // ---------- Disponibilidad (cada turno tiene su propia capacidad) ----------
   const hash = (s) => { let x = 2166136261; for (let i = 0; i < s.length; i++) { x ^= s.charCodeAt(i); x = Math.imul(x, 16777619); } return x >>> 0; };
   // El turno guardado no se descuenta acá: en este demo solo lo ve quien lo guardó, y si lo vuelve a elegir
   // sigue con el mismo (reservar() lo reconoce). En la versión real, la base lo bloquea para los demás.
   const usado = (vid, key, t, unit) => S.turnos.some((x) => x.vid === vid && x.key === key && x.t === t && x.unit === unit);
+  // En los de verdad, libres son las canchas sin turno en su agenda; en los de ejemplo, un cupo inventado fijo por horario
   const slotsFor = (v, dayI) => {
     const di = dayInfo(dayI), now = nowM(), out = [];
-    v.bloques.forEach(([a, b]) => {
-      for (let t = toMin(a); t + v.dur <= toMin(b); t += v.dur) {
-        if (dayI === 0 && t < now.min + 30) continue;
-        const ts = fmt(t);
+    iniciosDe(v, di.dow).forEach((t) => {
+      if (dayI === 0 && t < now.min + 30) return;
+      const ts = fmt(t);
+      let libres;
+      if (v.real) {
+        const kReal = t >= 1440 ? sumarDia(di.key, 1) : di.key;
+        libres = v.units.filter((u) => !v.ocup.has(`${v.recIds[u]}|${di.key}|${t}`) && !usado(v.id, kReal, ts, u));
+      } else {
         const occ = v.ocup + (t >= 20 * 60 ? 16 : 0) + (di.finde ? 12 : 0);
-        const libres = v.units.filter((u) => hash(`${v.id}|${di.key}|${ts}|${u}`) % 100 >= occ && !usado(v.id, di.key, ts, u));
-        out.push({ t: ts, start: t, end: fmt(t + v.dur), franja: franjaDe(t), libres, total: v.units.length });
+        libres = v.units.filter((u) => hash(`${v.id}|${di.key}|${ts}|${u}`) % 100 >= occ && !usado(v.id, di.key, ts, u));
       }
+      out.push({ t: ts, start: t, end: fmt(t + v.dur), franja: franjaDe(t), libres, total: v.units.length });
     });
     return out;
   };
@@ -168,7 +290,7 @@
   const quedan = (s, v) => (s.libres.length === 1 ? `Último${v.rubro === "barberia" ? "" : " lugar"}` : `${s.libres.length} libres`);
   const franjasDe = (rubro) => {
     const set = new Set();
-    VENUES.filter((v) => v.rubro === rubro).forEach((v) => v.bloques.forEach(([a, b]) => { for (let t = toMin(a); t + v.dur <= toMin(b); t += v.dur) set.add(franjaDe(t)); }));
+    VENUES.filter((v) => v.rubro === rubro).forEach((v) => [0, 1, 2, 3, 4, 5, 6].forEach((d) => iniciosDe(v, d).forEach((t) => set.add(franjaDe(t)))));
     return ["manana", "tarde", "noche"].filter((f) => set.has(f));
   };
   const turnosHoy = (rubro) => VENUES.filter((v) => v.rubro === rubro).reduce((a, v) => a + slotsFor(v, 0).filter((s) => s.libres.length).length, 0);
@@ -184,8 +306,13 @@
   function show(st) {
     let page = st.page === "carrito" ? "pago" : st.page || "home"; // "carrito": historial de antes del 18/11
     if (!TITLES[page]) page = "home";
+    // un negocio de verdad (o el turno por pagar en uno) que todavía no llegó de la base: se espera y se sigue
+    if (!realesOk && ((page === "ficha" && !venue(st.v) && /^n-/.test(st.v || "")) || (page === "pago" && vigente() && !venue(S.res.vid)))) {
+      cargaReales.then(() => show(st)); return;
+    }
     if (page === "ficha") {
       const v = venue(st.v); if (!v) return go("home", {}, true);
+      if (v.real) refrescarOcupados(v);
       const svc0 = v.svcs.find((s) => s.id === S.svc) || v.svcs[0];
       S.f = { v: v.id, dia: st.dia ?? 0, abierto: st.dia != null, svc: svc0.id, t: st.t || null, unit: "any" };
       if (S.f.t && !slotsFor(v, S.f.dia).some((s) => s.t === S.f.t && s.libres.length)) S.f.t = null;
@@ -209,7 +336,7 @@
   const diaCorto = (i) => (i === 0 ? "hoy" : i === 1 ? "mañana" : `el ${DOWL[dayInfo(i).dow]} ${dayInfo(i).d}/${dayInfo(i).m}`);
   function btnx(act, attrs, pressed, label, small = "") { return `<button type="button" class="chipx" data-act="${act}" ${attrs} aria-pressed="${pressed}">${label}${small ? `<small>${small}</small>` : ""}</button>`; }
   const SVCS = { corte: "Corte", "corte-barba": "Corte y barba", barba: "Barba" };
-  const cardV = (v) => `<button type="button" class="vcard" data-act="ficha" data-v="${v.id}"><span class="vcard__ph">${img(v.fotos[0], v.name, 'loading="lazy"')}<span class="tag">${RUBROS[v.rubro].n}</span></span>
+  const cardV = (v) => `<button type="button" class="vcard" data-act="ficha" data-v="${v.id}"><span class="vcard__ph">${portada(v, v.name, 'loading="lazy"')}<span class="tag">${RUBROS[v.rubro].n}</span></span>
     <span class="vcard__t"><span><span class="vcard__n">${esc(v.name)}</span><span class="vcard__z">${ZONAS[v.zona]}</span></span><span class="vcard__p"><small>desde</small>${money(minPrecio(v))}</span></span></button>`;
   const zonaOpts = (rubro) => {
     const vs = rubro ? VENUES.filter((v) => v.rubro === rubro) : VENUES;
@@ -343,7 +470,7 @@
       box.innerHTML = `<div class="empty"><h3>No quedan turnos ${S.franja ? "en esa franja" : "ese día"}</h3><p>${sig >= 0 ? `El próximo día con lugar es ${dayFull(sig).toLowerCase()}.` : "Probá con otra franja o zona."}</p>${sig >= 0 ? `<button type="button" class="btn btn--primary" data-act="dia-h" data-i="${sig}">Ver ${dayFull(sig).toLowerCase()}</button>` : `<button type="button" class="btn btn--ink" data-act="reset-f">Quitar filtros</button>`}</div>`;
       return;
     }
-    box.innerHTML = lista.map(({ v, sl }) => `<article class="rcard${sl.length ? "" : " is-empty"}"><button type="button" class="rcard__ph" data-act="ficha" data-v="${v.id}" data-dia="${S.dia}" aria-label="Ver ${esc(v.name)}">${img(v.fotos[0], "", 'loading="lazy"')}<span class="tag">${R.n}</span></button>
+    box.innerHTML = lista.map(({ v, sl }) => `<article class="rcard${sl.length ? "" : " is-empty"}"><button type="button" class="rcard__ph" data-act="ficha" data-v="${v.id}" data-dia="${S.dia}" aria-label="Ver ${esc(v.name)}">${portada(v, "", 'loading="lazy"')}<span class="tag">${R.n}</span></button>
         <div class="rcard__b"><div class="rcard__top"><div><h3>${esc(v.name)}</h3><p>${ZONAS[v.zona]} · ${v.units.length} ${R.uns}</p></div><div class="rcard__price"><small>desde</small>${money(precioCard(v))}</div></div>
         ${sl.length ? `<div class="qslots">${sl.slice(0, 6).map((s) => `<button type="button" class="qslot" data-act="open-slot" data-v="${v.id}" data-dia="${S.dia}" data-t="${s.t}">${s.t}<small class="${s.libres.length === 1 ? "last" : ""}">${quedan(s, v)}</small></button>`).join("")}</div>` : `<p style="color:var(--ink-500);font-size:14px"><span class="dot dot--off"></span>Sin turnos libres para este filtro</p>`}
         <div class="rcard__foot"><button type="button" class="link" data-act="ficha" data-v="${v.id}" data-dia="${S.dia}">${sl.length > 6 ? `Ver los ${sl.length} horarios` : "Ver el lugar"}</button></div></div></article>`).join("");
@@ -367,7 +494,9 @@
   const horarios = (v) => v.bloques.map(([a, b]) => `${a} a ${fmt(toMin(b))}`).join(" y ");
   function renderFicha() {
     const v = venue(S.f.v), R = RUBROS[v.rubro], sv0 = v.svcs[0], fotos = v.fotos.slice(0, 3);
-    const filas = v.rubro === "barberia"
+    const filas = v.real
+      ? (sv0.franjas.length ? sv0.franjas : [{ desde: "", precio: 0 }]).map((x) => `<tr><th scope="row">${x.desde ? `${esc(x.desde)} a ${esc(x.hasta)}` : "Turno"}<small>seña ${money(senaDe(x.precio, v))}</small></th><td>${money(x.precio)}</td></tr>`).join("")
+      : v.rubro === "barberia"
       ? v.svcs.map((s) => `<tr><th scope="row">${s.n}<small>${s.min} min</small></th><td>${money(s.p.dia)}</td></tr>`).join("")
       : `<tr><th scope="row">Lun a vie · hasta las 20<small>seña ${money(senaDe(sv0.p.dia))}</small></th><td>${money(sv0.p.dia)}</td></tr><tr><th scope="row">Lun a vie · desde las 20<small>seña ${money(senaDe(sv0.p.noche))}</small></th><td>${money(sv0.p.noche)}</td></tr><tr><th scope="row">Sáb y dom<small>seña ${money(senaDe(sv0.p.finde))}</small></th><td>${money(sv0.p.finde)}</td></tr>`;
     // Todo a lo ancho (pedido del dueño, 19/11): fotos, días y, al tocar un día, sus horarios. El resto, en dos columnas.
@@ -375,24 +504,25 @@
       <a class="back" href="#" data-act="back"><svg class="icon"><use href="#i-back"/></svg>Volver</a>
       <div class="ficha">
         <div class="ficha__head">
-          <div><p class="eyebrow">${SECCIONES[secDe(v.rubro)].n} · ${R.n}</p><h1>${esc(v.name)}</h1>
-          <div class="facts"><span><svg class="icon"><use href="#i-pin"/></svg>${ZONAS[v.zona]}</span><span><svg class="icon"><use href="#i-clock"/></svg>Turnos de ${v.dur} min</span><span><svg class="icon"><use href="#i-shield"/></svg>Seña ${Math.round(SENA * 100)} %</span></div></div>
+          <div${v.real ? ` class="ficha__quien"><span class="ficha__av" aria-hidden="true">${IMG[v.id] ? `<img src="${IMG[v.id]}" alt="" />` : esc(iniciales(v.name))}</span><div` : ""}><p class="eyebrow">${SECCIONES[secDe(v.rubro)].n} · ${R.n}</p><h1>${esc(v.name)}</h1>
+          <div class="facts"><span><svg class="icon"><use href="#i-pin"/></svg>${ZONAS[v.zona]}</span><span><svg class="icon"><use href="#i-clock"/></svg>Turnos de ${v.dur} min</span><span><svg class="icon"><use href="#i-shield"/></svg>Seña ${pctDe(v)} %</span></div></div>${v.real ? "</div>" : ""}
           <p class="ficha__desde"><small>desde</small><b>${money(minPrecio(v))}</b><span>por turno</span></p>
         </div>
-        <div class="gal${fotos.length < 2 ? " is-solo" : fotos.length === 2 ? " is-duo" : ""}">${fotos.map((k) => `<figure>${img(k, "")}</figure>`).join("")}</div>
+        ${v.real ? "" /* su foto es la de perfil (chica): va al lado del nombre, y los horarios suben */ : `<div class="gal${fotos.length < 2 ? " is-solo" : fotos.length === 2 ? " is-duo" : ""}">${fotos.map((k) => `<figure>${img(k, "")}</figure>`).join("")}</div>`}
         <section class="reserva" id="book" aria-labelledby="book-t"></section>
         <div class="ficha__rest">
           <div class="blk"><h2>Sobre el lugar</h2><p>${esc(v.desc)} ${v.units.length} ${R.uns}: ${v.units.map(esc).join(", ")}.</p></div>
-          <div class="blk"><h2>Lo que ofrece</h2><ul class="ame">${v.ame.map((k) => `<li>${AMI}${AM[k]}</li>`).join("")}</ul></div>
+          ${v.real ? `<div class="blk"><h2>Horarios</h2><table class="ptable"><caption class="sr-only">Horarios</caption><tbody>${horariosDe(v).map(([d, h]) => `<tr><th scope="row">${d}</th><td>${esc(h)}</td></tr>`).join("")}</tbody></table></div>`
+            : `<div class="blk"><h2>Lo que ofrece</h2><ul class="ame">${v.ame.map((k) => `<li>${AMI}${AM[k]}</li>`).join("")}</ul></div>`}
           <div class="blk"><h2>${v.rubro === "barberia" ? "Servicios y precios" : "Precios por horario"}</h2><table class="ptable"><caption class="sr-only">Precios</caption><tbody>${filas}</tbody></table></div>
-          <div class="blk"><h2>Dónde queda</h2><div class="mapbox">${mapSVG(v.id)}<div class="mapbox__t"><b>${ZONAS[v.zona]}</b>Valle de Uco, Mendoza</div></div><p class="mapnote">Ubicación aproximada. La dirección exacta te llega al confirmar el turno.</p></div>
+          <div class="blk"><h2>Dónde queda</h2>${v.real ? dondeReal(v) : `<div class="mapbox">${mapSVG(v.id)}<div class="mapbox__t"><b>${ZONAS[v.zona]}</b>Valle de Uco, Mendoza</div></div><p class="mapnote">Ubicación aproximada. La dirección exacta te llega al confirmar el turno.</p>`}</div>
           <div class="blk blk--ancho"><h2>Información adicional</h2><dl class="dl">
-            <div><dt>Horarios</dt><dd>Todos los días · ${horarios(v)}</dd></div>
+            ${v.real ? "" : `<div><dt>Horarios</dt><dd>Todos los días · ${horarios(v)}</dd></div>`}
             <div><dt>Llegada</dt><dd>Llegá 10 minutos antes para empezar a horario.</dd></div>
-            <div><dt>Pagos</dt><dd>Seña del ${Math.round(SENA * 100)} % online con Mercado Pago. El resto lo abonás en el lugar.</dd></div>
-            <div><dt>Cancelación</dt><dd>Hasta ${v.cancel} h antes, la seña se devuelve. Después, queda para el negocio.</dd></div>
+            <div><dt>Pagos</dt><dd>Seña del ${pctDe(v)} % online con Mercado Pago. El resto lo abonás en el lugar.</dd></div>
+            <div><dt>Cancelación</dt><dd>${reglaCancelar(v.devuelve, v.cancel)}</dd></div>
             <div><dt>Cómo reservás</dt><dd>Elegís día y horario, entrás con tu cuenta y pagás la seña. El turno queda en Mis turnos y te llega la confirmación por mail.</dd></div></dl>
-            <span class="demo">Negocio de ejemplo · demo</span></div>
+            ${v.real ? "" : `<span class="demo">Negocio de ejemplo · demo</span>`}</div>
         </div>
       </div>
       <div class="irpagar" id="ir-pagar" role="region" aria-label="Turno elegido" hidden></div>`;
@@ -425,7 +555,7 @@
     // El aviso verde de abajo: aparece solo con un horario elegido y no tapa la lectura
     const ir = $("#ir-pagar");
     if (sel) {
-      const precio = precioDe(svc, di, sel.start), sena = senaDe(precio), unitTxt = f.unit === "any" ? sel.libres[0] : f.unit;
+      const precio = precioDe(svc, di, sel.start), sena = senaDe(precio, v), unitTxt = f.unit === "any" ? sel.libres[0] : f.unit;
       ir.innerHTML = `<div class="irpagar__t"><b>${keyLabel(di.key)} · ${sel.t}</b><span>${esc(unitTxt)}${v.svcs.length > 1 ? " · " + esc(svc.n) : ""} · seña ${money(sena)} · ${money(precio)} el turno · hasta las ${sel.end}</span></div><button type="button" class="btn irpagar__btn" data-act="reservar">Ir a pagar<svg class="icon" aria-hidden="true"><use href="#i-back"/></svg></button>`;
       if (ir.hidden) { ir.hidden = false; void ir.offsetWidth; }
       ir.classList.add("is-on");
@@ -435,12 +565,16 @@
   function reservar() {
     const v = venue(S.f.v), f = S.f, di = dayInfo(f.dia), svc = curSvc(), r = vigente();
     // si ya tenía guardado este mismo horario, sigue con ese y con el tiempo que le queda
-    if (r && r.vid === v.id && r.key === di.key && r.t === f.t && r.svc === svc.id && (f.unit === "any" || f.unit === r.unit)) return go("pago");
+    if (r && r.vid === v.id && (r.fa || r.key) === di.key && r.t === f.t && r.svc === svc.id && (f.unit === "any" || f.unit === r.unit)) return go("pago");
     const s = slotsFor(v, f.dia).find((x) => x.t === f.t);
     if (!s || !s.libres.length) { toast("Ese horario se acaba de ocupar"); return renderBook(); }
     const unit = f.unit !== "any" && s.libres.includes(f.unit) ? f.unit : s.libres[0];
-    const precio = precioDe(svc, di, s.start), sena = senaDe(precio);
-    S.res = { id: "t" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), vid: v.id, svc: svc.id, key: di.key, t: s.t, end: s.end, unit, precio, sena, cancel: v.cancel, vence: Date.now() + HOLD };
+    const precio = precioDe(svc, di, s.start), sena = senaDe(precio, v);
+    // En uno de verdad va también lo que pide la base: la cancha (rec) y el horario como en su agenda (fa y min).
+    // key y t son el día y la hora de verdad: un turno de las 00:30 que sigue a la noche es del día siguiente.
+    const real = v.real ? { nid: v.nid, rec: v.recIds[unit], fa: di.key, min: s.start } : {};
+    S.res = { id: "t" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), vid: v.id, svc: svc.id, key: v.real && s.start >= 1440 ? sumarDia(di.key, 1) : di.key,
+      t: s.t, end: s.end, unit, precio, sena, cancel: v.cancel, devuelve: v.devuelve !== false, vence: Date.now() + HOLD, ...real };
     S.vencida = null;
     guardar(); reloj();
     go("pago");
@@ -483,7 +617,9 @@
   function renderPago() {
     const root = $("#pago-root"), r = vigente();
     if (!r) return sinTurno(root);
-    const v = venue(r.vid), R = RUBROS[v.rubro], svc = v.svcs.find((s) => s.id === r.svc) || v.svcs[0];
+    const v = venue(r.vid);
+    if (!v) { S.res = null; guardar(); return sinTurno(root); } // el lugar ya no está en la página
+    const R = RUBROS[v.rubro], svc = v.svcs.find((s) => s.id === r.svc) || v.svcs[0];
     const quien = v.rubro === "barberia" ? `Con ${esc(r.unit)}` : esc(r.unit);
     root.innerHTML = `
       <a class="back" href="#" data-act="back"><svg class="icon"><use href="#i-back"/></svg>Volver</a>
@@ -493,7 +629,7 @@
           <p class="reloj" role="timer"><svg class="icon" aria-hidden="true"><use href="#i-clock"/></svg><span>Te guardamos el turno</span><b data-reloj>${mmss(r.vence - Date.now())}</b></p>
         </div>
         <article class="chk__turno">
-          <div class="chk__ph">${img(v.fotos[0], "")}<span class="tag">${R.n}</span></div>
+          <div class="chk__ph">${portada(v)}<span class="tag">${R.n}</span></div>
           <div class="chk__b">
             <h2>${esc(v.name)}</h2>
             <p class="chk__when"><span>${keyLabel(r.key)} ·</span> <span>${r.t}–${r.end}</span></p>
@@ -509,11 +645,11 @@
         <aside class="chk__side"><div class="panel panel--sum"><h2>Resumen</h2><div class="pay">
           <div><span>Turno</span><b>${money(r.precio)}</b></div>
           <div><span>En el lugar</span><b>${money(r.precio - r.sena)}</b></div>
-          <div class="big"><span>Seña ahora (${Math.round(SENA * 100)} %)</span><b>${money(r.sena)}</b></div></div>
+          <div class="big"><span>Seña ahora (${pctDe(v)} %)</span><b>${money(r.sena)}</b></div></div>
           <button type="button" class="btn btn--primary btn--lg btn--block" data-act="pay" style="margin-top:18px"><span class="mp">Pagar seña con Mercado Pago</span></button>
-          <p class="note note--ok"><svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg><span>Podés cancelar hasta ${r.cancel} h antes y la seña se devuelve.</span></p>
-          <p class="note">Demo: los negocios son de ejemplo y no se cobra nada. En la versión real, acá se abre el pago de Mercado Pago.</p></div>
-          <div class="panel chk__mapa"><h2>Dónde queda</h2><div class="mapbox">${mapSVG(v.id)}<div class="mapbox__t"><b>${ZONAS[v.zona]}</b>Valle de Uco, Mendoza</div></div><p class="mapnote">Los datos del turno te llegan por mail al confirmar.</p></div></aside>
+          <p class="note note--ok"><svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg><span>${r.devuelve === false ? "Si cancelás, el horario se libera, pero en este lugar la seña no se devuelve." : r.cancel ? `Podés cancelar hasta ${r.cancel} h antes y la seña se devuelve.` : "Podés cancelar hasta que empiece y la seña se devuelve."}</span></p>
+          <p class="note">${v.real ? "Bookea está en prueba: todavía no se cobra la seña. El turno queda reservado igual en la agenda del lugar." : "Demo: los negocios son de ejemplo y no se cobra nada. En la versión real, acá se abre el pago de Mercado Pago."}</p></div>
+          <div class="panel chk__mapa"><h2>Dónde queda</h2>${v.real ? dondeReal(v) : `<div class="mapbox">${mapSVG(v.id)}<div class="mapbox__t"><b>${ZONAS[v.zona]}</b>Valle de Uco, Mendoza</div></div>`}<p class="mapnote">Los datos del turno te llegan por mail al confirmar.</p></div></aside>
         <div class="pasos"><h2>Cómo sigue</h2><ol>
           <li><span class="pasos__n">1</span><b>Pagás la seña</b><span>${money(r.sena)} con Mercado Pago. El turno queda confirmado en el momento.</span></li>
           <li><span class="pasos__n">2</span><b>Te llega por mail</b><span>La confirmación con el día, la hora, ${v.rubro === "barberia" ? "con quién" : "la cancha"} y el código del turno. También queda en Mis turnos.</span></li>
@@ -525,18 +661,19 @@
   }
   // Sin turno guardado: se venció el tiempo (y se puede volver a guardar) o se llegó sin elegir ninguno
   function sinTurno(root) {
-    const x = S.vencida, v = x && venue(x.vid), rubro = v ? v.rubro : S.rubro;
+    const v = S.vencida && venue(S.vencida.vid), x = v ? S.vencida : null, rubro = v ? v.rubro : S.rubro;
     root.innerHTML = `<div class="aviso${x ? " aviso--vencio" : ""}">
         <span class="aviso__ic"><svg class="icon" aria-hidden="true"><use href="#i-clock"/></svg></span>
         <div><h1>${x ? "Se terminó el tiempo" : "No tenés ningún turno por pagar"}</h1>
           <p>${x ? `El turno de ${keyLabel(x.key).toLowerCase()} a las ${x.t} en ${esc(v.name)} volvió a quedar libre. Si sigue libre, lo guardamos de nuevo por 10 minutos.` : "Elegí un horario y reservalo: te lo guardamos 10 minutos mientras pagás la seña."}</p>
           <div class="aviso__acts">${x ? `<button type="button" class="btn btn--primary" data-act="otra-vez">Volver a reservarlo</button>` : ""}<button type="button" class="btn ${x ? "btn--line" : "btn--primary"}" data-go="home" data-focus="pick">Buscar turnos</button></div></div>
-        ${x ? `<div class="aviso__turno"><div class="aviso__ph">${img(v.fotos[0], "")}<span class="tag">${RUBROS[v.rubro].n}</span></div><div class="aviso__b"><b>${esc(v.name)}</b><span class="aviso__when">${keyLabel(x.key)} · ${x.t}–${x.end}</span><span>${esc(x.unit)} · seña ${money(x.sena)}</span></div></div>` : ""}
+        ${x ? `<div class="aviso__turno"><div class="aviso__ph">${portada(v)}<span class="tag">${RUBROS[v.rubro].n}</span></div><div class="aviso__b"><b>${esc(v.name)}</b><span class="aviso__when">${keyLabel(x.key)} · ${x.t}–${x.end}</span><span>${esc(x.unit)} · seña ${money(x.sena)}</span></div></div>` : ""}
       </div>${masLibres(rubro, `Libres ahora: ${RUBROS[rubro].n.toLowerCase()}`)}`;
   }
   function otraVez() {
     const x = S.vencida; if (!x) return;
-    const v = venue(x.vid), dia = diaDe(x.key), s = dia >= 0 && dia < 7 ? slotsFor(v, dia).find((y) => y.t === x.t) : null;
+    const v = venue(x.vid); if (!v) { S.vencida = null; return go("home", {}, true); }
+    const dia = diaDe(x.fa || x.key), s = dia >= 0 && dia < 7 ? slotsFor(v, dia).find((y) => y.t === x.t) : null;
     if (!s || !s.libres.length) { S.vencida = null; toast("Ese horario ya se ocupó: elegí otro"); return go("ficha", { v: v.id, dia: Math.max(0, Math.min(6, dia)) }, true); }
     S.res = { ...x, unit: s.libres.includes(x.unit) ? x.unit : s.libres[0], vence: Date.now() + HOLD }; S.vencida = null;
     guardar(); renderPago(); revelar($("#page-pago")); window.scrollTo(0, 0);
@@ -554,6 +691,7 @@
     muchos: "Hubo muchos intentos seguidos. Esperá un minuto y probá de nuevo.",
     ocupado: "Ese horario lo acaba de reservar otra persona. Elegí otro.",
     pasado: "Ese horario ya pasó. Elegí otro.",
+    "no-disponible": "Ese horario ya no está disponible. Elegí otro.",
     limite: "Ya tenés 10 turnos por delante. Cancelá alguno para reservar otro.",
     "sin-datos": "Completá tu nombre y tu celular para reservar.",
     negocio: "Esta cuenta también maneja un negocio en el panel. Para borrarla, escribinos a hola@bookea.ar.",
@@ -627,7 +765,7 @@
     S.yo = (r && r.ok && r.cliente) || null;
     S.email = r && r.ok && !r.cliente && r.email ? r.email : "";
     if (S.yo || S.email) { S.pend = ""; store.set("tuvo-cuenta", true); }
-    if (S.yo) { const t = await CU.turnos(); S.turnos = t.ok ? t.lista.filter((x) => venue(x.vid)) : []; }
+    if (S.yo) { const t = await CU.turnos(); S.turnos = t.ok ? t.lista.filter((x) => venue(x.vid) || x.lugar) : []; }
     else S.turnos = [];
     pintarCuenta();
   }
@@ -721,7 +859,7 @@
     const res = await pedido;
     if (!res.ok) {
       ov.remove(); pagando = false;
-      if (res.error === "ocupado" || res.error === "pasado") { // ese horario ya no se puede: a elegir otro
+      if (res.error === "ocupado" || res.error === "pasado" || res.error === "no-disponible") { // ese horario ya no se puede: a elegir otro
         S.res = null; guardar(); reloj(); toast(msj(res.error));
         return go("ficha", { v: r.vid, dia: Math.max(0, Math.min(6, diaDe(r.key))) }, true);
       }
@@ -729,11 +867,12 @@
       if (res.error === "sesion" || res.error === "sin-datos") { S.yo = null; await aplicar(await CU.iniciar()); }
       return avisoCu(msj(res.error));
     }
-    ov.innerHTML = `<div class="mpov__in"><div class="okc"><svg class="icon"><use href="#i-check"/></svg></div><h2>¡Turno confirmado!</h2><p>Es una demo: no se cobró nada.</p></div>`;
+    ov.innerHTML = `<div class="mpov__in"><div class="okc"><svg class="icon"><use href="#i-check"/></svg></div><h2>¡Turno confirmado!</h2><p>${v.real ? "Bookea está en prueba: no se cobró la seña." : "Es una demo: no se cobró nada."}</p></div>`;
+    if (v.real) v.ocup.add(`${r.rec}|${r.fa}|${r.min}`); // ya está en su agenda
     await espera(reduce ? 300 : 1200);
     S.turnos = S.turnos.concat(res.turno); S.res = null; S.vencida = null; guardar(); reloj();
     ov.remove(); pagando = false;
-    go("turnos", { nuevos: [res.turno.id] }); toast("Turno confirmado (demo, sin cobro).");
+    go("turnos", { nuevos: [res.turno.id] }); toast(v.real ? "Turno confirmado. Bookea está en prueba: no se cobró la seña." : "Turno confirmado (demo, sin cobro).");
   }
 
   // ---------- Mis turnos ----------
@@ -741,7 +880,7 @@
   function renderTurnos(st = {}) {
     const root = $("#turnos-root"), lista = S.turnos.slice().sort((a, b) => cuando(a) - cuando(b));
     // abajo, siempre, turnos libres del último rubro reservado: la pantalla no queda vacía
-    const ult = lista.length ? venue(lista[lista.length - 1].vid) : null, rubro = ult ? ult.rubro : S.rubro;
+    const ult = lista.length ? lugarDeTurno(lista[lista.length - 1]) : null, rubro = ult && SECCIONES[secDe(ult.rubro)].rubros.includes(ult.rubro) ? ult.rubro : S.rubro;
     const mas = masLibres(rubro, `Reservá otro: ${RUBROS[rubro].n.toLowerCase()}`);
     // Sin cuenta abierta: para entrar (o, si todavía no tiene, cómo se crea)
     if (!S.yo) {
@@ -757,7 +896,7 @@
     const ahora = Date.now();
     const listo = st.nuevos ? `<div class="okban"><span class="okban__ic"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg></span><div><b>¡Listo, tu turno está confirmado!</b><span>Te mandamos los datos por mail a ${esc(S.yo.email)}. El resto lo pagás en el lugar.</span></div><button type="button" class="btn btn--ink btn--s" data-go="home" data-focus="pick">Reservar otro turno</button></div>` : "";
     root.innerHTML = `<h1>Mis turnos</h1><p class="sub">Tus turnos confirmados, con la seña ya paga.</p>${listo}<div class="mt"><div class="mt__lista">` + lista.map((it) => {
-      const v = venue(it.vid), R = RUBROS[v.rubro], svc = v.svcs.find((s) => s.id === it.svc) || v.svcs[0], pasado = cuando(it).getTime() + 3600e3 < ahora;
+      const v = lugarDeTurno(it), R = RUBROS[v.rubro], svc = v.svcs.find((s) => s.id === it.svc) || v.svcs[0], pasado = cuando(it).getTime() + 3600e3 < ahora;
       const txt = encodeURIComponent(`Turno en ${v.name}: ${keyLabel(it.key)} ${it.t} hs (${it.unit}). Código ${it.code}.`);
       return `<article class="tcard${st.nuevos && st.nuevos.includes(it.id) ? " is-new" : ""}"><div class="tcard__h"><span class="code">${it.code}</span><span class="status"${pasado ? ' style="color:var(--ink-500);background:var(--ink-100)"' : ""}>${pasado ? "Finalizado" : "Confirmado"}</span></div>
         <div class="tcard__b"><div><h3>${esc(v.name)}</h3><div class="tcard__when">${keyLabel(it.key)} · ${it.t}–${it.end}</div><p>${R.n}${v.rubro === "barberia" ? " · " + svc.n : ""} · ${esc(it.unit)} · ${ZONAS[v.zona]}</p></div>
@@ -778,10 +917,10 @@
   };
   function cancelar(id) {
     const it = S.turnos.find((x) => x.id === id); if (!it) return;
-    const horas = (cuando(it) - Date.now()) / 3600e3, devuelve = horas > it.cancel;
+    const horas = (cuando(it) - Date.now()) / 3600e3, devuelve = it.devuelve !== false && horas > it.cancel;
     const dlg = $("#dlg");
     $("#dlg-t").textContent = "¿Cancelar este turno?";
-    $("#dlg-p").textContent = devuelve ? `Cancelás con más de ${it.cancel} h de anticipación: la seña de ${money(it.sena)} se devuelve y el turno se libera.` : `Faltan menos de ${it.cancel} h: la seña de ${money(it.sena)} queda para el negocio y el turno se libera.`;
+    $("#dlg-p").textContent = it.devuelve === false ? `En este lugar la seña no se devuelve: la seña de ${money(it.sena)} queda para el negocio y el turno se libera.` : devuelve ? `Cancelás con más de ${it.cancel} h de anticipación: la seña de ${money(it.sena)} se devuelve y el turno se libera.` : `Faltan menos de ${it.cancel} h: la seña de ${money(it.sena)} queda para el negocio y el turno se libera.`;
     $("#dlg-si").textContent = "Cancelar turno";
     $("#dlg-si").onclick = async () => {
       const b = $("#dlg-si"); b.disabled = true;
@@ -1019,6 +1158,13 @@
   try { history.scrollRestoration = "manual"; history.replaceState({ page: inicial.page }, "", /^https?:$/.test(location.protocol) ? location.pathname.replace(/\/index\.html$/, "/") : location.pathname); } catch {}
   show({ page: inicial.page });
   if (inicial.ir) requestAnimationFrame(() => scrollTo(inicial.ir));
+  // bookea.ar/su-link (o ?lugar=su-link): la ficha de ese negocio, apenas llega de la base
+  if (LINK) cargaReales.then(() => {
+    const v = venue("n-" + LINK) || venue(LINK);
+    if (v) go("ficha", { v: v.id }, true); else toast("No encontramos ese lugar. Buscá entre los turnos libres.");
+  });
+  // Si llegaron negocios de verdad para la lista, se suman a lo que se ve
+  cargaReales.then(() => { if (VENUES.some((v) => v.real)) { if (S.page === "home") renderHome(); else if (S.page === "resultados") renderResultados(); } });
   // Un link con # a la misma página (por ejemplo bookea.ar/#sumate con el sitio ya abierto) no recarga:
   // se resuelve acá, reemplazando la entrada del historial para que "atrás" no quede en el mismo lugar
   window.addEventListener("hashchange", () => {

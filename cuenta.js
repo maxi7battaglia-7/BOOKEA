@@ -40,6 +40,7 @@
     if (/maneja un negocio/i.test(msj)) return "negocio";
     if (/10 turnos/i.test(msj)) return "limite";
     if (/ya pas[oó]/i.test(msj)) return "pasado";
+    if (/no est[aá] disponible/i.test(msj)) return "no-disponible"; // el negocio cambió sus horarios o ya no está
     if (cod === "23505") return "ocupado";
     if (cod === "23514" || cod === "22P02" || cod === "22007" || cod === "22008") return "invalido";
     if (cod === "P0002") return "no-existe";
@@ -51,19 +52,23 @@
   };
   const fallo = (e) => ({ ok: false, error: tipoDeError(e), detalle: e && e.message });
 
-  // Un turno de la base, con la forma que usa sitio.js
+  // Un turno de la base, con la forma que usa sitio.js. Los de un negocio de verdad llevan "n-" adelante (como
+  // sus lugares en la página) y los datos del lugar, por si la página todavía no lo tiene cargado.
   const turnoDeFila = (f) => ({
-    id: f.id, vid: f.lugar_id, svc: f.servicio_id || "turno", key: String(f.fecha).slice(0, 10),
+    id: f.id, vid: (f.negocio_id ? "n-" : "") + f.lugar_id, svc: f.servicio_id || "turno", key: String(f.fecha).slice(0, 10),
     t: String(f.hora).slice(0, 5), end: String(f.fin).slice(0, 5), unit: f.cancha,
-    precio: +f.precio || 0, sena: +f.sena || 0, cancel: +f.cancelar_horas || 0, code: f.codigo,
+    precio: +f.precio || 0, sena: +f.sena || 0, cancel: +f.cancelar_horas || 0, devuelve: f.devuelve_sena !== false, code: f.codigo,
+    lugar: f.lugar || "", zona: f.zona || "", rubro: f.rubro || "", servicio: f.servicio || "",
   });
   const clienteDe = (f, email) => (f ? { id: f.id, nombre: f.nombre || "", email: f.email || email || "", celular: f.celular || "", promos: !!f.promos } : null);
   // Lo que se manda a reservar_turno (los nombres van para el mail de confirmación)
-  const filaDeTurno = (r) => ({
+  // En un negocio de verdad van su id, la cancha (recurso) y el horario como en su agenda (fecha_agenda y minuto):
+  // el precio, la seña y lo demás los pone la base con lo que el negocio cargó en Mi negocio.
+  const filaDeTurno = (r) => Object.assign({
     lugar_id: r.vid, lugar: r.lugar, zona: r.zona || "", rubro: r.rubro || "", servicio_id: r.svc || "", servicio: r.servicio || "",
     cancha: r.unit, fecha: r.key, hora: r.t, fin: r.end, precio: Math.round(+r.precio || 0), sena: Math.round(+r.sena || 0),
     cancelar_horas: Math.round(+r.cancel || 0),
-  });
+  }, r.nid ? { negocio_id: r.nid, recurso: r.rec, fecha_agenda: r.fa, minuto: r.min } : {});
   // Adónde vuelven los links de los mails (confirmar la cuenta, contraseña nueva): esta misma página
   const vuelta = (que) => window.location.href.split("#")[0].split("?")[0] + "?cuenta=" + que;
 
@@ -72,6 +77,20 @@
   // ======================================================================
   const nube = ({ supabaseUrl, supabaseAnonKey }) => {
     let sb = null, email = "", cliente = null;
+    // Lo público (los negocios de la página y sus horarios ocupados) se pide directo, sin bajar la librería:
+    // así el inicio sigue cargando rápido. Con la clave pública, como cualquier visitante.
+    const publico = async (fn, args) => {
+      try {
+        const r = await fetch(`${supabaseUrl.replace(/\/$/, "")}/rest/v1/rpc/${fn}`, {
+          method: "POST",
+          headers: { apikey: supabaseAnonKey, Authorization: `Bearer ${supabaseAnonKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify(args || {}),
+        });
+        const data = await r.json().catch(() => null);
+        if (!r.ok) return fallo(Object.assign(new Error((data && data.message) || "http " + r.status), { code: data && data.code, status: r.status }));
+        return { ok: true, lista: Array.isArray(data) ? data : [] };
+      } catch (e) { return fallo(e); }
+    };
     const alRecuperarCbs = [];
     const listo = async () => {
       if (sb) return sb;
@@ -108,6 +127,10 @@
     return {
       modo: "nube",
       vuelta: VUELTA, // "confirmada" o "clave" si se llegó desde un link de un mail
+      // Los negocios de verdad que muestra la página (y el de un link, bookea.ar/su-link, aunque todavía no esté en la lista)
+      lugares(incluir) { return publico("lugares_publicos", { incluir: incluir || null }); },
+      // Los horarios ocupados de un negocio, al momento: [cancha, fecha de la agenda, minuto]
+      ocupados(lugar) { return publico("horarios_ocupados", { lugar }); },
       async iniciar() {
         if (!hayRastro()) return { ok: true, cliente: null };
         return conLibreria(async () => {
@@ -249,6 +272,8 @@
         return { ok: true, cliente: publico(c) };
       },
       async salir() { const d = db(); d.sesion = null; escribir(K, d); },
+      async lugares() { return { ok: true, lista: [] }; }, // en modo de prueba, solo los lugares de ejemplo
+      async ocupados() { return { ok: true, lista: [] }; },
       async recuperar() { return { ok: false, error: "local" }; },
       alRecuperar() {},
       async ponerClave() { return { ok: false, error: "local" }; },

@@ -307,6 +307,11 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
     const confirmar = (si) => fetch('http://localhost:8787/api/confirmar', { method: 'POST', body: JSON.stringify({ si }) });
     const frenteListo = (p) => p.waitForFunction(() => document.documentElement.classList.contains('is-ready') && !document.querySelector('.splash'), null, { timeout: 8000 }).then(() => p.waitForTimeout(500));
     const pag = (p) => p.evaluate(() => document.querySelector('.page:not([hidden])').dataset.page);
+    // captura de la página entera: antes baja hasta el final, así cada bloque hace su entrada y se ve
+    const entera = async (p, ruta) => {
+      await p.evaluate(async () => { for (let y = 0; y <= document.body.scrollHeight; y += 300) { scrollTo(0, y); await new Promise((r) => setTimeout(r, 90)); } scrollTo(0, 0); });
+      await p.waitForTimeout(900); await p.screenshot({ path: ruta, fullPage: true });
+    };
     const aPagar = async (p) => {
       await p.goto(F + '?rubro=padel'); await frenteListo(p);
       await p.click('.qslot >> nth=0'); await p.waitForTimeout(500);
@@ -399,7 +404,74 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
     await f2.waitForURL(/\/\?cuenta=confirmada/, { timeout: 8000 }).catch(() => {});
     await frenteListo(f2); await f2.waitForSelector('#cuenta.cuenta--yo, .micuenta', { timeout: 8000 }).catch(() => {});
     ok(/Nico Ríos/.test(await f2.textContent('main')) && !/admin\.html/.test(f2.url()), 'panel: el link del mail de un cliente que cae en el panel lo lleva a la página de reservas, ya adentro');
-    for (const [n, p] of [['f1', f1], ['f2', f2], ['f3', f3]]) ok(!p.errs.filter((x) => !/Failed to load resource/.test(x)).length, `frente: sin errores en la consola (${n}) ${p.errs.join(' | ')}`);
+    // ---------- Negocio de verdad en la página: el de Ana (aprobado), con su link y su agenda ----------
+    await sql(`with x as (update negocios set ciudad = 'Tunuyán', direccion = 'Belgrano 450', descripcion = 'Dos canchas de pádel.',
+      ajustes = jsonb_build_object(
+        'recursos', jsonb_build_array(jsonb_build_object('id', 'r1', 'nombre', 'Cancha 1', 'detalle', 'Blindex'), jsonb_build_object('id', 'r2', 'nombre', 'Cancha 2', 'detalle', 'Techada')),
+        'duracion', 60,
+        'horario', (select jsonb_agg(jsonb_build_object('abre', '08:00', 'cierra', '23:00', 'cerrado', false)) from generate_series(0, 6)),
+        'franjas', jsonb_build_array(jsonb_build_object('desde', '08:00', 'hasta', '18:00', 'precio', 20000), jsonb_build_object('desde', '18:00', 'hasta', '23:00', 'precio', 26000)),
+        'senaPct', 25, 'cancelarHoras', 6, 'devolverSena', true)
+      where slug = 'losalamospadel' returning 1) select count(*) from x`);
+    const mananaN = await sql("select to_json(((now() at time zone 'America/Argentina/Mendoza')::date + 1)::text)");
+    // Ana tiene cargado a mano un turno mañana a las 20:00 en la cancha 1
+    await sql(`with x as (insert into reservas (negocio_id, recurso, fecha, hora, cliente, estado, origen)
+      select id, 'r1', '${mananaN}', 1200, 'Pepe a mano', 'confirmada', 'telefono' from negocios where slug = 'losalamospadel' returning 1) select count(*) from x`);
+    const f4 = await nueva();
+    await f4.goto(F + '?rubro=padel'); await frenteListo(f4);
+    ok(!/Los Álamos Pádel/.test(await f4.textContent('#r-list')), 'negocio de verdad: sin Mercado Pago todavía no aparece en la lista de la página');
+    await f4.goto('http://localhost:8787/losalamospadel'); await f4.waitForURL(/\/\?lugar=losalamospadel/, { timeout: 8000 }).catch(() => {});
+    await frenteListo(f4); await f4.waitForFunction(() => document.querySelector('.page:not([hidden])').dataset.page === 'ficha', null, { timeout: 8000 }).catch(() => {});
+    const ficha = (await pag(f4)) === 'ficha' ? await f4.textContent('#ficha-root') : '';
+    ok(/Los Álamos Pádel/.test(await f4.textContent('#ficha-root h1').catch(() => '')) && /Tunuyán/.test(ficha) && /Turnos de 60 min/.test(ficha) && /Seña 25 %/.test(ficha),
+      'negocio de verdad: bookea.ar/su-link abre su ficha con su nombre, su ciudad, la duración y la seña de Mi negocio');
+    ok(/Todos los días/.test(ficha) && /08:00 a 23:00/.test(ficha) && /Belgrano 450/.test(ficha) && /\$\s20\.000/.test(ficha) && /\$\s26\.000/.test(ficha) && !/Negocio de ejemplo/.test(ficha)
+      && (await f4.getAttribute('.dir__ir', 'href') || '').startsWith('https://www.google.com/maps/search/'),
+      'negocio de verdad: sus horarios, sus precios por franja, su dirección con "Cómo llegar" y sin el cartel de ejemplo');
+    await f4.click('.cupo[data-i="1"]'); await f4.waitForSelector('#book-panel');
+    await entera(f4, `${out}/nb-ficha-real.png`);
+    const cel = await nueva(390, 844);
+    await cel.goto(F + '?lugar=losalamospadel'); await frenteListo(cel);
+    await cel.waitForFunction(() => document.querySelector('.page:not([hidden])').dataset.page === 'ficha', null, { timeout: 8000 }).catch(() => {});
+    await cel.click('.cupo[data-i="1"]'); await entera(cel, `${out}/nb-ficha-real-cel.png`);
+    ok(await cel.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'negocio de verdad: en el celular la ficha entra a lo ancho');
+    await cel.close();
+    const s20 = await f4.textContent('.slot[data-t="20:00"] small');
+    ok(/Último lugar/.test(s20), `negocio de verdad: el turno que Ana cargó a mano ocupa su cancha (a las 20:00 queda una: "${s20}")`);
+    // Nico entra y reserva mañana a las 19:00 en la cancha 2
+    await f4.goto(F + '#mis-turnos'); await frenteListo(f4);
+    await f4.fill('#cu-email', 'nico@prueba.com'); await f4.fill('#cu-clave', 'canchas2026'); await f4.click('#f-cuenta button[type=submit]');
+    await f4.waitForSelector('.micuenta', { timeout: 8000 });
+    await f4.goto(F + '?lugar=losalamospadel'); await frenteListo(f4);
+    await f4.waitForFunction(() => document.querySelector('.page:not([hidden])').dataset.page === 'ficha', null, { timeout: 8000 });
+    await f4.click('.cupo[data-i="1"]'); await f4.click('.slot[data-t="19:00"]'); await f4.waitForTimeout(300);
+    if (await f4.isVisible('.slot--u')) await f4.click('.slot--u[data-u="Cancha 2 · techada"]');
+    ok(/seña \$\s6\.500 · \$\s26\.000 el turno/.test(await f4.textContent('#ir-pagar')), 'negocio de verdad: el precio y la seña salen de sus franjas (26.000, seña 6.500)');
+    await f4.click('#ir-pagar [data-act="reservar"]'); await f4.waitForSelector('#pago-root .chk__turno');
+    ok(/Bookea está en prueba/.test(await f4.textContent('#pago-root')) && /Belgrano 450/.test(await f4.textContent('#pago-root')), 'negocio de verdad: al pagar avisa que la seña todavía no se cobra, y muestra la dirección');
+    await entera(f4, `${out}/nb-pago-real.png`);
+    await f4.click('.chk__side [data-act="pay"]'); await f4.waitForSelector('.tcard', { timeout: 10000 });
+    const tN = (await sql(`select json_agg(t) from (select t.*, r.cliente as r_cliente, r.wa as r_wa, r.origen as r_origen, r.sena as r_sena, r.recurso as r_recurso, r.hora as r_hora
+      from turnos t join reservas r on r.id = t.reserva_id where t.negocio_id = (select id from negocios where slug = 'losalamospadel')) t`) || [])[0];
+    ok(tN && tN.cancha === 'Cancha 2 · techada' && tN.precio === 26000 && tN.sena === 6500 && tN.hora === '19:00:00' && tN.fecha === mananaN,
+      `negocio de verdad: el turno queda en la base con la cancha, el día, la hora y el precio de Mi negocio (${tN && tN.cancha}, ${tN && tN.precio})`);
+    ok(tN && tN.r_cliente === 'Nico Ríos' && tN.r_wa === '261 444 0000' && tN.r_origen === 'link' && tN.r_sena === 0 && tN.r_recurso === 'r2' && tN.r_hora === 1140,
+      'negocio de verdad: el turno entra en la agenda de Ana, por el link, con el nombre y el celular de Nico (y sin seña cobrada, en prueba)');
+    ok(/Los Álamos Pádel/.test(await f4.textContent('.tcard')) && /Cancha 2/.test(await f4.textContent('.tcard')), 'negocio de verdad: el turno se ve en Mis turnos');
+    // Ana lo cancela desde su panel: a Nico se le cancela también
+    await sql(`with x as (update reservas set estado = 'cancelada', retenida = false where id = '${tN.reserva_id}' returning 1) select count(*) from x`);
+    ok((await sql(`select to_json(estado || '/' || cancelado_por) from turnos where id = '${tN.id}'`)) === 'cancelado/negocio', 'negocio de verdad: si el negocio cancela en su agenda, el turno del cliente se cancela');
+    await f4.goto(F + '?lugar=losalamospadel'); await frenteListo(f4);
+    await f4.waitForFunction(() => document.querySelector('.page:not([hidden])').dataset.page === 'ficha', null, { timeout: 8000 }).catch(() => {});
+    await f4.click('.cupo[data-i="1"]');
+    ok(/2 libres/.test(await f4.textContent('.slot[data-t="19:00"] small')), 'negocio de verdad: el horario cancelado vuelve a estar libre en la página');
+    // Un negocio pendiente no se abre ni con su link; una dirección que no existe muestra la página de "no encontramos"
+    await f4.goto(F + '?lugar=estudiocarla'); await frenteListo(f4); await f4.waitForTimeout(400);
+    ok((await pag(f4)) === 'home' && /No encontramos ese lugar/.test(await f4.textContent('#toast')), 'negocio pendiente: con su link no se abre (lleva al inicio)');
+    await f4.goto('http://localhost:8787/no/existe');
+    ok(/No encontramos esta página/.test(await f4.textContent('h1')), 'una dirección que no existe: "No encontramos esta página"');
+    await f4.screenshot({ path: `${out}/nb-404.png` });
+    for (const [n, p] of [['f1', f1], ['f2', f2], ['f3', f3], ['f4', f4]]) ok(!p.errs.filter((x) => !/Failed to load resource/.test(x)).length, `frente: sin errores en la consola (${n}) ${p.errs.join(' | ')}`);
   } catch (e) {
     console.log('FALLA (excepción)', e.message); process.exitCode = 1;
   } finally {

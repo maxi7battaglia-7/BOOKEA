@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Bookea</title>
+  <meta name="robots" content="noindex" />
+  <link rel="icon" href="/marca/isotipo.svg" type="image/svg+xml" />
+  <!-- GitHub Pages muestra esta página cuando una dirección no existe.
+       bookea.ar/su-link (el link de reservas que cada negocio ve en Mi negocio) lleva a la ficha de ese
+       negocio en la página: bookea.ar/?lugar=su-link (sitio.js la abre apenas llega de la base). -->
+  <script>
+    (function () {
+      var m = /^\/([A-Za-z0-9]{1,30})\/?$/.exec(location.pathname);
+      if (m) location.replace("/?lugar=" + m[1].toLowerCase());
+    })();
+  </script>
+  <style>
+    :root { color-scheme: light; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #fff; color: #11151c;
+           font: 16px/1.5 "Helvetica Neue", Arial, system-ui, sans-serif; }
+    main { max-width: 420px; padding: 32px 16px; text-align: center; }
+    img { width: 44px; height: 44px; }
+    h1 { font-size: 26px; line-height: 1.2; letter-spacing: -.02em; margin: 18px 0 8px; }
+    p { margin: 0 0 22px; color: #4a525e; }
+    a { display: inline-block; background: #e4572e; color: #fff; text-decoration: none; font-weight: 600; padding: 13px 22px; border-radius: 10px; }
+    a:hover { background: #cf4a24; }
+    a:focus-visible { outline: 3px solid #11151c; outline-offset: 2px; }
+  </style>
+</head>
+<body>
+  <main>
+    <img src="/marca/isotipo.svg" alt="Bookea" />
+    <h1>No encontramos esta página</h1>
+    <p>Puede que el link esté mal escrito o que ya no exista.</p>
+    <a href="/">Buscar turnos</a>
+  </main>
+</body>
+</html>

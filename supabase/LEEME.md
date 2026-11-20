@@ -132,18 +132,47 @@ Para que funcione en bookea.ar, una vez:
 5. **Probar:** en una ventana de incógnito, en bookea.ar reservá un turno, creá una cuenta con un email tuyo,
    confirmala desde el mail y pagá (es simulado). Te tiene que llegar "Tu turno está confirmado" y verse en Mis turnos.
 
-Mientras los lugares sean de ejemplo, el mail de confirmación aclara que la seña no se cobró. Cuando se cobre con
-Mercado Pago, cambiá `bookea_en_prueba()` (en `avisos-por-mail.sql`) a `false` y volvé a correr el archivo.
+Mientras la seña no se cobre, los mails, la página y la agenda del negocio aclaran que no se cobró. Cuando se cobre
+con Mercado Pago, cambiá `bookea_en_prueba()` (en `esquema.sql`) a `false` y volvé a correr los dos archivos.
 
 **Datos personales (Ley 25.326):** antes de abrir el registro a clientes reales, inscribí la base en el Registro
 Nacional de Bases de Datos (AAIP, por Trámites a Distancia, con tu clave fiscal) y completá en `../privacidad.html`
 quién es el responsable, su domicilio y el número de inscripción.
 
+## Negocios de verdad en bookea.ar (20/11)
+
+La página muestra cada negocio aprobado con lo que cargó en **Mi negocio**: canchas, duración del turno, horarios
+de cada día, precios por franja, seña, cancelación, dirección y foto de perfil. Los horarios libres son los de su
+agenda: la base le pasa a la página solo qué horarios están ocupados (`lugares_publicos`, `horarios_ocupados`), sin
+nombres, emails ni teléfonos.
+
+- **Dónde aparece:** con su link, `bookea.ar/su-link` (el que ve en Mi negocio; `../404.html` lo lleva a
+  `bookea.ar/?lugar=su-link`). En la lista de la página (inicio y resultados) aparece recién cuando pueda cobrar la
+  seña con Mercado Pago: hasta entonces `tiene_mercado_pago()` dice que no para todos.
+- **Al reservar:** la base arma el turno con los datos del negocio (no con lo que manda la página): controla que la
+  cancha exista, que el horario sea uno de los suyos y que esté libre, y calcula el precio y la seña. El turno entra
+  en su agenda como "por el link", con el nombre y el celular del cliente. Mientras Bookea esté en prueba, en la
+  agenda va sin seña (no se cobró) y con una nota que lo dice.
+- **Si el cliente cancela,** el horario se libera en la agenda. **Si el negocio lo cancela desde el panel** (o borra
+  la fila), se cancela también el del cliente y le llega el mail.
+- **Mails nuevos** (`avisos-por-mail.sql`): al negocio, "Tenés un turno nuevo" (con el cliente y su WhatsApp) y "Se
+  canceló un turno"; al cliente, "El lugar canceló tu turno" cuando cancela el negocio.
+
+Para que funcione en bookea.ar, una vez: **SQL Editor**, pegá todo `esquema.sql` → **Run**; después todo
+`avisos-por-mail.sql` → **Run** (en ese orden).
+
+Para probarlo: aprobá un negocio de prueba en **Solicitudes**, entrá con esa cuenta, completá Mi negocio (canchas,
+horarios y precios) y abrí **Ver la página de reservas**. Reservá desde otra cuenta de cliente en una ventana de
+incógnito: el turno tiene que aparecer en la agenda del negocio (se actualiza sola cada minuto) y llegar los dos mails.
+
+Los links `admin`, `index`, `privacidad`, `reservar`, `assets` y `marca` son de páginas de Bookea: el panel no los
+deja elegir.
+
 ## Qué falta para la siguiente etapa
 
-- **La página de reservas (`index.html`) todavía usa negocios de ejemplo** (las cuentas de los clientes y sus turnos ya van a la base). El paso que sigue es que lea el
-  negocio por su link (`slug`) y que el cliente reserve contra la base, con una función que controle que el
-  horario esté libre y que no muestre datos de otros clientes.
+- **Mercado Pago:** que cada negocio conecte su cuenta desde el panel, que la seña se cobre de verdad (y vaya a la
+  cuenta del negocio), que el turno quede guardado 10 minutos en la base mientras se paga y que las devoluciones salgan
+  solas. Con eso, `tiene_mercado_pago()` dice que sí y el negocio aparece en la lista.
 - **Pasar los mails de Supabase (confirmar cuenta, contraseña nueva) al castellano** en Authentication → Emails → Templates.
 - **Fotos**: hoy la foto de perfil se guarda chica dentro del negocio; más adelante conviene Supabase Storage.
 

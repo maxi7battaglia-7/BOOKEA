@@ -5,8 +5,10 @@
 --   2. Al negocio: cuando lo aprobás.
 --   3. Al negocio: cuando lo rechazás (o le quitás el acceso a uno que estaba aprobado).
 --   4. Al cliente que reserva en bookea.ar: su turno confirmado.
---   5. Al cliente: cuando cancela un turno.
---   Los avisos 2 a 5 solo se mandan si configurás un remitente con tu propio dominio
+--   5. Al cliente: cuando se cancela un turno (lo canceló él, o el lugar desde su panel).
+--   6. Al negocio: cada turno nuevo que le reservan en bookea.ar.
+--   7. Al negocio: cuando un cliente cancela uno de esos turnos.
+--   Los avisos 2 a 7 solo se mandan si configurás un remitente con tu propio dominio
 --   (Resend no deja mandar a otras personas desde su dirección de prueba).
 --   Todos salen con la misma cara que los mails de Supabase (supabase/mails/): franja noche
 --   con el logo, línea verde agua y naranja, fondo crema.
@@ -170,18 +172,15 @@ create trigger avisar_negocio_rechazado after update of estado on public.negocio
 -- =====================================================================================
 -- Mails a los clientes que reservan en bookea.ar (tabla turnos de esquema.sql):
 --   4. Turno confirmado: al pagar la seña, con el día, la hora, el lugar, la cancha y el código.
---   5. Turno cancelado: cuando lo cancela desde Mis turnos, con lo que pasa con la seña.
+--   5. Turno cancelado: cuando lo cancela desde Mis turnos (o lo cancela el lugar), con lo que pasa con la seña.
+--   6 y 7. Al negocio (al email del dueño), en los turnos de un negocio de verdad: turno nuevo y turno cancelado.
 --   Como los avisos 2 y 3, solo se mandan con remitente de dominio propio (resend_remitente).
+--   Mientras Bookea esté en prueba (bookea_en_prueba(), en esquema.sql), los mails dicen que la seña no se cobró.
 -- =====================================================================================
 
 -- Adónde llevan los botones de estos mails
 create or replace function public.bookea_url_turnos() returns text language sql immutable as $$
   select 'https://bookea.ar/#mis-turnos'
-$$;
--- Mientras los lugares de la página sean de ejemplo y la seña no se cobre, los mails lo dicen.
--- Cuando se cobre de verdad (Mercado Pago), cambiá el true por false y volvé a correr este archivo.
-create or replace function public.bookea_en_prueba() returns boolean language sql immutable as $$
-  select true
 $$;
 -- "jueves 20 de noviembre"
 create or replace function public.fecha_larga(d date) returns text language sql immutable as $$
@@ -199,7 +198,6 @@ create or replace function public.fila_mail(etiqueta text, valor text) returns t
     || '</td><td style="padding:3px 0;color:#11151c">' || valor || '</td></tr>'
 $$;
 revoke all on function public.bookea_url_turnos() from public, anon, authenticated;
-revoke all on function public.bookea_en_prueba() from public, anon, authenticated;
 revoke all on function public.fecha_larga(date) from public, anon, authenticated;
 revoke all on function public.plata(integer) from public, anon, authenticated;
 revoke all on function public.fila_mail(text, text) from public, anon, authenticated;
@@ -230,6 +228,27 @@ revoke all on function public.codificar_url(text) from public, anon, authenticat
 revoke all on function public.link_mapa(text, text, text, text) from public, anon, authenticated;
 revoke all on function public.link_whatsapp(text) from public, anon, authenticated;
 
+-- La línea gris del final mientras Bookea esté en prueba: la seña no se cobró
+create or replace function public.nota_prueba(de_verdad boolean) returns text language sql stable as $$
+  select case when public.bookea_en_prueba()
+    then '<p style="margin:0 0 12px;font-size:13px;color:#6f6656">Bookea está en prueba: '
+         || case when de_verdad then 'la seña no se cobró.' else 'los lugares de la página son de ejemplo y la seña no se cobró.' end || '</p>'
+    else '' end
+$$;
+-- La regla para cancelar, como la lee el cliente
+create or replace function public.regla_cancelar(devuelve boolean, horas integer) returns text language sql immutable as $$
+  select case when not coalesce(devuelve, true) then 'Si no podés ir, cancelalo desde Mis turnos así el horario se libera: en este lugar la seña no se devuelve.'
+              when coalesce(horas, 0) = 0 then 'Si no podés ir, cancelalo desde Mis turnos: hasta que empiece, la seña se devuelve.'
+              else 'Si no podés ir, cancelalo desde Mis turnos: hasta ' || horas || ' h antes, la seña se devuelve.' end
+$$;
+-- "Jueves 20 de noviembre, de 20:00 a 21:30"
+create or replace function public.cuando_turno(f date, h time, fin time) returns text language sql immutable as $$
+  select upper(left(public.fecha_larga(f), 1)) || substr(public.fecha_larga(f), 2) || ', de ' || to_char(h, 'HH24:MI') || ' a ' || to_char(fin, 'HH24:MI')
+$$;
+revoke all on function public.nota_prueba(boolean) from public, anon, authenticated;
+revoke all on function public.regla_cancelar(boolean, integer) from public, anon, authenticated;
+revoke all on function public.cuando_turno(date, time, time) from public, anon, authenticated;
+
 -- 4. Turno confirmado → mail al cliente
 create or replace function public.avisar_turno_confirmado() returns trigger
 language plpgsql security definer set search_path = '' as $$
@@ -238,7 +257,6 @@ declare
   n      public.negocios%rowtype; -- el negocio real del turno (vacío en los lugares de ejemplo)
   mapa   text;
   wa     text;
-  cuando text := upper(left(public.fecha_larga(new.fecha), 1)) || substr(public.fecha_larga(new.fecha), 2) || ', de ' || to_char(new.hora, 'HH24:MI') || ' a ' || to_char(new.fin, 'HH24:MI');
 begin
   if public.secreto('resend_remitente') is null then return new; end if;
   select * into c from public.clientes where id = new.cliente_id;
@@ -256,7 +274,7 @@ begin
       public.saludo(c.nombre)
       || '<p style="margin:0 0 16px">Te esperamos en <b style="color:#11151c">' || public.html_seguro(new.lugar) || '</b>. Estos son los datos de tu turno:</p>'
       || '<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 16px;font-size:14px;line-height:1.5">'
-      || public.fila_mail('Cuándo', '<b>' || cuando || '</b>')
+      || public.fila_mail('Cuándo', '<b>' || public.cuando_turno(new.fecha, new.hora, new.fin) || '</b>')
       || public.fila_mail('Dónde', public.html_seguro(new.lugar) || coalesce(' · ' || nullif(public.html_seguro(new.zona), ''), ''))
       || case when btrim(coalesce(n.direccion, '')) <> '' or mapa is not null then public.fila_mail('Dirección',
            -- la ciudad ya va en "Dónde": acá solo si es otra
@@ -273,11 +291,8 @@ begin
       || public.fila_mail('En el lugar', public.plata(new.precio - new.sena))
       || public.fila_mail('Código', '<b style="font-family:monospace;letter-spacing:1px">' || new.codigo || '</b>')
       || '</table>'
-      || '<p style="margin:0 0 12px">Llegá 10 minutos antes. Si no podés ir, cancelalo desde Mis turnos: hasta '
-      || new.cancelar_horas || ' h antes, la seña se devuelve.</p>'
-      || case when public.bookea_en_prueba()
-           then '<p style="margin:0 0 12px;font-size:13px;color:#6f6656">Bookea está en prueba: los lugares de la página son de ejemplo y la seña no se cobró.</p>'
-           else '' end,
+      || '<p style="margin:0 0 12px">Llegá 10 minutos antes. ' || public.regla_cancelar(new.devuelve_sena, new.cancelar_horas) || '</p>'
+      || public.nota_prueba(new.negocio_id is not null),
       'Ver mis turnos', public.bookea_url_turnos(),
       'Te mandamos este mail porque reservaste un turno en Bookea con este email.')
   );
@@ -289,36 +304,111 @@ drop trigger if exists avisar_turno_confirmado on public.turnos;
 create trigger avisar_turno_confirmado after insert on public.turnos
   for each row when (new.estado = 'confirmado') execute function public.avisar_turno_confirmado();
 
--- 5. Turno cancelado → mail al cliente
+-- 6. Turno nuevo en un negocio de verdad → mail al negocio, con el cliente y su WhatsApp (ya está en su agenda)
+create or replace function public.avisar_turno_al_negocio() returns trigger
+language plpgsql security definer set search_path = '' as $$
+declare
+  c  public.clientes%rowtype;
+  n  public.negocios%rowtype;
+  wa text;
+begin
+  if public.secreto('resend_remitente') is null then return new; end if;
+  select * into n from public.negocios where id = new.negocio_id;
+  select * into c from public.clientes where id = new.cliente_id;
+  wa := public.link_whatsapp(c.celular);
+  perform public.mandar_mail(
+    n.email_dueno,
+    'Turno nuevo: ' || c.nombre || ', ' || public.fecha_larga(new.fecha) || ' a las ' || to_char(new.hora, 'HH24:MI'),
+    public.mail_bookea(
+      'Tenés un turno nuevo',
+      public.saludo(n.nombre_dueno)
+      || '<p style="margin:0 0 16px"><b style="color:#11151c">' || public.html_seguro(c.nombre) || '</b> reservó en bookea.ar. Ya está en tu agenda:</p>'
+      || '<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 16px;font-size:14px;line-height:1.5">'
+      || public.fila_mail('Cuándo', '<b>' || public.cuando_turno(new.fecha, new.hora, new.fin) || '</b>')
+      || public.fila_mail(case when new.rubro ilike 'barber%' then 'Con' else 'Cancha' end, public.html_seguro(new.cancha))
+      || public.fila_mail('Cliente', public.html_seguro(c.nombre))
+      || case when wa is not null
+           then public.fila_mail('WhatsApp', '<a href="' || public.html_seguro(wa) || '" style="color:#0f5e52;font-weight:bold">' || public.html_seguro(btrim(c.celular)) || '</a>')
+           else '' end
+      || public.fila_mail('Precio', public.plata(new.precio))
+      || public.fila_mail('Seña', case when public.bookea_en_prueba() then 'No se cobró (Bookea está en prueba)' else public.plata(new.sena) || ' pagada' end)
+      || public.fila_mail('Código', '<b style="font-family:monospace;letter-spacing:1px">' || new.codigo || '</b>')
+      || '</table>',
+      'Ver la agenda', public.bookea_url_panel(),
+      'Te llega este mail porque ' || public.html_seguro(n.nombre) || ' recibe turnos por Bookea.')
+  );
+  return new;
+exception when others then
+  return new;
+end $$;
+drop trigger if exists avisar_turno_al_negocio on public.turnos;
+create trigger avisar_turno_al_negocio after insert on public.turnos
+  for each row when (new.estado = 'confirmado' and new.negocio_id is not null) execute function public.avisar_turno_al_negocio();
+
+-- 5. Turno cancelado → mail al cliente (lo canceló él desde Mis turnos, o el lugar desde su panel)
+-- 7. Si lo canceló el cliente en un negocio de verdad → mail al negocio (el horario ya está libre en su agenda)
 create or replace function public.avisar_turno_cancelado() returns trigger
 language plpgsql security definer set search_path = '' as $$
 declare
-  c        public.clientes%rowtype;
-  devuelve boolean := (new.fecha + new.hora) - (coalesce(new.cancelado, now()) at time zone 'America/Argentina/Mendoza')
-                      > make_interval(hours => new.cancelar_horas);
+  c         public.clientes%rowtype;
+  n         public.negocios%rowtype;
+  por_lugar boolean := new.cancelado_por = 'negocio';
+  devuelve  boolean := coalesce(new.devuelta, new.devuelve_sena
+                         and (new.fecha + new.hora) - (coalesce(new.cancelado, now()) at time zone 'America/Argentina/Mendoza')
+                             > make_interval(hours => new.cancelar_horas));
+  cuando    text := public.fecha_larga(new.fecha) || ' a las ' || to_char(new.hora, 'HH24:MI');
+  wa        text;
 begin
   if public.secreto('resend_remitente') is null then return new; end if;
   select * into c from public.clientes where id = new.cliente_id;
+  if new.negocio_id is not null then
+    select * into n from public.negocios where id = new.negocio_id;
+    wa := public.link_whatsapp(n.whatsapp);
+  end if;
   perform public.mandar_mail(
     c.email,
-    'Turno cancelado: ' || new.lugar || ', ' || public.fecha_larga(new.fecha) || ' a las ' || to_char(new.hora, 'HH24:MI'),
+    'Turno cancelado: ' || new.lugar || ', ' || cuando,
     public.mail_bookea(
-      'Cancelaste tu turno',
+      case when por_lugar then public.html_seguro(new.lugar) || ' canceló tu turno' else 'Cancelaste tu turno' end,
       public.saludo(c.nombre)
-      || '<p style="margin:0 0 12px">Tu turno en <b style="color:#11151c">' || public.html_seguro(new.lugar) || '</b> del '
-      || public.fecha_larga(new.fecha) || ' a las ' || to_char(new.hora, 'HH24:MI') || ' (' || public.html_seguro(new.cancha)
-      || ') quedó cancelado y el horario se liberó.</p>'
       || '<p style="margin:0 0 12px">'
+      || case when por_lugar
+           then '<b style="color:#11151c">' || public.html_seguro(new.lugar) || '</b> canceló tu turno del ' || cuando || ' (' || public.html_seguro(new.cancha) || ').'
+           else 'Tu turno en <b style="color:#11151c">' || public.html_seguro(new.lugar) || '</b> del ' || cuando || ' (' || public.html_seguro(new.cancha)
+                || ') quedó cancelado y el horario se liberó.' end
+      || '</p><p style="margin:0 0 12px">'
       || case when new.sena = 0 then 'No tenías seña pagada.'
+              when por_lugar and devuelve then 'La seña de ' || public.plata(new.sena) || ' se te devuelve.'
+              when por_lugar then 'El lugar se quedó con la seña de ' || public.plata(new.sena) || '.'
+                   || coalesce(' Si tenés dudas, escribiles por <a href="' || public.html_seguro(wa) || '" style="color:#0f5e52;font-weight:bold">WhatsApp</a>.', '')
+              when not new.devuelve_sena then 'En este lugar la seña no se devuelve: la seña de ' || public.plata(new.sena) || ' queda para el lugar.'
               when devuelve then 'Lo cancelaste con más de ' || new.cancelar_horas || ' h de anticipación: la seña de ' || public.plata(new.sena) || ' se devuelve.'
               else 'Lo cancelaste con menos de ' || new.cancelar_horas || ' h de anticipación: la seña de ' || public.plata(new.sena) || ' queda para el lugar.' end
       || '</p>'
-      || case when public.bookea_en_prueba()
-           then '<p style="margin:0 0 12px;font-size:13px;color:#6f6656">Bookea está en prueba: los lugares de la página son de ejemplo y la seña no se cobró.</p>'
-           else '' end,
-      'Reservar otro turno', 'https://bookea.ar/',
-      'Si no lo cancelaste vos, escribinos a <a href="mailto:hola@bookea.ar" style="color:#0f5e52;font-weight:bold">hola@bookea.ar</a>.')
+      || public.nota_prueba(new.negocio_id is not null),
+      'Reservar otro turno', 'https://bookea.ar/' || coalesce('?lugar=' || n.slug, ''),
+      case when por_lugar then 'Si tenés dudas, escribinos a <a href="mailto:hola@bookea.ar" style="color:#0f5e52;font-weight:bold">hola@bookea.ar</a>.'
+           else 'Si no lo cancelaste vos, escribinos a <a href="mailto:hola@bookea.ar" style="color:#0f5e52;font-weight:bold">hola@bookea.ar</a>.' end)
   );
+  -- Al negocio, si el que canceló fue el cliente
+  if new.negocio_id is not null and not por_lugar then
+    perform public.mandar_mail(
+      n.email_dueno,
+      'Turno cancelado: ' || c.nombre || ', ' || cuando,
+      public.mail_bookea(
+        'Se canceló un turno',
+        public.saludo(n.nombre_dueno)
+        || '<p style="margin:0 0 12px"><b style="color:#11151c">' || public.html_seguro(c.nombre) || '</b> canceló su turno del ' || cuando
+        || ' (' || public.html_seguro(new.cancha) || '). El horario ya está libre en tu agenda.</p>'
+        || '<p style="margin:0 0 12px">'
+        || case when public.bookea_en_prueba() then 'Bookea está en prueba: no había seña cobrada.'
+                when new.sena = 0 then 'No tenía seña pagada.'
+                when devuelve then 'Canceló con tiempo: la seña de ' || public.plata(new.sena) || ' se le devuelve.'
+                else 'Canceló con menos anticipación de la que pedís: la seña de ' || public.plata(new.sena) || ' queda para vos.' end
+        || '</p>',
+        'Ver la agenda', public.bookea_url_panel())
+    );
+  end if;
   return new;
 exception when others then
   return new;

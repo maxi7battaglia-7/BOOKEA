@@ -576,30 +576,195 @@ begin
 end $$;
 reset role;
 
--- Turno en un negocio real: solo si está aprobado, y con el nombre y la ciudad que tiene en la base
+-- Turno en un negocio de verdad (Cancha Eva): solo si está aprobado. El turno sale de su Mi negocio (cancha, horario,
+-- precio, seña y cancelación), entra en su agenda, y la agenda y el turno del cliente quedan siempre de acuerdo.
 insert into auth.users (email, raw_user_meta_data) values ('eva@prueba.com', '{"nombre":"Eva","negocio":"Cancha Eva","rubro":"Fútbol 5"}');
 select set_config('prueba.neg_eva', (select id::text from public.negocios where email_dueno = 'eva@prueba.com'), false) \g /dev/null
+select set_config('prueba.eva', (select id::text from auth.users where email = 'eva@prueba.com'), false) \g /dev/null
+-- un día que no sea domingo (los domingos Cancha Eva cierra)
+select set_config('prueba.dia_eva', (select (current_date + 4 + case when extract(dow from current_date + 4) = 0 then 1 else 0 end)::text), false) \g /dev/null
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000e1', false) \g /dev/null
 set role authenticated;
 do $$ begin
   begin
-    perform public.reservar_turno(jsonb_build_object('negocio_id', current_setting('prueba.neg_eva'), 'lugar_id', 'x', 'lugar', 'x', 'cancha', 'Cancha 1',
-      'fecha', current_date + 4, 'hora', '21:00', 'fin', '22:00', 'precio', 40000, 'sena', 10000));
+    perform public.reservar_turno(jsonb_build_object('negocio_id', current_setting('prueba.neg_eva'), 'recurso', 'r1',
+      'fecha_agenda', current_setting('prueba.dia_eva'), 'minuto', 1260));
     raise exception 'FALLA: se reservó en un negocio pendiente';
   exception when no_data_found then raise notice 'OK  no se reserva en un negocio que todavía no está aprobado';
   end;
 end $$;
 reset role;
-update public.negocios set estado = 'aprobado', ciudad = 'San Carlos' where id = current_setting('prueba.neg_eva')::uuid;
+update public.negocios set estado = 'aprobado', ciudad = 'San Carlos', direccion = 'Ruta 40 km 3', whatsapp = '2622 44 5566' where id = current_setting('prueba.neg_eva')::uuid;
+
+-- Sin canchas ni horarios todavía: no aparece ni con su link
+set role anon;
+do $$ begin
+  assert public.lugares_publicos('canchaeva') = '[]'::jsonb, 'apareció un negocio sin canchas ni horarios';
+end $$;
+reset role;
+update public.negocios set ajustes = jsonb_build_object(
+  'recursos', jsonb_build_array(jsonb_build_object('id', 'r1', 'nombre', 'Cancha 1', 'detalle', ''),
+                                jsonb_build_object('id', 'r2', 'nombre', 'Cancha 2', 'detalle', 'Techada')),
+  'duracion', 60,
+  'horario', (select jsonb_agg(jsonb_build_object('abre', '18:00', 'cierra', '01:00', 'cerrado', d = 0) order by d) from generate_series(0, 6) d),
+  'franjas', jsonb_build_array(jsonb_build_object('desde', '18:00', 'hasta', '20:00', 'precio', 40000),
+                               jsonb_build_object('desde', '20:00', 'hasta', '01:00', 'precio', 50000)),
+  'senaPct', 25, 'cancelarHoras', 12, 'devolverSena', true)
+ where id = current_setting('prueba.neg_eva')::uuid;
+-- Eva carga un turno a mano a las 19:00 en la cancha 1
+insert into public.reservas (negocio_id, recurso, fecha, hora, cliente, wa, precio, estado, origen)
+  values (current_setting('prueba.neg_eva')::uuid, 'r1', current_setting('prueba.dia_eva')::date, 1140, 'Pepe Mano', '2622 11 1111', 40000, 'confirmada', 'telefono');
+
+-- La página, sin cuenta: lo ve con su link, no en la lista (todavía no cobra con Mercado Pago), y sin datos de nadie
+set role anon;
+do $$
+declare l jsonb; o jsonb;
+begin
+  assert public.lugares_publicos() = '[]'::jsonb, 'un negocio sin Mercado Pago apareció en la lista';
+  l := public.lugares_publicos('CanchaEva ');
+  assert jsonb_array_length(l) = 1 and l -> 0 ->> 'nombre' = 'Cancha Eva' and l -> 0 ->> 'ciudad' = 'San Carlos'
+     and l -> 0 ->> 'direccion' = 'Ruta 40 km 3' and (l -> 0 ->> 'duracion')::int = 60 and jsonb_array_length(l -> 0 -> 'recursos') = 2
+     and (l -> 0 -> 'franjas' -> 1 ->> 'precio')::int = 50000 and (l -> 0 ->> 'senaPct')::numeric = 25 and not (l -> 0 ->> 'publicado')::boolean
+     and (l -> 0 -> 'horario' -> 0 ->> 'cerrado')::boolean and not (l -> 0 -> 'horario' -> 1 ->> 'cerrado')::boolean, 'lugar: ' || l::text;
+  assert l::text not like '%eva@prueba.com%' and l::text not like '%2622 44 5566%' and l::text not like '%Pepe%' and l::text not like '%2622 11 1111%',
+    'la página ve datos que no son para el público: ' || l::text;
+  assert l -> 0 -> 'ocupados' @> jsonb_build_array(jsonb_build_array('r1', current_setting('prueba.dia_eva'), 1140)), 'falta el turno cargado a mano: ' || l::text;
+  o := public.horarios_ocupados('canchaeva');
+  assert o = l -> 0 -> 'ocupados', 'horarios_ocupados: ' || o::text;
+  assert public.horarios_ocupados('noexiste') = '[]'::jsonb, 'un link que no existe trajo horarios';
+  begin
+    perform public.lugar_publico(x) from public.negocios x;
+    raise exception 'FALLA: sin cuenta se leyó un negocio por fuera de lugares_publicos';
+  exception when insufficient_privilege then null;
+  end;
+  raise notice 'OK  la página ve el negocio con su link (no en la lista hasta Mercado Pago), con sus horarios ocupados y sin datos de nadie';
+end $$;
+reset role;
+
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000e1', false) \g /dev/null
 set role authenticated;
 do $$
-declare t jsonb;
+declare t jsonb; r public.reservas%rowtype; d date := current_setting('prueba.dia_eva')::date;
 begin
-  t := public.reservar_turno(jsonb_build_object('negocio_id', current_setting('prueba.neg_eva'), 'lugar_id', 'inventado', 'lugar', 'Nombre inventado',
-    'zona', 'Otra', 'cancha', 'Cancha 1', 'fecha', current_date + 4, 'hora', '21:00', 'fin', '22:00', 'precio', 40000, 'sena', 10000));
-  assert t ->> 'lugar' = 'Cancha Eva' and t ->> 'zona' = 'San Carlos' and t ->> 'lugar_id' = 'canchaeva' and t ->> 'negocio_id' = current_setting('prueba.neg_eva'),
-    'el turno no tomó los datos del negocio: ' || t::text;
-  raise notice 'OK  en un negocio aprobado, el turno queda atado a él, con su nombre y su ciudad de la base';
+  -- lo que mande la página (precio, nombre, cancha) no cuenta: sale de la base
+  t := public.reservar_turno(jsonb_build_object('negocio_id', current_setting('prueba.neg_eva'), 'recurso', 'r2', 'fecha_agenda', d, 'minuto', 1260,
+    'lugar_id', 'inventado', 'lugar', 'Nombre inventado', 'zona', 'Otra', 'cancha', 'Cancha 9', 'precio', 1, 'sena', 0, 'cancelar_horas', 0));
+  assert t ->> 'lugar' = 'Cancha Eva' and t ->> 'zona' = 'San Carlos' and t ->> 'lugar_id' = 'canchaeva' and t ->> 'negocio_id' = current_setting('prueba.neg_eva')
+     and t ->> 'cancha' = 'Cancha 2 · techada' and (t ->> 'fecha')::date = d and t ->> 'hora' = '21:00:00' and t ->> 'fin' = '22:00:00'
+     and (t ->> 'precio')::int = 50000 and (t ->> 'sena')::int = 12500 and (t ->> 'cancelar_horas')::int = 12 and (t ->> 'devuelve_sena')::boolean
+     and t ->> 'servicio' = 'Turno de 60 min' and t ->> 'rubro' = 'Fútbol 5', 'el turno no salió de Mi negocio: ' || t::text;
+  perform set_config('prueba.turno_eva', t ->> 'id', false);
+  raise notice 'OK  en un negocio de verdad, la cancha, el horario, el precio, la seña y la cancelación salen de su Mi negocio';
+  -- en la agenda del negocio, como un turno por el link, con el nombre y el celular del cliente
+  reset role;
+  select * into r from public.reservas where id = (t ->> 'reserva_id')::uuid;
+  assert r.negocio_id = current_setting('prueba.neg_eva')::uuid and r.recurso = 'r2' and r.fecha = d and r.hora = 1260
+     and r.cliente = 'Julieta Paz' and r.wa = '261 555 9999' and r.precio = 50000 and r.sena = 0 and r.estado = 'confirmada'
+     and r.origen = 'link' and r.nota like '%' || (t ->> 'codigo') || '%' and r.nota like '%no se cobró%', 'agenda: ' || to_jsonb(r)::text;
+  raise notice 'OK  el turno entra en la agenda del negocio con el nombre y el celular del cliente (en prueba, sin seña cobrada)';
+  set role authenticated;
+  -- un horario ocupado en la agenda (por el link o cargado a mano) no se reserva
+  begin
+    perform public.reservar_turno(jsonb_build_object('negocio_id', current_setting('prueba.neg_eva'), 'recurso', 'r2', 'fecha_agenda', d, 'minuto', 1260));
+    raise exception 'FALLA: se reservó dos veces el mismo horario de un negocio';
+  exception when unique_violation then null;
+  end;
+  begin
+    perform public.reservar_turno(jsonb_build_object('negocio_id', current_setting('prueba.neg_eva'), 'recurso', 'r1', 'fecha_agenda', d, 'minuto', 1140));
+    raise exception 'FALLA: se reservó un horario que el negocio ya tenía cargado a mano';
+  exception when unique_violation then null;
+  end;
+  raise notice 'OK  un horario ocupado en la agenda del negocio (por la página o a mano) no se reserva';
+  -- horarios que el negocio no tiene
+  begin
+    perform public.reservar_turno(jsonb_build_object('negocio_id', current_setting('prueba.neg_eva'), 'recurso', 'r1', 'fecha_agenda', d, 'minuto', 1270));
+    raise exception 'FALLA: se reservó a una hora que no es de las del negocio';
+  exception when no_data_found then null;
+  end;
+  begin
+    perform public.reservar_turno(jsonb_build_object('negocio_id', current_setting('prueba.neg_eva'), 'recurso', 'r9', 'fecha_agenda', d, 'minuto', 1260));
+    raise exception 'FALLA: se reservó una cancha que no existe';
+  exception when no_data_found then null;
+  end;
+  begin
+    perform public.reservar_turno(jsonb_build_object('negocio_id', current_setting('prueba.neg_eva'), 'recurso', 'r1', 'fecha_agenda', d, 'minuto', 1500));
+    raise exception 'FALLA: se reservó un turno que termina después del cierre';
+  exception when no_data_found then null;
+  end;
+  begin
+    perform public.reservar_turno(jsonb_build_object('negocio_id', current_setting('prueba.neg_eva'), 'recurso', 'r1',
+      'fecha_agenda', d + (7 - extract(dow from d)::int) % 7, 'minuto', 1260));
+    raise exception 'FALLA: se reservó un domingo, que el negocio cierra';
+  exception when no_data_found then null;
+  end;
+  raise notice 'OK  no se reserva fuera de los horarios del negocio, en una cancha que no existe ni un día que cierra';
+  -- el turno de las 00:00 que sigue a la noche es del día siguiente para el cliente, y de la noche anterior en la agenda
+  t := public.reservar_turno(jsonb_build_object('negocio_id', current_setting('prueba.neg_eva'), 'recurso', 'r1', 'fecha_agenda', d, 'minuto', 1440));
+  assert (t ->> 'fecha')::date = d + 1 and t ->> 'hora' = '00:00:00' and t ->> 'fin' = '01:00:00' and (t ->> 'precio')::int = 50000, 'medianoche: ' || t::text;
+  perform set_config('prueba.turno_eva_noche', t ->> 'id', false);
+  reset role;
+  assert exists (select 1 from public.reservas where id = (t ->> 'reserva_id')::uuid and fecha = d and hora = 1440), 'el turno de medianoche no quedó en la noche de la agenda';
+  raise notice 'OK  el turno de las 00:00 queda en la noche de la agenda y en el día siguiente para el cliente';
+end $$;
+reset role;
+
+-- Eva cancela desde el panel el turno de Juli: también se cancela el de Juli (y la seña se devuelve)
+select set_config('prueba.reserva_eva', (select reserva_id::text from public.turnos where id = current_setting('prueba.turno_eva')::uuid), false) \g /dev/null
+select set_config('request.jwt.claim.sub', current_setting('prueba.eva'), false) \g /dev/null
+set role authenticated;
+do $$ begin
+  assert (select count(*) from public.turnos) = 0, 'el negocio ve los turnos de los clientes en su tabla';
+  update public.reservas set estado = 'cancelada', retenida = false where id = current_setting('prueba.reserva_eva')::uuid;
+  assert found, 'Eva no pudo cancelar el turno de su agenda';
+  -- y aunque un panel abierto desde antes lo vuelva a poner confirmado, queda cancelado
+  update public.reservas set estado = 'confirmada' where id = current_setting('prueba.reserva_eva')::uuid;
+end $$;
+reset role;
+do $$
+declare t public.turnos%rowtype;
+begin
+  select * into t from public.turnos where id = current_setting('prueba.turno_eva')::uuid;
+  assert t.estado = 'cancelado' and t.cancelado_por = 'negocio' and t.devuelta, 'el negocio canceló y el turno del cliente: ' || to_jsonb(t)::text;
+  assert (select estado from public.reservas where id = t.reserva_id) = 'cancelada', 'un turno cancelado volvió a la agenda';
+  raise notice 'OK  si el negocio cancela desde el panel, se cancela también el turno del cliente (y no vuelve a la agenda)';
+end $$;
+
+-- Juli cancela el de medianoche: se libera en la agenda
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000e1', false) \g /dev/null
+set role authenticated;
+do $$
+declare r jsonb;
+begin
+  r := public.cancelar_turno(current_setting('prueba.turno_eva_noche')::uuid);
+  assert r ->> 'estado' = 'cancelado' and r ->> 'cancelado_por' = 'cliente' and (r ->> 'devuelve')::boolean, 'cancelar: ' || r::text;
+end $$;
+reset role;
+do $$ begin
+  assert (select r.estado from public.reservas r join public.turnos t on t.reserva_id = r.id where t.id = current_setting('prueba.turno_eva_noche')::uuid) = 'cancelada',
+    'el turno que canceló el cliente sigue ocupando la agenda';
+  raise notice 'OK  si el cliente cancela, el horario se libera en la agenda del negocio';
+end $$;
+
+-- Si el negocio borra la fila de la agenda, el turno del cliente se cancela; y si el negocio no devuelve la seña, al cancelar no vuelve
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000e1', false) \g /dev/null
+set role authenticated;
+select set_config('prueba.turno_eva_b', (public.reservar_turno(jsonb_build_object('negocio_id', current_setting('prueba.neg_eva'), 'recurso', 'r1',
+  'fecha_agenda', current_setting('prueba.dia_eva'), 'minuto', 1200)) ->> 'id'), false) \g /dev/null
+reset role;
+delete from public.reservas where id = (select reserva_id from public.turnos where id = current_setting('prueba.turno_eva_b')::uuid);
+update public.negocios set ajustes = ajustes || '{"devolverSena": false}' where id = current_setting('prueba.neg_eva')::uuid;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000e1', false) \g /dev/null
+set role authenticated;
+do $$
+declare t jsonb; r jsonb;
+begin
+  assert (select estado from public.turnos where id = current_setting('prueba.turno_eva_b')::uuid) = 'cancelado', 'se borró la fila de la agenda y el turno siguió';
+  t := public.reservar_turno(jsonb_build_object('negocio_id', current_setting('prueba.neg_eva'), 'recurso', 'r1',
+    'fecha_agenda', current_setting('prueba.dia_eva'), 'minuto', 1200));
+  assert not (t ->> 'devuelve_sena')::boolean, 'devolverSena: ' || t::text;
+  r := public.cancelar_turno((t ->> 'id')::uuid);
+  assert not (r ->> 'devuelve')::boolean, 'en un lugar que no devuelve la seña, se devolvió: ' || r::text;
+  raise notice 'OK  si el negocio borra el turno de la agenda se cancela el del cliente, y si no devuelve la seña, no se devuelve';
 end $$;
 reset role;
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000e2', false) \g /dev/null

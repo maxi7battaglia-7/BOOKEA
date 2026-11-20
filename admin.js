@@ -665,6 +665,9 @@
     return !texto;
   };
   const slugDe = (t) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "").slice(0, 24) || "minegocio";
+  // La página del negocio en bookea.ar (bookea.ar/su-link lleva ahí: ver 404.html). Estos links son de páginas de Bookea.
+  const linkPagina = (slug) => "./?lugar=" + encodeURIComponent(slug);
+  const LINKS_DE_BOOKEA = ["admin", "index", "privacidad", "reservar", "assets", "marca"];
   const negocioNuevo = (id, nombre, rubro, slugDado) => {
     let slug = slugDado || slugDe(nombre), k = 2;
     const usados = new Set(!slugDado && DB ? Object.values(DB.negocios).map((n) => n.slug) : []);
@@ -1503,7 +1506,7 @@
     const durs = DURACIONES.includes(n.duracion) ? DURACIONES : [...DURACIONES, n.duracion].sort((a, b) => a - b);
     $("#vista").innerHTML = `
       <header class="vhead"><div><h1>Mi negocio</h1><p class="vhead__frase">Lo que ven tus clientes cuando reservan y las reglas de tu agenda. Cada cambio se guarda solo.</p></div>
-        <div class="vhead__acc"><p class="guardado" id="g-msg" role="status" aria-live="polite">Se guarda solo</p><a class="btn btn--line" href="reservar.html" target="_blank" rel="noopener">${ico("afuera")}Ver la página de reservas</a></div></header>
+        <div class="vhead__acc"><p class="guardado" id="g-msg" role="status" aria-live="polite">Se guarda solo</p><a class="btn btn--line" id="g-ver" href="${linkPagina(n.slug)}" target="_blank" rel="noopener">${ico("afuera")}Ver la página de reservas</a></div></header>
       <form class="ng" id="f-neg" novalidate>
           ${tarjeta("ng-0", "negocio", "Tu negocio", "Lo primero que ven tus clientes al reservar.", `
             <div class="perfil">
@@ -1528,7 +1531,7 @@
             <div class="filas filas--hr" id="g-hor">${ORDEN_DIAS.map(filaDia).join("")}</div>
             <p class="field__help">¿Cerrás después de medianoche? Elegí la hora igual (00:30).</p>`)}
           ${tarjeta("ng-7", "clientes", "Así te ven", "Tu ficha en Bookea, con lo que vas cargando.", `<div class="prev" id="g-prev" aria-live="off"></div>
-            <a class="prev__link" id="g-prev-link" href="reservar.html" target="_blank" rel="noopener"></a>`, "ng-card--prev")}
+            <a class="prev__link" id="g-prev-link" href="${linkPagina(n.slug)}" target="_blank" rel="noopener"></a>`, "ng-card--prev")}
           ${tarjeta("ng-2", "cancha", "Qué se reserva", `Cada ${esc(u)} es una columna en tu agenda.`, `
             <div class="field campo"><label for="g-dur">Cada turno dura</label><select id="g-dur">${durs.map((d) => `<option value="${d}"${d === n.duracion ? " selected" : ""}>${durTexto(d)}</option>`).join("")}</select></div>
             <div class="filas" id="g-recs">${n.recursos.map(filaRec).join("")}</div>
@@ -1627,6 +1630,7 @@
           ${horas.length ? `<ul class="prev__horas">${verHoras.map((t) => `<li>${aHora(t)}</li>`).join("")}${horas.length > verHoras.length ? `<li class="prev__mas">+${horas.length - verHoras.length}</li>` : ""}</ul>` : ""}</div>
         <dl class="prev__datos"><div><dt>Turnos de</dt><dd>${durCorto(+$("#g-dur").value)}</dd></div><div><dt>Desde</dt><dd>${desde ? plata(desde) : "Sin precio"}</dd></div><div><dt>Seña</dt><dd>${desde ? plata(senaDe({ senaPct: pc }, desde)) : `${pc} %`}</dd></div></dl>`;
       $("#g-prev-link").innerHTML = `${ico("afuera")}<span>bookea.ar/<b>${esc(slugDe($("#g-slug").value) || n.slug)}</b></span>`;
+      $("#g-prev-link").href = $("#g-ver").href = linkPagina(n.slug); // el link guardado (el que se está escribiendo todavía no existe)
     };
     const programar = (ms = 1100) => { pintarPrev(); clearTimeout(espera); espera = setTimeout(() => { espera = null; if (estado() !== inicial) guardar({ auto: true }); }, ms); };
     f.addEventListener("input", () => programar()); f.addEventListener("change", () => programar());
@@ -1641,7 +1645,7 @@
       const conTurnos = quitados.filter((r) => RES.some((x) => x.recurso === r.id && x.fecha >= hoy && ocupa(x) && esTurno(x)));
       const ok = [
         marcar($("#g-nombre"), "g-nombre-err", !nombre),
-        marcar($("#g-slug"), "g-slug-err", false),
+        marcar($("#g-slug"), "g-slug-err", LINKS_DE_BOOKEA.includes(slug) && "Ese link es de una página de Bookea. Probá con otro."),
         marcar($("#g-mapa"), "g-mapa-err", !!$("#g-mapa").value.trim() && !MAPS_OK.test($("#g-mapa").value.trim())),
       ];
       const eR = $("#g-recs-err"), eF = $("#g-frs-err");
@@ -1924,7 +1928,7 @@
             <div class="cu-yo__q"><h2 id="cu-0">${esc(YO.nombre || "Tu cuenta")}</h2><p>${esDueno() ? "Podés hacer todo y manejar el equipo" : "Parte del equipo"}</p></div></div>
           <div class="cu-yo__neg"><span class="mono" aria-hidden="true">${NEG.foto ? `<img src="${NEG.foto}" alt="" />` : esc(iniciales(NEG.nombre))}</span>
             <div><p class="cu-yo__rol">${esDueno() ? "Dueño de" : "En el equipo de"}</p><b>${esc(NEG.nombre)}</b><small>${esc([NEG.rubro, NEG.ciudad].filter(Boolean).join(" · "))}</small></div></div>
-          <a class="cu-yo__link" href="reservar.html" target="_blank" rel="noopener">${ico("afuera")}<span>bookea.ar/<b>${esc(NEG.slug)}</b></span></a>
+          <a class="cu-yo__link" href="${linkPagina(NEG.slug)}" target="_blank" rel="noopener">${ico("afuera")}<span>bookea.ar/<b>${esc(NEG.slug)}</b></span></a>
           ${esDueno() ? `<div class="cu-yo__eq"><h3 id="cu-5">Tu equipo</h3><p>Sumá a las personas que te ayudan y elegí qué puede ver y hacer cada una.</p>
             <button type="button" class="btn btn--crema" id="cu-equipo">${ico("equipo")}Ver y sumar personas</button></div>`
           : `<div class="cu-yo__eq"><h3 id="cu-5">Tu lugar en el equipo</h3><p>Lo que podés hacer lo elige el dueño del negocio. En este panel podés:</p>

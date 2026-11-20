@@ -479,8 +479,9 @@ create policy "admins: verse a sí mismo" on public.admins_bookea
 -- Para pagar la seña, el cliente crea su cuenta (nombre, email, celular y contraseña) o entra con la suya.
 -- La contraseña la guarda Supabase Auth (solo un hash, igual que las cuentas de los negocios).
 --   · clientes → los datos de cada cliente (uno por cuenta). Los carga alta_de_cuenta al registrarse.
---   · turnos   → los turnos que reservó cada cliente. Por ahora, en los lugares de ejemplo de la página
---                (lugar_id es el de sitio.js): cuando los negocios reales estén en la página, se van a atar a negocios.
+--   · turnos   → los turnos que reservó cada cliente: en los lugares de ejemplo de la página (lugar_id es el de
+--                sitio.js) o en un negocio de verdad (negocio_id), donde el turno entra también en su agenda
+--                (reservas) con el nombre y el celular del cliente. Ver "Negocios en la página", al final.
 -- Cada cliente ve solo lo suyo. Reservar, cancelar, corregir sus datos y borrar la cuenta se hace con las
 -- funciones de abajo, que controlan todo en la base. Los mails de cada turno salen de avisos-por-mail.sql.
 -- =====================================================================================
@@ -521,6 +522,14 @@ create index if not exists turnos_por_cliente on public.turnos (cliente_id, fech
 -- el link de Google Maps y el WhatsApp que el dueño cargó en Mi negocio, para el mail de confirmación.
 alter table public.turnos add column if not exists negocio_id uuid references public.negocios (id) on delete set null;
 create index if not exists turnos_por_negocio on public.turnos (negocio_id, fecha);
+-- En un negocio de verdad: la fila de su agenda (reservas) que ocupa el turno, si la seña se devuelve al cancelar
+-- con tiempo (el dueño puede elegir que no), quién lo canceló y si al final la seña se devolvió.
+alter table public.turnos
+  add column if not exists reserva_id    uuid references public.reservas (id) on delete set null,
+  add column if not exists devuelve_sena boolean not null default true,
+  add column if not exists cancelado_por text not null default '' check (cancelado_por in ('', 'cliente', 'negocio')),
+  add column if not exists devuelta      boolean;
+create index if not exists turnos_por_reserva on public.turnos (reserva_id) where reserva_id is not null;
 -- Un horario de una cancha no se reserva dos veces: si dos personas pagan el mismo turno a la vez, la base acepta una.
 create unique index if not exists turnos_un_cliente_por_horario
   on public.turnos (lugar_id, cancha, fecha, hora) where estado = 'confirmado';
@@ -552,24 +561,107 @@ begin
   return to_jsonb(fila);
 end $$;
 
+-- Mientras Bookea esté en prueba (la seña todavía no se cobra), la página, la agenda del negocio y los mails lo dicen.
+-- Cuando se cobre de verdad (Mercado Pago), cambiá el true por false y volvé a correr este archivo.
+create or replace function public.bookea_en_prueba() returns boolean language sql immutable as $$
+  select true
+$$;
+
+-- "21:30" → 1290 (minutos desde las 00:00), como guarda el panel los horarios
+create or replace function public.minutos(hhmm text) returns integer
+language sql immutable set search_path = '' as $$
+  select case when coalesce(hhmm, '') ~ '^[0-9]{1,2}:[0-9]{2}$'
+              then split_part(hhmm, ':', 1)::integer * 60 + split_part(hhmm, ':', 2)::integer end
+$$;
+
+-- Lo que sale un turno que empieza en ese minuto, según los precios por horario de Mi negocio (igual que el panel:
+-- una franja que pasa la medianoche sigue del otro lado, y fuera de toda franja vale la última)
+create or replace function public.precio_en(franjas jsonb, minuto integer) returns integer
+language plpgsql immutable set search_path = '' as $$
+declare
+  m      integer := minuto % 1440;
+  f      jsonb;
+  d      integer;
+  h      integer;
+  ultimo integer := 0;
+begin
+  for f in select value from jsonb_array_elements(case when jsonb_typeof(franjas) = 'array' then franjas else '[]'::jsonb end) loop
+    d := coalesce(public.minutos(f ->> 'desde'), 0);
+    h := coalesce(public.minutos(f ->> 'hasta'), 0);
+    if h <= d then h := h + 1440; end if;
+    ultimo := case when coalesce(f ->> 'precio', '') ~ '^[0-9]{1,8}(\.[0-9]+)?$' then round((f ->> 'precio')::numeric)::integer else 0 end;
+    if (case when m < d then m + 1440 else m end) >= d and (case when m < d then m + 1440 else m end) < h then return ultimo; end if;
+  end loop;
+  return ultimo;
+end $$;
+
 -- Reservar (después de pagar la seña). El turno queda a nombre de la cuenta que reserva; la base pone el código.
--- "t" trae: lugar_id, lugar, zona, rubro, servicio_id, servicio, cancha, fecha, hora, fin, precio, sena, cancelar_horas.
+-- En un lugar de ejemplo, "t" trae: lugar_id, lugar, zona, rubro, servicio_id, servicio, cancha, fecha, hora, fin,
+-- precio, sena y cancelar_horas.
+-- En un negocio de verdad trae negocio_id, recurso (la cancha), fecha_agenda y minuto (como la agenda del panel:
+-- un turno de las 00:30 que sigue a la noche del sábado es del sábado, minuto 1470). Todo lo demás (la cancha, el
+-- horario, el precio, la seña y la regla para cancelar) sale de lo que el negocio cargó en Mi negocio, no de la página.
+-- El turno entra también en su agenda, con el nombre y el celular del cliente.
 create or replace function public.reservar_turno(t jsonb) returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare
-  f    date := (t ->> 'fecha')::date;
-  h    time := (t ->> 'hora')::time;
-  neg  public.negocios%rowtype;
-  fila public.turnos%rowtype;
+  f        date := (t ->> 'fecha')::date;
+  h        time := (t ->> 'hora')::time;
+  fin      time := (t ->> 'fin')::time;
+  precio   integer := (t ->> 'precio')::integer;
+  sena     integer := (t ->> 'sena')::integer;
+  horas    integer := coalesce((t ->> 'cancelar_horas')::integer, 0);
+  devuelve boolean := true;
+  cancha   text := btrim(t ->> 'cancha');
+  servicio text := coalesce(t ->> 'servicio', '');
+  cod      text := 'BK-' || upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 5));
+  yo       public.clientes%rowtype;
+  neg      public.negocios%rowtype;
+  aj       jsonb;
+  rec      jsonb;
+  dia      jsonb;
+  fa       date;
+  m        integer;
+  dur      integer;
+  abre     integer;
+  cierra   integer;
+  pct      numeric;
+  rid      uuid;
+  fila     public.turnos%rowtype;
 begin
   if auth.uid() is null then raise exception 'Hace falta iniciar sesión' using errcode = '42501'; end if;
-  if not exists (select 1 from public.clientes c where c.id = auth.uid()) then
-    raise exception 'Faltan tus datos' using errcode = '42501';
-  end if;
-  -- Turno en un negocio real: tiene que estar aprobado, y su nombre y su ciudad salen de la base (no de la página)
+  select * into yo from public.clientes c where c.id = auth.uid();
+  if not found then raise exception 'Faltan tus datos' using errcode = '42501'; end if;
+  -- Turno en un negocio de verdad: tiene que estar aprobado, y el turno sale de su Mi negocio
   if nullif(t ->> 'negocio_id', '') is not null then
     select * into neg from public.negocios x where x.id = (t ->> 'negocio_id')::uuid and x.estado = 'aprobado';
     if not found then raise exception 'Ese lugar no está disponible' using errcode = 'P0002'; end if;
+    aj  := neg.ajustes;
+    fa  := coalesce(nullif(t ->> 'fecha_agenda', ''), t ->> 'fecha')::date;
+    m   := case when coalesce(t ->> 'minuto', '') ~ '^[0-9]{1,4}$' then (t ->> 'minuto')::integer end;
+    rec := (select r from jsonb_array_elements(case when jsonb_typeof(aj -> 'recursos') = 'array' then aj -> 'recursos' else '[]'::jsonb end) r
+             where r ->> 'id' = t ->> 'recurso' limit 1);
+    dur := case when coalesce(aj ->> 'duracion', '') ~ '^[0-9]{1,3}$' then (aj ->> 'duracion')::integer end;
+    dia := case when jsonb_typeof(aj -> 'horario') = 'array' then aj -> 'horario' -> extract(dow from fa)::integer end;
+    abre := public.minutos(dia ->> 'abre');
+    cierra := public.minutos(dia ->> 'cierra');
+    if cierra <= abre then cierra := cierra + 1440; end if;
+    -- la cancha existe, ese día abre, y el turno empieza en uno de sus horarios y termina antes de cerrar
+    if rec is null or m is null or coalesce(dur, 0) < 5 or dia is null or dia ->> 'cerrado' = 'true'
+       or abre is null or cierra is null or m < abre or m + dur > cierra or (m - abre) % dur <> 0 then
+      raise exception 'Ese horario no está disponible' using errcode = 'P0002';
+    end if;
+    f        := fa + m / 1440;
+    h        := make_time((m % 1440) / 60, m % 60, 0);
+    fin      := make_time(((m + dur) % 1440) / 60, (m + dur) % 60, 0);
+    precio   := public.precio_en(aj -> 'franjas', m);
+    pct      := case when coalesce(aj ->> 'senaPct', '') ~ '^[0-9]{1,3}(\.[0-9]+)?$' then least((aj ->> 'senaPct')::numeric, 100) else 0 end;
+    sena     := (round(precio * pct / 10000) * 100)::integer;  -- como el panel: redondeada a $ 100
+    horas    := case when coalesce(aj ->> 'cancelarHoras', '') ~ '^[0-9]{1,3}$' then least((aj ->> 'cancelarHoras')::integer, 168) else 0 end;
+    devuelve := coalesce(aj ->> 'devolverSena', '') <> 'false';
+    cancha   := left(btrim(coalesce(rec ->> 'nombre', '')), 40)
+                || case when btrim(coalesce(rec ->> 'detalle', '')) <> '' then ' · ' || lower(left(btrim(rec ->> 'detalle'), 17)) else '' end;
+    servicio := 'Turno de ' || dur || ' min';
   end if;
   if f + h < public.ahora_mendoza() then raise exception 'Ese horario ya pasó' using errcode = '23514'; end if;
   if f > current_date + 60 then raise exception 'Ese día está muy lejos' using errcode = '23514'; end if;
@@ -578,43 +670,66 @@ begin
         and x.fecha + x.hora >= public.ahora_mendoza()) >= 10 then
     raise exception 'Ya tenés 10 turnos por delante' using errcode = '23514';
   end if;
-  insert into public.turnos (cliente_id, negocio_id, lugar_id, lugar, zona, rubro, servicio_id, servicio, cancha, fecha, hora, fin, precio, sena, cancelar_horas)
-    values (auth.uid(), neg.id, coalesce(neg.slug, t ->> 'lugar_id'), coalesce(neg.nombre, btrim(t ->> 'lugar')),
-            coalesce(nullif(neg.ciudad, ''), t ->> 'zona', ''), coalesce(t ->> 'rubro', ''),
-            coalesce(t ->> 'servicio_id', ''), coalesce(t ->> 'servicio', ''), btrim(t ->> 'cancha'), f, h, (t ->> 'fin')::time,
-            (t ->> 'precio')::integer, (t ->> 'sena')::integer, coalesce((t ->> 'cancelar_horas')::integer, 0))
+  -- En la agenda del negocio, como un turno "por el link". Si ese horario ya está ocupado (otro turno, uno cargado
+  -- a mano o un bloqueo), la base no deja reservarlo. Mientras Bookea esté en prueba, la seña no se cobró: va en 0.
+  if neg.id is not null then
+    insert into public.reservas (negocio_id, recurso, fecha, hora, cliente, wa, precio, sena, estado, origen, nota)
+      values (neg.id, rec ->> 'id', fa, m, left(yo.nombre, 80), left(yo.celular, 40), precio,
+              case when public.bookea_en_prueba() then 0 else sena end, 'confirmada', 'link',
+              'Reservó en bookea.ar · código ' || cod
+              || case when public.bookea_en_prueba() then ' · Bookea está en prueba: la seña no se cobró.' else '' end)
+      returning id into rid;
+  end if;
+  insert into public.turnos (cliente_id, negocio_id, reserva_id, codigo, lugar_id, lugar, zona, rubro, servicio_id, servicio, cancha,
+                             fecha, hora, fin, precio, sena, cancelar_horas, devuelve_sena)
+    values (auth.uid(), neg.id, rid, cod, coalesce(neg.slug, t ->> 'lugar_id'), coalesce(neg.nombre, btrim(t ->> 'lugar')),
+            coalesce(nullif(neg.ciudad, ''), t ->> 'zona', ''), left(coalesce(case when neg.id is not null then neg.rubro end, t ->> 'rubro', ''), 40),
+            case when neg.id is not null then 'turno' else coalesce(t ->> 'servicio_id', '') end, servicio, cancha, f, h, fin,
+            precio, sena, horas, devuelve)
     returning * into fila;
   return to_jsonb(fila);
 end $$;
 
 -- Cancelar uno de mis turnos (si todavía no empezó). Dice si la seña se devuelve: con más horas de anticipación
--- que las del lugar, sí; si no, queda para el negocio.
+-- que las del lugar, sí; si no (o si el lugar no devuelve la seña), queda para el negocio.
+-- En un negocio de verdad, el horario se libera también en su agenda.
 create or replace function public.cancelar_turno(turno uuid) returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare
-  fila  public.turnos%rowtype;
-  ahora timestamp := public.ahora_mendoza();
+  fila     public.turnos%rowtype;
+  ahora    timestamp := public.ahora_mendoza();
+  devuelve boolean;
 begin
   if auth.uid() is null then raise exception 'Hace falta iniciar sesión' using errcode = '42501'; end if;
   select * into fila from public.turnos x where x.id = turno and x.cliente_id = auth.uid() for update;
   if not found then raise exception 'No existe ese turno' using errcode = 'P0002'; end if;
+  devuelve := fila.devuelve_sena and (fila.fecha + fila.hora) - ahora > make_interval(hours => fila.cancelar_horas);
   if fila.estado = 'confirmado' then
     if fila.fecha + fila.hora < ahora then raise exception 'Ese turno ya pasó' using errcode = '23514'; end if;
-    update public.turnos x set estado = 'cancelado', cancelado = now() where x.id = turno returning * into fila;
+    update public.turnos x set estado = 'cancelado', cancelado = now(), cancelado_por = 'cliente', devuelta = devuelve
+      where x.id = turno returning * into fila;
+    update public.reservas r set estado = 'cancelada', retenida = not devuelve and r.sena > 0
+      where r.id = fila.reserva_id and r.estado <> 'cancelada';
   end if;
-  return to_jsonb(fila) || jsonb_build_object('devuelve', (fila.fecha + fila.hora) - ahora > make_interval(hours => fila.cancelar_horas));
+  return to_jsonb(fila) || jsonb_build_object('devuelve', coalesce(fila.devuelta, devuelve));
 end $$;
 
 -- Borrar mi cuenta y mis datos (Ley 25.326: el cliente puede pedir que se borren). Se borran la cuenta, sus datos
--- y sus turnos. Una cuenta que también maneja un negocio no se borra desde acá: se pide por mail.
+-- y sus turnos; los que todavía no pasaron se cancelan antes, así se liberan en la agenda de cada negocio.
+-- Una cuenta que también maneja un negocio no se borra desde acá: se pide por mail.
 create or replace function public.borrar_mi_cuenta() returns boolean
 language plpgsql security definer set search_path = '' as $$
+declare x uuid;
 begin
   if auth.uid() is null then raise exception 'Hace falta iniciar sesión' using errcode = '42501'; end if;
   if exists (select 1 from public.miembros m where m.user_id = auth.uid())
      or exists (select 1 from public.admins_bookea a where a.user_id = auth.uid()) then
     raise exception 'Esta cuenta maneja un negocio' using errcode = '42501';
   end if;
+  for x in select t.id from public.turnos t where t.cliente_id = auth.uid() and t.estado = 'confirmado'
+             and t.fecha + t.hora >= public.ahora_mendoza() loop
+    perform public.cancelar_turno(x);
+  end loop;
   delete from auth.users u where u.id = auth.uid();
   return true;
 end $$;
@@ -631,6 +746,9 @@ drop policy if exists "turnos: ver los propios" on public.turnos;
 create policy "turnos: ver los propios" on public.turnos
   for select to authenticated using (cliente_id = auth.uid());
 revoke all on function public.ahora_mendoza() from public, anon, authenticated;
+revoke all on function public.bookea_en_prueba() from public, anon, authenticated;
+revoke all on function public.minutos(text) from public, anon, authenticated;
+revoke all on function public.precio_en(jsonb, integer) from public, anon, authenticated;
 revoke all on function public.guardar_mis_datos(text, text, boolean) from public, anon;
 grant execute on function public.guardar_mis_datos(text, text, boolean) to authenticated;
 revoke all on function public.reservar_turno(jsonb) from public, anon;
@@ -639,3 +757,132 @@ revoke all on function public.cancelar_turno(uuid) from public, anon;
 grant execute on function public.cancelar_turno(uuid) to authenticated;
 revoke all on function public.borrar_mi_cuenta() from public, anon;
 grant execute on function public.borrar_mi_cuenta() to authenticated;
+
+-- =====================================================================================
+-- Negocios en la página (bookea.ar)
+--
+-- La página muestra cada negocio aprobado con lo que cargó en Mi negocio: nombre, rubro, ciudad, dirección, foto,
+-- descripción, canchas, duración del turno, horarios, precios, seña y cancelación. Y los horarios ocupados de su
+-- agenda, sin decir de quién son. Nada más: ni el email del dueño, ni su WhatsApp, ni sus clientes.
+--
+-- Cuáles aparecen:
+--   · En la lista de la página (inicio y resultados): los aprobados que ya pueden cobrar la seña con Mercado Pago.
+--     Hasta que esté Mercado Pago, ninguno (tiene_mercado_pago dice que no).
+--   · Con su link (bookea.ar/su-link): cualquiera aprobado que ya tenga canchas y horarios, para que el dueño se vea
+--     y lo pruebe.
+-- Los turnos: reservar_turno los pone también en la agenda del negocio (reservas). Si el cliente cancela, el horario
+-- se libera en la agenda; si el negocio cancela desde el panel, se cancela también el del cliente y le llega el mail.
+-- =====================================================================================
+
+-- ¿Ya puede cobrar la seña con Mercado Pago? Es el paso que sigue: hasta entonces, ninguno.
+create or replace function public.tiene_mercado_pago(n uuid) returns boolean
+language sql stable set search_path = '' as $$
+  select false
+$$;
+
+-- ¿Tiene lo mínimo para tomar turnos? Al menos una cancha, la duración del turno y los horarios de los 7 días.
+create or replace function public.lugar_listo(aj jsonb) returns boolean
+language sql immutable set search_path = '' as $$
+  select case when jsonb_typeof(aj -> 'recursos') = 'array' and jsonb_typeof(aj -> 'horario') = 'array'
+                   and coalesce(aj ->> 'duracion', '') ~ '^[0-9]{1,3}$'
+              then jsonb_array_length(aj -> 'recursos') > 0 and jsonb_array_length(aj -> 'horario') = 7
+                   and (aj ->> 'duracion')::integer >= 5
+              else false end
+$$;
+
+-- Los horarios ocupados de su agenda (turnos, también los cargados a mano, y bloqueos), de ayer a 8 días:
+-- [cancha, fecha de la agenda, minuto]. Sin nombres.
+create or replace function public.ocupados_de(n uuid) returns jsonb
+language sql stable set search_path = '' as $$
+  select coalesce(jsonb_agg(jsonb_build_array(r.recurso, r.fecha, r.hora) order by r.fecha, r.hora, r.recurso), '[]'::jsonb)
+  from public.reservas r
+  where r.negocio_id = n and r.estado <> 'cancelada'
+    and r.fecha between public.ahora_mendoza()::date - 1 and public.ahora_mendoza()::date + 8
+$$;
+
+-- Lo que la página muestra de un negocio (los ajustes, armados de nuevo campo por campo: solo lo que hace falta)
+create or replace function public.lugar_publico(x public.negocios) returns jsonb
+language sql stable set search_path = '' as $$
+  select jsonb_build_object(
+    'id', x.id, 'slug', x.slug, 'nombre', x.nombre, 'rubro', x.rubro, 'ciudad', x.ciudad, 'direccion', x.direccion,
+    'mapa', x.mapa, 'foto', x.foto, 'descripcion', x.descripcion,
+    'recursos', (select coalesce(jsonb_agg(jsonb_build_object('id', r ->> 'id', 'nombre', coalesce(r ->> 'nombre', ''),
+                                                              'detalle', coalesce(r ->> 'detalle', '')) order by i), '[]'::jsonb)
+                   from jsonb_array_elements(x.ajustes -> 'recursos') with ordinality as e(r, i)),
+    'duracion', (x.ajustes ->> 'duracion')::integer,
+    'horario', (select jsonb_agg(jsonb_build_object('abre', coalesce(d ->> 'abre', ''), 'cierra', coalesce(d ->> 'cierra', ''),
+                                                    'cerrado', d ->> 'cerrado' = 'true') order by i)
+                  from jsonb_array_elements(x.ajustes -> 'horario') with ordinality as e(d, i)),
+    'franjas', (select coalesce(jsonb_agg(jsonb_build_object('desde', coalesce(f ->> 'desde', ''), 'hasta', coalesce(f ->> 'hasta', ''),
+                                                             'precio', public.precio_en(jsonb_build_array(f), public.minutos(f ->> 'desde'))) order by i), '[]'::jsonb)
+                  from jsonb_array_elements(case when jsonb_typeof(x.ajustes -> 'franjas') = 'array' then x.ajustes -> 'franjas' else '[]'::jsonb end)
+                       with ordinality as e(f, i)),
+    'senaPct', case when coalesce(x.ajustes ->> 'senaPct', '') ~ '^[0-9]{1,3}(\.[0-9]+)?$' then least((x.ajustes ->> 'senaPct')::numeric, 100) else 0 end,
+    'cancelarHoras', case when coalesce(x.ajustes ->> 'cancelarHoras', '') ~ '^[0-9]{1,3}$' then least((x.ajustes ->> 'cancelarHoras')::integer, 168) else 0 end,
+    'devolverSena', coalesce(x.ajustes ->> 'devolverSena', '') <> 'false',
+    'publicado', public.tiene_mercado_pago(x.id),
+    'ocupados', public.ocupados_de(x.id))
+$$;
+
+-- Para la página (también sin cuenta): los negocios de la lista y, si se pide, el de un link (bookea.ar/su-link)
+create or replace function public.lugares_publicos(incluir text default null) returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select coalesce(jsonb_agg(public.lugar_publico(x) order by x.nombre), '[]'::jsonb)
+  from public.negocios x
+  where x.estado = 'aprobado' and public.lugar_listo(x.ajustes)
+    and (public.tiene_mercado_pago(x.id) or x.slug = lower(btrim(coalesce(incluir, ''))))
+$$;
+
+-- Los horarios ocupados de un negocio, al momento (la página los vuelve a pedir al abrir su ficha)
+create or replace function public.horarios_ocupados(lugar text) returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select coalesce((select public.ocupados_de(x.id) from public.negocios x
+                    where x.slug = lower(btrim(coalesce(lugar, ''))) and x.estado = 'aprobado'), '[]'::jsonb)
+$$;
+
+-- La agenda del negocio y los turnos de bookea.ar, siempre de acuerdo:
+--   · Si el negocio borra la fila de un turno de bookea.ar, el turno del cliente se cancela (y la seña se devuelve).
+--   · Un turno que el cliente ya canceló no vuelve a la agenda (por ejemplo, desde un panel abierto desde antes).
+create or replace function public.reserva_web_antes() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  if tg_op = 'DELETE' then
+    update public.turnos t set estado = 'cancelado', cancelado = now(), cancelado_por = 'negocio', devuelta = true
+     where t.reserva_id = old.id and t.estado = 'confirmado';
+    return old;
+  end if;
+  if old.estado = 'cancelada' and new.estado <> 'cancelada'
+     and exists (select 1 from public.turnos t where t.reserva_id = old.id and t.estado = 'cancelado') then
+    new.estado := 'cancelada';
+    new.retenida := old.retenida;
+  end if;
+  return new;
+end $$;
+drop trigger if exists reserva_web_antes on public.reservas;
+create trigger reserva_web_antes before update or delete on public.reservas
+  for each row execute function public.reserva_web_antes();
+
+--   · Si el negocio cancela en el panel un turno de bookea.ar, se cancela también el del cliente (le llega el mail).
+--     Si el negocio retuvo la seña, no se devuelve; si no, sí.
+create or replace function public.reserva_web_cancelada() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  update public.turnos t set estado = 'cancelado', cancelado = now(), cancelado_por = 'negocio', devuelta = not new.retenida
+   where t.reserva_id = new.id and t.estado = 'confirmado';
+  return new;
+end $$;
+drop trigger if exists reserva_web_cancelada on public.reservas;
+create trigger reserva_web_cancelada after update of estado on public.reservas
+  for each row when (new.estado = 'cancelada' and old.estado <> 'cancelada')
+  execute function public.reserva_web_cancelada();
+
+revoke all on function public.tiene_mercado_pago(uuid) from public, anon, authenticated;
+revoke all on function public.lugar_listo(jsonb) from public, anon, authenticated;
+revoke all on function public.ocupados_de(uuid) from public, anon, authenticated;
+revoke all on function public.lugar_publico(public.negocios) from public, anon, authenticated;
+revoke all on function public.reserva_web_antes() from public, anon, authenticated;
+revoke all on function public.reserva_web_cancelada() from public, anon, authenticated;
+revoke all on function public.lugares_publicos(text) from public;
+grant execute on function public.lugares_publicos(text) to anon, authenticated;  -- la página, con o sin cuenta
+revoke all on function public.horarios_ocupados(text) from public;
+grant execute on function public.horarios_ocupados(text) to anon, authenticated;
