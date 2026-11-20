@@ -575,6 +575,33 @@ begin
   raise notice 'OK  el cliente corrige su nombre, su celular y las promociones (el email no cambia)';
 end $$;
 reset role;
+
+-- Turno en un negocio real: solo si está aprobado, y con el nombre y la ciudad que tiene en la base
+insert into auth.users (email, raw_user_meta_data) values ('eva@prueba.com', '{"nombre":"Eva","negocio":"Cancha Eva","rubro":"Fútbol 5"}');
+select set_config('prueba.neg_eva', (select id::text from public.negocios where email_dueno = 'eva@prueba.com'), false) \g /dev/null
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000e1', false) \g /dev/null
+set role authenticated;
+do $$ begin
+  begin
+    perform public.reservar_turno(jsonb_build_object('negocio_id', current_setting('prueba.neg_eva'), 'lugar_id', 'x', 'lugar', 'x', 'cancha', 'Cancha 1',
+      'fecha', current_date + 4, 'hora', '21:00', 'fin', '22:00', 'precio', 40000, 'sena', 10000));
+    raise exception 'FALLA: se reservó en un negocio pendiente';
+  exception when no_data_found then raise notice 'OK  no se reserva en un negocio que todavía no está aprobado';
+  end;
+end $$;
+reset role;
+update public.negocios set estado = 'aprobado', ciudad = 'San Carlos' where id = current_setting('prueba.neg_eva')::uuid;
+set role authenticated;
+do $$
+declare t jsonb;
+begin
+  t := public.reservar_turno(jsonb_build_object('negocio_id', current_setting('prueba.neg_eva'), 'lugar_id', 'inventado', 'lugar', 'Nombre inventado',
+    'zona', 'Otra', 'cancha', 'Cancha 1', 'fecha', current_date + 4, 'hora', '21:00', 'fin', '22:00', 'precio', 40000, 'sena', 10000));
+  assert t ->> 'lugar' = 'Cancha Eva' and t ->> 'zona' = 'San Carlos' and t ->> 'lugar_id' = 'canchaeva' and t ->> 'negocio_id' = current_setting('prueba.neg_eva'),
+    'el turno no tomó los datos del negocio: ' || t::text;
+  raise notice 'OK  en un negocio aprobado, el turno queda atado a él, con su nombre y su ciudad de la base';
+end $$;
+reset role;
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000e2', false) \g /dev/null
 set role authenticated;
 do $$

@@ -142,6 +142,58 @@ do $$ begin
   assert (select count(*) from net.enviados where body ->> 'subject' like 'Turno cancelado%') = 1, 'cancelar dos veces mandó dos mails';
   raise notice 'OK  cancelar dos veces no manda dos mails';
 end $$;
+-- Turno en un negocio real: el mail lleva su dirección, "Cómo llegar" y su WhatsApp, tal como los cargó en Mi negocio
+insert into auth.users (email, raw_user_meta_data) values ('martin@prueba.com', '{"nombre":"Martín","negocio":"Los Álamos Pádel","rubro":"Pádel"}');
+update public.negocios set estado = 'aprobado', direccion = 'Av. San Martín 1234', ciudad = 'Tupungato', whatsapp = '0261 555-1234', mapa = ''
+ where email_dueno = 'martin@prueba.com';
+select set_config('prueba.neg', (select id::text from public.negocios where email_dueno = 'martin@prueba.com'), false) \g /dev/null
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000e1', false) \g /dev/null
+set role authenticated;
+do $$ begin
+  perform public.reservar_turno(jsonb_build_object('negocio_id', current_setting('prueba.neg'), 'lugar_id', 'x', 'lugar', 'Otro nombre', 'rubro', 'Pádel',
+    'cancha', 'Cancha 1', 'fecha', current_date + 8, 'hora', '19:00', 'fin', '20:30', 'precio', 34000, 'sena', 8500, 'cancelar_horas', 6));
+end $$;
+reset role;
+do $$
+declare e record;
+begin
+  assert public.codificar_url('Los Álamos, Av. 1') = 'Los%20%C3%81lamos%2C%20Av.%201', 'codificar_url: ' || public.codificar_url('Los Álamos, Av. 1');
+  assert public.link_whatsapp('0261 555-1234') = 'https://wa.me/5492615551234' and public.link_whatsapp('+54 9 261 555 1234') = 'https://wa.me/5492615551234'
+     and public.link_whatsapp('') is null, 'link_whatsapp';
+  select * into e from net.enviados order by id desc limit 1;
+  assert e.body ->> 'subject' like 'Turno confirmado: Los Álamos Pádel, %', 'el nombre del lugar sale de la base: ' || (e.body ->> 'subject');
+  assert e.body ->> 'html' like '%>Av. San Martín 1234<br>%' and e.body ->> 'html' like '%Los Álamos Pádel · Tupungato%'
+     and e.body ->> 'html' like '%https://www.google.com/maps/search/?api=1&amp;query=Los%20%C3%81lamos%20P%C3%A1del%2C%20Av.%20San%20Mart%C3%ADn%201234%2C%20Tupungato%'
+     and e.body ->> 'html' like '%>Cómo llegar<%', 'falta la dirección o "Cómo llegar": ' || (e.body ->> 'html');
+  assert e.body ->> 'html' like '%href="https://wa.me/5492615551234"%' and e.body ->> 'html' like '%>0261 555-1234<%', 'falta el WhatsApp: ' || (e.body ->> 'html');
+  raise notice 'OK  turno en un negocio real: el mail lleva la dirección, "Cómo llegar" (Google Maps) y el WhatsApp de Mi negocio';
+end $$;
+-- Con su propio link de Google Maps, se usa ese; un link que no es de Maps (o sin WhatsApp) no aparece
+update public.negocios set mapa = 'https://maps.app.goo.gl/AbC123' where email_dueno = 'martin@prueba.com';
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000e1', false) \g /dev/null
+set role authenticated;
+do $$ begin
+  perform public.reservar_turno(jsonb_build_object('negocio_id', current_setting('prueba.neg'), 'lugar_id', 'x', 'lugar', 'x',
+    'cancha', 'Cancha 2', 'fecha', current_date + 8, 'hora', '19:00', 'fin', '20:30', 'precio', 34000, 'sena', 8500));
+end $$;
+reset role;
+do $$ begin
+  assert (select body ->> 'html' from net.enviados order by id desc limit 1) like '%href="https://maps.app.goo.gl/AbC123"%', 'no usó el link de Maps del dueño';
+end $$;
+update public.negocios set mapa = 'javascript:alert(1)', whatsapp = '', direccion = '', ciudad = '' where email_dueno = 'martin@prueba.com';
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000e1', false) \g /dev/null
+set role authenticated;
+do $$ begin
+  perform public.reservar_turno(jsonb_build_object('negocio_id', current_setting('prueba.neg'), 'lugar_id', 'x', 'lugar', 'x',
+    'cancha', 'Cancha 3', 'fecha', current_date + 8, 'hora', '19:00', 'fin', '20:30', 'precio', 34000, 'sena', 8500));
+end $$;
+reset role;
+do $$
+declare h text := (select body ->> 'html' from net.enviados order by id desc limit 1);
+begin
+  assert h not like '%javascript:%' and h not like '%wa.me%' and h not like '%Cómo llegar%' and h like '%Cancha 3%', 'con datos vacíos o un link raro: ' || h;
+  raise notice 'OK  con su propio link de Google Maps usa ese; sin datos (o con un link que no es de Maps) no muestra esas filas';
+end $$;
 -- si pg_net falla, registrarse sigue funcionando
 create or replace function net.http_post(url text, body jsonb default '{}', params jsonb default '{}',
   headers jsonb default '{}', timeout_milliseconds int default 5000) returns bigint

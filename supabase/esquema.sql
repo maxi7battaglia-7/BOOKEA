@@ -517,6 +517,10 @@ create table if not exists public.turnos (
   cancelado      timestamptz
 );
 create index if not exists turnos_por_cliente on public.turnos (cliente_id, fecha);
+-- El negocio real del turno (vacío en los lugares de ejemplo). De ahí salen, siempre al día, la dirección,
+-- el link de Google Maps y el WhatsApp que el dueño cargó en Mi negocio, para el mail de confirmación.
+alter table public.turnos add column if not exists negocio_id uuid references public.negocios (id) on delete set null;
+create index if not exists turnos_por_negocio on public.turnos (negocio_id, fecha);
 -- Un horario de una cancha no se reserva dos veces: si dos personas pagan el mismo turno a la vez, la base acepta una.
 create unique index if not exists turnos_un_cliente_por_horario
   on public.turnos (lugar_id, cancha, fecha, hora) where estado = 'confirmado';
@@ -555,11 +559,17 @@ language plpgsql security definer set search_path = '' as $$
 declare
   f    date := (t ->> 'fecha')::date;
   h    time := (t ->> 'hora')::time;
+  neg  public.negocios%rowtype;
   fila public.turnos%rowtype;
 begin
   if auth.uid() is null then raise exception 'Hace falta iniciar sesión' using errcode = '42501'; end if;
   if not exists (select 1 from public.clientes c where c.id = auth.uid()) then
     raise exception 'Faltan tus datos' using errcode = '42501';
+  end if;
+  -- Turno en un negocio real: tiene que estar aprobado, y su nombre y su ciudad salen de la base (no de la página)
+  if nullif(t ->> 'negocio_id', '') is not null then
+    select * into neg from public.negocios x where x.id = (t ->> 'negocio_id')::uuid and x.estado = 'aprobado';
+    if not found then raise exception 'Ese lugar no está disponible' using errcode = 'P0002'; end if;
   end if;
   if f + h < public.ahora_mendoza() then raise exception 'Ese horario ya pasó' using errcode = '23514'; end if;
   if f > current_date + 60 then raise exception 'Ese día está muy lejos' using errcode = '23514'; end if;
@@ -568,8 +578,9 @@ begin
         and x.fecha + x.hora >= public.ahora_mendoza()) >= 10 then
     raise exception 'Ya tenés 10 turnos por delante' using errcode = '23514';
   end if;
-  insert into public.turnos (cliente_id, lugar_id, lugar, zona, rubro, servicio_id, servicio, cancha, fecha, hora, fin, precio, sena, cancelar_horas)
-    values (auth.uid(), t ->> 'lugar_id', btrim(t ->> 'lugar'), coalesce(t ->> 'zona', ''), coalesce(t ->> 'rubro', ''),
+  insert into public.turnos (cliente_id, negocio_id, lugar_id, lugar, zona, rubro, servicio_id, servicio, cancha, fecha, hora, fin, precio, sena, cancelar_horas)
+    values (auth.uid(), neg.id, coalesce(neg.slug, t ->> 'lugar_id'), coalesce(neg.nombre, btrim(t ->> 'lugar')),
+            coalesce(nullif(neg.ciudad, ''), t ->> 'zona', ''), coalesce(t ->> 'rubro', ''),
             coalesce(t ->> 'servicio_id', ''), coalesce(t ->> 'servicio', ''), btrim(t ->> 'cancha'), f, h, (t ->> 'fin')::time,
             (t ->> 'precio')::integer, (t ->> 'sena')::integer, coalesce((t ->> 'cancelar_horas')::integer, 0))
     returning * into fila;

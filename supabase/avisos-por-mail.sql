@@ -204,15 +204,50 @@ revoke all on function public.fecha_larga(date) from public, anon, authenticated
 revoke all on function public.plata(integer) from public, anon, authenticated;
 revoke all on function public.fila_mail(text, text) from public, anon, authenticated;
 
+-- Un texto listo para ir dentro de un link (los espacios y las tildes, como %20 y %C3%A1)
+create or replace function public.codificar_url(t text) returns text language sql immutable as $$
+  select coalesce(string_agg(case when b between 48 and 57 or b between 65 and 90 or b between 97 and 122 or b in (45, 46, 95, 126)
+                                  then chr(b) else '%' || upper(lpad(to_hex(b), 2, '0')) end, '' order by i), '')
+  from (select i, get_byte(convert_to(coalesce(t, ''), 'UTF8'), i) as b
+          from generate_series(0, octet_length(convert_to(coalesce(t, ''), 'UTF8')) - 1) as i) s
+$$;
+-- "Cómo llegar": el link de Google Maps que pegó el dueño en Mi negocio, o uno armado con el nombre, la dirección
+-- y la ciudad (igual que el panel). Un link que no es de Google Maps no se usa.
+create or replace function public.link_mapa(nombre text, direccion text, ciudad text, mapa text) returns text language sql immutable as $$
+  select case
+    when coalesce(mapa, '') ~* '^https://((www\.)?google\.[a-z.]+/maps|maps\.google\.[a-z.]+|maps\.app\.goo\.gl|goo\.gl/maps)' then mapa
+    when btrim(coalesce(direccion, '')) = '' and btrim(coalesce(ciudad, '')) = '' then null
+    else 'https://www.google.com/maps/search/?api=1&query='
+         || public.codificar_url(concat_ws(', ', nullif(btrim(nombre), ''), nullif(btrim(direccion), ''), nullif(btrim(ciudad), '')))
+  end
+$$;
+-- El WhatsApp del lugar como link de wa.me (igual que el panel: sin el 0 de adelante y con 549 si no tiene el 54)
+create or replace function public.link_whatsapp(numero text) returns text language sql immutable as $$
+  select case when d = '' then null when d like '54%' then 'https://wa.me/' || d else 'https://wa.me/549' || d end
+  from (select regexp_replace(regexp_replace(coalesce(numero, ''), '[^0-9]', '', 'g'), '^0', '') as d) s
+$$;
+revoke all on function public.codificar_url(text) from public, anon, authenticated;
+revoke all on function public.link_mapa(text, text, text, text) from public, anon, authenticated;
+revoke all on function public.link_whatsapp(text) from public, anon, authenticated;
+
 -- 4. Turno confirmado → mail al cliente
 create or replace function public.avisar_turno_confirmado() returns trigger
 language plpgsql security definer set search_path = '' as $$
 declare
   c      public.clientes%rowtype;
+  n      public.negocios%rowtype; -- el negocio real del turno (vacío en los lugares de ejemplo)
+  mapa   text;
+  wa     text;
   cuando text := upper(left(public.fecha_larga(new.fecha), 1)) || substr(public.fecha_larga(new.fecha), 2) || ', de ' || to_char(new.hora, 'HH24:MI') || ' a ' || to_char(new.fin, 'HH24:MI');
 begin
   if public.secreto('resend_remitente') is null then return new; end if;
   select * into c from public.clientes where id = new.cliente_id;
+  -- Turno de un negocio real: su dirección, "Cómo llegar" y su WhatsApp, tal como los tiene cargados en Mi negocio
+  if new.negocio_id is not null then
+    select * into n from public.negocios where id = new.negocio_id;
+    mapa := public.link_mapa(n.nombre, n.direccion, n.ciudad, n.mapa);
+    wa   := public.link_whatsapp(n.whatsapp);
+  end if;
   perform public.mandar_mail(
     c.email,
     'Turno confirmado: ' || new.lugar || ', ' || public.fecha_larga(new.fecha) || ' a las ' || to_char(new.hora, 'HH24:MI'),
@@ -223,6 +258,15 @@ begin
       || '<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 16px;font-size:14px;line-height:1.5">'
       || public.fila_mail('Cuándo', '<b>' || cuando || '</b>')
       || public.fila_mail('Dónde', public.html_seguro(new.lugar) || coalesce(' · ' || nullif(public.html_seguro(new.zona), ''), ''))
+      || case when btrim(coalesce(n.direccion, '')) <> '' or mapa is not null then public.fila_mail('Dirección',
+           -- la ciudad ya va en "Dónde": acá solo si es otra
+           coalesce(nullif(public.html_seguro(concat_ws(', ', nullif(btrim(n.direccion), ''),
+             case when btrim(coalesce(n.ciudad, '')) <> new.zona then nullif(btrim(n.ciudad), '') end)), '') || '<br>', '')
+           || coalesce('<a href="' || public.html_seguro(mapa) || '" style="color:#0f5e52;font-weight:bold">Cómo llegar</a>', ''))
+         else '' end
+      || case when wa is not null then public.fila_mail('WhatsApp',
+           '<a href="' || public.html_seguro(wa) || '" style="color:#0f5e52;font-weight:bold">' || public.html_seguro(btrim(n.whatsapp)) || '</a>')
+         else '' end
       || public.fila_mail(case when new.rubro ilike 'barber%' then 'Con' else 'Cancha' end, public.html_seguro(new.cancha))
       || case when new.rubro ilike 'barber%' and new.servicio <> '' then public.fila_mail('Servicio', public.html_seguro(new.servicio)) else '' end
       || public.fila_mail('Seña', public.plata(new.sena))
