@@ -312,7 +312,10 @@ begin
       || case when new.sena = 0 then 'No tenías seña pagada.'
               when devuelve then 'Lo cancelaste con más de ' || new.cancelar_horas || ' h de anticipación: la seña de ' || public.plata(new.sena) || ' se devuelve.'
               else 'Lo cancelaste con menos de ' || new.cancelar_horas || ' h de anticipación: la seña de ' || public.plata(new.sena) || ' queda para el lugar.' end
-      || '</p>',
+      || '</p>'
+      || case when public.bookea_en_prueba()
+           then '<p style="margin:0 0 12px;font-size:13px;color:#6f6656">Bookea está en prueba: los lugares de la página son de ejemplo y la seña no se cobró.</p>'
+           else '' end,
       'Reservar otro turno', 'https://bookea.ar/',
       'Si no lo cancelaste vos, escribinos a <a href="mailto:hola@bookea.ar" style="color:#0f5e52;font-weight:bold">hola@bookea.ar</a>.')
   );

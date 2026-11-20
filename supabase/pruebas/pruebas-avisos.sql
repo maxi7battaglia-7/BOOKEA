@@ -132,7 +132,8 @@ begin
   select * into e from net.enviados order by id desc limit 1;
   assert e.body -> 'to' ->> 0 = 'juli@prueba.com' and e.body ->> 'subject' = 'Turno cancelado: Los <Álamos>, ' || public.fecha_larga(current_date + 7) || ' a las 20:00', 'cancelación: ' || e.body::text;
   assert e.body ->> 'html' like '%la seña de $&nbsp;8.500 se devuelve%' and e.body ->> 'html' like '%hola@bookea.ar%', 'html: ' || (e.body ->> 'html');
-  raise notice 'OK  turno cancelado: le llega el mail con lo que pasa con la seña';
+  assert e.body ->> 'html' like '%la seña no se cobró%', 'mientras está en prueba, el mail de cancelación también lo dice';
+  raise notice 'OK  turno cancelado: le llega el mail con lo que pasa con la seña (y que en prueba no se cobró)';
 end $$;
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000e1', false) \g /dev/null
 set role authenticated;
