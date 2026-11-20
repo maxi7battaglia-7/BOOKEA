@@ -16,7 +16,7 @@ LEMA = "Reservá turnos en segundos."
 LOGO = "https://bookea.ar/marca/isotipo-192.png"
 
 ARRIBA = (
-    '<div style="background:#f5ecd7;padding:32px 16px;font-family:Arial,Helvetica,sans-serif;color:#11151c">\n'
+    '<div lang="es" dir="ltr" style="background:#f5ecd7;padding:32px 16px;font-family:Arial,Helvetica,sans-serif;color:#11151c">\n'
     '  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" bgcolor="#ffffff" style="max-width:480px;margin:0 auto;background:#ffffff;border-radius:10px;overflow:hidden;border-collapse:separate">\n'
     '    <tr><td bgcolor="#11151c" style="background:#11151c;padding:22px 28px">\n'
     f'      <img src="{LOGO}" width="36" height="36" alt="" style="vertical-align:middle;border:0">\n'
