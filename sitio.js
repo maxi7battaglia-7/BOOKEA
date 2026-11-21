@@ -1108,8 +1108,6 @@
       if (b.textContent !== String(n) && n > 0) { b.classList.remove("is-sube"); void b.offsetWidth; b.classList.add("is-sube"); }
       b.textContent = n; b.hidden = !n;
     });
-    // "Mis turnos" queda siempre arriba: es por donde el cliente entra a su cuenta
-    $("#t-turnos").hidden = false;
   }
   let tt;
   function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("is-on"); clearTimeout(tt); tt = setTimeout(() => t.classList.remove("is-on"), 2600); }

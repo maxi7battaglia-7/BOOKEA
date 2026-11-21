@@ -350,7 +350,7 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
     ok(t1 && t1.estado === 'confirmado' && t1.lugar && t1.cancha && (await f1.textContent('.tcard .code')) === t1.codigo, `frente: al pagar, el turno queda en la base (${t1 && t1.lugar}, ${t1 && t1.cancha}) con el código que se ve en Mis turnos`);
     await f1.screenshot({ path: `${out}/fr-mis-turnos.png`, fullPage: true });
     await f1.reload(); await frenteListo(f1);
-    await f1.click('#t-turnos'); await f1.waitForSelector('.micuenta');
+    await f1.click('.foot a[data-go="turnos"]'); await f1.waitForSelector('.micuenta');
     ok((await f1.locator('.tcard').count()) === 1, 'frente: al volver a abrir la página sigue adentro, con su turno');
     // Otro cliente (sin "Confirm email") quiere el mismo horario: la base no lo deja
     await confirmar(false);
@@ -376,7 +376,7 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
     await f1.goto(F + `?cuenta=clave#access_token=${juliId}&type=recovery`); await frenteListo(f1);
     await f1.waitForSelector('#dlg-clave[open]', { timeout: 6000 });
     await f1.fill('#dc-clave', 'nueva-2026'); await f1.click('#f-clave button[type=submit]'); await f1.waitForFunction(() => !document.querySelector('#dlg-clave').open);
-    await f1.click('#t-turnos'); await f1.waitForSelector('.micuenta'); await f1.click('.micuenta [data-act="cu-salir"]'); await f1.waitForSelector('#f-cuenta');
+    await f1.click('.foot a[data-go="turnos"]'); await f1.waitForSelector('.micuenta'); await f1.click('.micuenta [data-act="cu-salir"]'); await f1.waitForSelector('#f-cuenta');
     await f1.fill('#cu-email', 'juli@prueba.com'); await f1.fill('#cu-clave', 'nueva-2026'); await f1.click('#f-cuenta button[type=submit]');
     await f1.waitForSelector('.micuenta', { timeout: 6000 });
     ok(true, 'frente: con el link elige otra contraseña y después entra con ella');

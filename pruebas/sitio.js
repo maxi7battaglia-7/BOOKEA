@@ -88,7 +88,8 @@ const medir = () => {
       ok((await p.pagina()) === 'home' && (await p.locator('#f-rubros .rubro').count()) === 3 && (await p.getAttribute('#f-secs [data-k="deportes"]', 'aria-pressed')) === 'true', `${w} inicio: arranca en Deportes, con sus tres rubros con foto`);
       ok(await p.evaluate(() => [...document.fonts].some((f) => f.family.includes('Inter Tight') && f.status === 'loaded')), `${w} inicio: la letra Inter Tight cargó desde bookea.ar`);
       ok(await p.evaluate(() => [...document.images].every((i) => !i.complete || i.naturalWidth > 0)), `${w} inicio: ninguna foto rota`);
-      ok(await p.evaluate(() => { const t = [...document.querySelectorAll('.top a, .top button')].filter((e) => e.offsetParent).map((e) => e.textContent.trim()); return !t.some((x) => /Reservar turno/.test(x)) && t.some((x) => x === 'Ingresar'); }), `${w} barra de arriba: sin "Reservar turno", con "Ingresar"`);
+      ok(await p.evaluate(() => { const t = [...document.querySelectorAll('.top a, .top button')].filter((e) => e.offsetParent).map((e) => e.textContent.trim()); return !t.some((x) => /Reservar turno|Mis turnos/.test(x)) && t.some((x) => x === 'Ingresar'); }), `${w} barra de arriba: sin "Reservar turno" ni "Mis turnos" (pedido del dueño, 21/11), con "Ingresar"`);
+      ok((await p.locator('.foot a[data-go="turnos"]').count()) === 1, `${w} pie: "Mis turnos" está abajo, en la columna Bookea`);
       await p.limpio('inicio');
       await p.toca('#f-rubros .rubro[data-k="futbol"]'); await espera(p, 200);
       ok((await p.getAttribute('#f-rubros .rubro[data-k="futbol"]', 'aria-pressed')) === 'true' && (await p.getAttribute('#f-rubros .rubro[data-k="padel"]', 'aria-pressed')) === 'false', `${w} inicio: tocar Fútbol 5 lo marca`);
