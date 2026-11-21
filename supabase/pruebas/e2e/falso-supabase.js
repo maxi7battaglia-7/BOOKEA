@@ -34,6 +34,25 @@
       _sesion() { if (!guarda) return enMemoria; try { return JSON.parse(localStorage.getItem(clave)); } catch { return null; } },
       _guardar(s) { if (!guarda) { enMemoria = s; return; } if (s) localStorage.setItem(clave, JSON.stringify(s)); else localStorage.removeItem(clave); },
       from(t) { return new Consulta(base, cliente, t); },
+      // Storage de juguete (las fotos de "Tu página"): sube como la cuenta, así se aplican los permisos del bucket
+      storage: {
+        from(bucket) {
+          return {
+            async upload(ruta, blob, opc = {}) {
+              const s = cliente._sesion();
+              const b64 = await new Promise((ok) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1]); r.readAsDataURL(blob); });
+              const r = await post(base + '/api/storage/subir', { token: s && s.access_token, bucket, ruta, tipo: opc.contentType || blob.type, b64 });
+              return { data: r.error ? null : { path: ruta }, error: errorDe(r.error) || null };
+            },
+            getPublicUrl(ruta) { return { data: { publicUrl: `${base}/storage/v1/object/public/${bucket}/${ruta}` } }; },
+            async remove(rutas) {
+              const s = cliente._sesion();
+              const r = await post(base + '/api/storage/borrar', { token: s && s.access_token, bucket, rutas });
+              return { data: r.error ? null : rutas, error: errorDe(r.error) || null };
+            },
+          };
+        },
+      },
       async rpc(fn, args) {
         const s = cliente._sesion();
         const r = await post(base + '/api/q', { token: s && s.access_token, op: 'rpc', fn, args });

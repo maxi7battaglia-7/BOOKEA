@@ -197,7 +197,7 @@ do $$
 declare e record;
 begin
   select * into e from net.enviados where body -> 'to' ->> 0 = 'juli@prueba.com' order by id desc limit 1;
-  assert e.body ->> 'html' like '%Cancelaste tu turno%' and e.body ->> 'html' like '%href="https://bookea.ar/?lugar=losalamospadel"%', 'al cliente: ' || (e.body ->> 'html');
+  assert e.body ->> 'html' like '%Cancelaste tu turno%' and e.body ->> 'html' like '%href="https://bookea.ar/losalamospadel/reservar"%', 'al cliente: ' || (e.body ->> 'html');
   select * into e from net.enviados where body -> 'to' ->> 0 = 'martin@prueba.com' order by id desc limit 1;
   assert e.body ->> 'subject' = 'Turno cancelado: Juli Paz, ' || public.fecha_larga(current_date + 8) || ' a las 19:30'
      and e.body ->> 'html' like '%Se canceló un turno%' and e.body ->> 'html' like '%El horario ya está libre en tu agenda%', 'al negocio: ' || e.body::text;

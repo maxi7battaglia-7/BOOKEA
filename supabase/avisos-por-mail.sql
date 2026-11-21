@@ -386,7 +386,7 @@ begin
               else 'Lo cancelaste con menos de ' || new.cancelar_horas || ' h de anticipación: la seña de ' || public.plata(new.sena) || ' queda para el lugar.' end
       || '</p>'
       || public.nota_prueba(new.negocio_id is not null),
-      'Reservar otro turno', 'https://bookea.ar/' || coalesce('?lugar=' || n.slug, ''),
+      'Reservar otro turno', 'https://bookea.ar/' || coalesce(n.slug || '/reservar', ''),
       case when por_lugar then 'Si tenés dudas, escribinos a <a href="mailto:hola@bookea.ar" style="color:#0f5e52;font-weight:bold">hola@bookea.ar</a>.'
            else 'Si no lo cancelaste vos, escribinos a <a href="mailto:hola@bookea.ar" style="color:#0f5e52;font-weight:bold">hola@bookea.ar</a>.' end)
   );

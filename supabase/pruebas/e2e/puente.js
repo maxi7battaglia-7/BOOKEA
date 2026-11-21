@@ -12,6 +12,7 @@ const BASE = process.env.BASE || 'bookea_e2e';
 const PUERTO = +process.env.PUERTO || 8787;
 let CONFIRMAR = false; // si es true, crear cuenta no abre sesión (como Supabase con "Confirm email")
 const recuperos = [];
+const archivos = new Map(); // las fotos subidas (Storage de juguete): "bucket/ruta" → { tipo, datos }
 
 const psql = (sql) => new Promise((ok) => {
   execFile('su', ['postgres', '-c', `psql -X -q -At -v ON_ERROR_STOP=1 -v VERBOSITY=verbose -d ${BASE} -f -`], { maxBuffer: 64 << 20 }, (err, stdout, stderr) => {
@@ -150,6 +151,20 @@ http.createServer(async (req, res) => {
     if (url.pathname.startsWith('/api/auth/')) return json(await auth(url.pathname.slice(10), b));
     if (url.pathname === '/api/confirmar') { CONFIRMAR = !!b.si; return json({ ok: true }); }
     if (url.pathname === '/api/sql') return json(await psql(b.sql)); // para que la prueba mire la base por dentro
+    // Storage: la fila de storage.objects se crea como la cuenta (los permisos del bucket deciden) y la foto queda en memoria
+    if (url.pathname === '/api/storage/subir') {
+      const r = await psql(comoCuenta(b.token, `insert into storage.objects (bucket_id, name) values (${lit(b.bucket)}, ${lit(b.ruta)})`));
+      if (r.error) return json({ error: { message: 'new row violates row-level security policy', statusCode: '403', code: '42501' } });
+      archivos.set(`${b.bucket}/${b.ruta}`, { tipo: b.tipo || 'application/octet-stream', datos: Buffer.from(b.b64 || '', 'base64') });
+      return json({ data: { path: b.ruta } });
+    }
+    if (url.pathname === '/api/storage/borrar') {
+      for (const ruta of b.rutas || []) {
+        const r = await psql(comoCuenta(b.token, `delete from storage.objects where bucket_id = ${lit(b.bucket)} and name = ${lit(ruta)}`));
+        if (!r.error) archivos.delete(`${b.bucket}/${ruta}`);
+      }
+      return json({ data: b.rutas || [] });
+    }
     // Como la API de Supabase (PostgREST): lo que cuenta.js pide directo con fetch, sin cuenta (rol anon)
     if (url.pathname.startsWith('/rest/v1/rpc/')) {
       const r = await consulta({ op: 'rpc', fn: url.pathname.slice('/rest/v1/rpc/'.length), args: b });
@@ -158,6 +173,12 @@ http.createServer(async (req, res) => {
     return json({ error: 'ruta' }, 404);
   }
   if (url.pathname === '/api/recuperos') return json(recuperos);
+  if (url.pathname.startsWith('/storage/v1/object/public/')) {
+    const a = archivos.get(decodeURIComponent(url.pathname.slice('/storage/v1/object/public/'.length)));
+    if (!a) { res.writeHead(404); return res.end(); }
+    res.writeHead(200, { 'content-type': a.tipo });
+    return res.end(a.datos);
+  }
   if (url.pathname === '/config.js') {
     res.writeHead(200, { 'content-type': 'text/javascript' });
     return res.end(`window.BOOKEA_CONFIG = { supabaseUrl: "http://localhost:${PUERTO}", supabaseAnonKey: "clave-publica-de-prueba" };`);

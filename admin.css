@@ -843,6 +843,59 @@ html:has(#panel:not([hidden])) { scrollbar-gutter: stable; }
   .aviso { bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
 }
 
+/* ---------- Tu página (pedido del dueño, 21/11): la presentación del negocio en bookea.ar/nombre ----------
+   Mismas tarjetas que Mi negocio: Portada y logo (dos de ancho) · Tus links (noche) / Tu historia (dos de ancho) · Redes /
+   Fotos del lugar (a lo ancho). La portada se ve como en la página: la foto (o noche), el logo, el nombre y la frase,
+   con la franja verde agua y naranja abajo. En el celular, "Tu página" se abre desde Mi negocio (la barra de abajo ya está llena). */
+.pg-card--port { grid-column: span 2; }
+.pg-card--gal { grid-column: 1 / -1; }
+.port { position: relative; overflow: hidden; display: grid; place-items: center; min-height: 200px; border-radius: 12px; background: var(--ink); color: var(--cream); }
+.port.has-foto { color: #fff; }
+.port__bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.port.has-foto::before { content: ""; position: absolute; inset: 0; z-index: 1; background: linear-gradient(180deg, rgba(17, 21, 28, .25), rgba(17, 21, 28, .72)); } /* taste-skill-ignore: velo para leer sobre la foto, como en la página */
+.port__in { position: relative; z-index: 2; display: grid; justify-items: center; gap: 6px; padding: 26px 16px 30px; text-align: center; }
+.port__logo { display: grid; place-items: center; width: 64px; height: 64px; border-radius: 16px; overflow: hidden; background: var(--cream); color: var(--ink); font-family: var(--f-display); font-stretch: var(--display-ancho); font-weight: 700; font-size: 22px; }
+.port__logo.has-img { background: #fff; }
+.port__logo img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.port__in b { font-family: var(--f-display); font-stretch: var(--display-ancho); font-size: clamp(22px, 2.4vw, 30px); line-height: 1.05; letter-spacing: -0.02em; }
+.port__in small { font-size: 14px; opacity: .9; max-width: 40ch; }
+.port__franja { position: absolute; left: 0; right: 0; bottom: 0; z-index: 2; height: 5px; background: linear-gradient(90deg, var(--teal) 0 62%, var(--orange) 62% 100%); } /* taste-skill-ignore: la franja de la marca */
+.port__acc { display: flex; flex-wrap: wrap; gap: 8px; }
+.pg-card--links { gap: 14px; }
+.pg-link { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 2px 10px; padding: 12px 14px; border-radius: 12px; background: rgba(255, 255, 255, .06); border: 1px solid rgba(255, 255, 255, .12); } /* taste-skill-ignore: caja sobre la tarjeta noche */
+.pg-link p { grid-column: 1 / -1; font-size: 12px; color: #b4bac3; }
+.pg-link a { color: var(--v200); text-decoration: none; overflow-wrap: anywhere; border-radius: 4px; }
+.pg-link a b { color: #fff; font-weight: 600; }
+.pg-link a:focus-visible { outline: 3px solid var(--v); outline-offset: 3px; }
+@media (hover: hover) and (pointer: fine) { .pg-link a:hover { text-decoration: underline; text-underline-offset: 0.25em; } }
+.pg-link .btn { grid-column: 2; grid-row: 2; background: rgba(255, 255, 255, .1); border-color: rgba(255, 255, 255, .32); color: #fff; } /* taste-skill-ignore: botón sobre la tarjeta noche */
+.pg-link .btn .ico { color: var(--v200); }
+@media (hover: hover) and (pointer: fine) { .pg-link .btn:hover { background: rgba(255, 255, 255, .18); border-color: rgba(255, 255, 255, .5); } }
+.pg-link__nota { font-size: 13px; line-height: 1.45; color: #b4bac3; margin-top: auto; }
+.check-pg { display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: 15px; color: var(--tx); cursor: pointer; }
+.check-pg input { width: 20px; height: 20px; accent-color: var(--teal); }
+.check-pg:has(input:disabled) { color: var(--tx-3); cursor: default; }
+.galp { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
+.galp__f { position: relative; aspect-ratio: 4 / 3; border-radius: 10px; overflow: hidden; background: var(--fondo); margin: 0; }
+.galp__f img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.galp__f .quitar { position: absolute; top: 6px; right: 6px; width: 36px; height: 36px; background: rgba(255, 255, 255, .92); }
+.galp__mas { display: grid; place-content: center; justify-items: center; gap: 6px; aspect-ratio: 4 / 3; border: 1.5px dashed var(--control); border-radius: 10px; color: var(--tx-2); font-size: 14px; font-weight: 600; cursor: pointer; transition: border-color var(--t-ui) ease, color var(--t-ui) ease, background-color var(--t-ui) ease; }
+.galp__mas .ico { width: 22px; height: 22px; color: var(--v); }
+#p-fotos:focus-visible + .field__err, .galp__mas:focus-within { outline: 3px solid var(--v); outline-offset: 2px; }
+@media (hover: hover) and (pointer: fine) { .galp__mas:hover { border-color: var(--v); color: var(--v-tinta); background: var(--v50); } }
+@media (max-width: 1199px) { .galp { grid-template-columns: repeat(3, minmax(0, 1fr)); } .pg .ng-card--desc { grid-column: 1 / -1; } }
+@media (max-width: 760px) {
+  .pg-card--port { grid-column: auto; }
+  .galp { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pg-link { grid-template-columns: minmax(0, 1fr); }
+  .pg-link .btn { grid-column: 1; grid-row: auto; justify-self: start; }
+}
+/* en la barra de abajo, "Tu página" se abre desde Negocio: queda marcado Negocio */
+@media (max-width: 900px), (hover: none), (pointer: coarse) {
+  .menu:has(.menu__i--compu[aria-current="page"]) .menu__i[data-vista="negocio"], .menu:has(.menu__i--compu[aria-current="page"]) .menu__i[data-vista="negocio"] .ico { color: var(--orange); }
+}
+@media (max-width: 900px), (hover: none), (pointer: coarse) { .menu__i--compu { display: none; } }
+
 /* ---------- Teléfono y tablet: el resto de la pantalla ---------- */
 @media (max-width: 900px) {
   .vista { padding: 20px 16px 104px; gap: 16px; }

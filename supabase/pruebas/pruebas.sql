@@ -822,4 +822,58 @@ do $$ begin
   assert exists (select 1 from public.clientes where id = '00000000-0000-0000-0000-0000000000e1'), 'se borró otro cliente';
   raise notice 'OK  el cliente borra su cuenta: se borran sus datos y sus turnos, y nada de los demás';
 end $$;
+-- La página del negocio (bookea.ar/nombre): su frase, su historia, solo sus propias fotos, sus redes y su WhatsApp si lo elige
+select set_config('request.jwt.claim.sub', current_setting('prueba.eva'), false) \g /dev/null
+set role authenticated;
+do $$
+declare n text := current_setting('prueba.neg_eva');
+begin
+  update public.negocios set pagina = jsonb_build_object(
+    'frase', 'Fútbol con amigos desde 1998', 'historia', 'Empezamos con una cancha.' || chr(10) || 'Hoy tenemos dos.',
+    'logo', 'https://x.supabase.co/storage/v1/object/public/negocios/' || n || '/logo-1.webp',
+    'portada', 'https://otro-sitio.com/foto.jpg',
+    'galeria', jsonb_build_array('https://x.supabase.co/storage/v1/object/public/negocios/' || n || '/g1.webp',
+                                 'https://x.supabase.co/storage/v1/object/public/negocios/00000000-0000-0000-0000-000000000000/ajena.webp'),
+    'instagram', 'https://www.instagram.com/canchaeva/?hl=es', 'tiktok', '@canchaeva', 'facebook', 'Cancha Eva', 'mostrar_whatsapp', false)
+  where id = n::uuid;
+  assert found, 'Eva no pudo cambiar su página';
+  -- las fotos: a su carpeta sí; a la de otro negocio, o sueltas, no
+  insert into storage.objects (bucket_id, name) values ('negocios', n || '/logo-1.webp');
+  begin
+    insert into storage.objects (bucket_id, name) values ('negocios', current_setting('prueba.neg_b') || '/intruso.webp');
+    raise exception 'FALLA: un negocio subió una foto a la carpeta de otro';
+  exception when insufficient_privilege then null;
+  end;
+  begin
+    insert into storage.objects (bucket_id, name) values ('negocios', 'suelta.webp');
+    raise exception 'FALLA: se subió una foto fuera de la carpeta de un negocio';
+  exception when insufficient_privilege then null;
+  end;
+  raise notice 'OK  fotos de la página: cada negocio sube a su carpeta y a ninguna otra';
+end $$;
+reset role;
+set role anon;
+do $$
+declare pg jsonb := public.lugares_publicos('canchaeva') -> 0 -> 'pagina';
+begin
+  assert pg ->> 'frase' = 'Fútbol con amigos desde 1998' and pg ->> 'historia' like 'Empezamos con una cancha.%Hoy tenemos dos.', 'página: ' || coalesce(pg::text, 'nada');
+  assert pg ->> 'logo' like '%/negocios/' || current_setting('prueba.neg_eva') || '/logo-1.webp' and pg -> 'portada' = 'null'::jsonb
+     and jsonb_array_length(pg -> 'galeria') = 1, 'fotos de la página (solo las de su carpeta): ' || pg::text;
+  assert pg ->> 'instagram' = 'canchaeva' and pg ->> 'tiktok' = 'canchaeva' and pg ->> 'facebook' = 'CanchaEva' and pg ->> 'whatsapp' = '', 'redes: ' || pg::text;
+  begin
+    insert into storage.objects (bucket_id, name) values ('negocios', current_setting('prueba.neg_eva') || '/sin-cuenta.webp');
+    raise exception 'FALLA: sin cuenta se subió una foto';
+  exception when insufficient_privilege then null;
+  end;
+  raise notice 'OK  la página del negocio: su frase, su historia, solo sus propias fotos y sus redes (sin su WhatsApp si no lo eligió)';
+end $$;
+reset role;
+update public.negocios set pagina = pagina || '{"mostrar_whatsapp": true}' where id = current_setting('prueba.neg_eva')::uuid;
+set role anon;
+do $$ begin
+  assert public.lugares_publicos('canchaeva') -> 0 -> 'pagina' ->> 'whatsapp' = '2622 44 5566', 'el WhatsApp que eligió mostrar no aparece';
+  raise notice 'OK  si elige mostrar su WhatsApp, aparece en su página';
+end $$;
+reset role;
+
 \echo 'Todas las pruebas del esquema pasaron.'

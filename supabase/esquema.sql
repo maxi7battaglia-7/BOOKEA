@@ -48,6 +48,16 @@ alter table public.negocios
   add column if not exists email_dueno  text not null default '' check (char_length(email_dueno) <= 200),
   add column if not exists revisado     timestamptz;
 
+-- La página del negocio en bookea.ar/nombre (pedido del dueño, 21/11): frase, historia, redes, si muestra su WhatsApp,
+-- y las direcciones de su logo, su portada y su galería (las fotos van en Storage: negocios/<id del negocio>/...).
+alter table public.negocios add column if not exists pagina jsonb not null default '{}'::jsonb;
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'negocios_pagina_valida') then
+    alter table public.negocios add constraint negocios_pagina_valida
+      check (jsonb_typeof(pagina) = 'object' and octet_length(pagina::text) <= 20000);
+  end if;
+end $$;
+
 -- ---------- Equipo de Bookea: quién aprueba los negocios nuevos ----------
 -- Se agrega a mano desde el SQL Editor (ver supabase/LEEME.md):
 --   insert into public.admins_bookea (user_id) select id from auth.users where email = 'tu@email.com';
@@ -407,7 +417,7 @@ grant select on public.invitaciones to authenticated;  -- el dueño las ve; se c
 revoke all on public.negocios from authenticated;
 grant select on public.negocios to authenticated;
 -- Los datos que el dueño puede cambiar. El estado (aprobado o no) NO está: solo cambia con revisar_negocio.
-grant update (slug, nombre, rubro, ciudad, direccion, whatsapp, foto, descripcion, mapa, ajustes) on public.negocios to authenticated;
+grant update (slug, nombre, rubro, ciudad, direccion, whatsapp, foto, descripcion, mapa, ajustes, pagina) on public.negocios to authenticated;
 grant select on public.miembros to authenticated;
 grant select, insert, update, delete on public.reservas to authenticated;
 grant select on public.admins_bookea to authenticated;
@@ -800,6 +810,19 @@ language sql stable set search_path = '' as $$
     and r.fecha between public.ahora_mendoza()::date - 1 and public.ahora_mendoza()::date + 8
 $$;
 
+-- Una foto de su página: solo si está en su carpeta de Storage (negocios/<id>/...); cualquier otra dirección no se muestra
+create or replace function public.foto_publica(n uuid, u text) returns text
+language sql immutable set search_path = '' as $$
+  select case when coalesce(u, '') ~* ('^https?://[^/]+/storage/v1/object/public/negocios/' || n::text || '/[a-z0-9._-]+$') then u end
+$$;
+-- Un usuario de Instagram, TikTok o Facebook: aunque peguen el link entero, queda solo el usuario ("losalamospadel")
+create or replace function public.red_social(t text) returns text
+language sql immutable set search_path = '' as $$
+  select left(regexp_replace(split_part(split_part(
+           regexp_replace(btrim(coalesce(t, '')), '^(https?://)?(www\.|m\.)?(instagram\.com|tiktok\.com|facebook\.com|fb\.com)/', '', 'i'),
+           '/', 1), '?', 1), '[^A-Za-z0-9._-]', '', 'g'), 60)
+$$;
+
 -- Lo que la página muestra de un negocio (los ajustes, armados de nuevo campo por campo: solo lo que hace falta)
 create or replace function public.lugar_publico(x public.negocios) returns jsonb
 language sql stable set search_path = '' as $$
@@ -820,6 +843,21 @@ language sql stable set search_path = '' as $$
     'senaPct', case when coalesce(x.ajustes ->> 'senaPct', '') ~ '^[0-9]{1,3}(\.[0-9]+)?$' then least((x.ajustes ->> 'senaPct')::numeric, 100) else 0 end,
     'cancelarHoras', case when coalesce(x.ajustes ->> 'cancelarHoras', '') ~ '^[0-9]{1,3}$' then least((x.ajustes ->> 'cancelarHoras')::integer, 168) else 0 end,
     'devolverSena', coalesce(x.ajustes ->> 'devolverSena', '') <> 'false',
+    -- su página: el WhatsApp, solo si eligió mostrarlo
+    'pagina', jsonb_build_object(
+      'frase', left(btrim(coalesce(x.pagina ->> 'frase', '')), 160),
+      'historia', left(btrim(coalesce(x.pagina ->> 'historia', '')), 3000),
+      'logo', public.foto_publica(x.id, x.pagina ->> 'logo'),
+      'portada', public.foto_publica(x.id, x.pagina ->> 'portada'),
+      'galeria', (select coalesce(jsonb_agg(u order by i), '[]'::jsonb) from (
+                    select public.foto_publica(x.id, g) as u, i
+                      from jsonb_array_elements_text(case when jsonb_typeof(x.pagina -> 'galeria') = 'array' then x.pagina -> 'galeria' else '[]'::jsonb end)
+                           with ordinality as e(g, i)) s
+                   where u is not null and i <= 8),
+      'instagram', public.red_social(x.pagina ->> 'instagram'),
+      'tiktok', public.red_social(x.pagina ->> 'tiktok'),
+      'facebook', public.red_social(x.pagina ->> 'facebook'),
+      'whatsapp', case when x.pagina ->> 'mostrar_whatsapp' = 'true' then x.whatsapp else '' end),
     'publicado', public.tiene_mercado_pago(x.id),
     'ocupados', public.ocupados_de(x.id))
 $$;
@@ -876,7 +914,34 @@ create trigger reserva_web_cancelada after update of estado on public.reservas
   for each row when (new.estado = 'cancelada' and old.estado <> 'cancelada')
   execute function public.reserva_web_cancelada();
 
+-- ---------- Las fotos de la página (Supabase Storage) ----------
+-- Un bucket público, "negocios": cada negocio sube sus fotos a su carpeta (negocios/<id del negocio>/...) y solo puede
+-- quien cambia Mi negocio (el dueño, o quien tenga el permiso "negocio"). Las ve cualquiera: son las de su página.
+create or replace function public.puede_subir_foto(objeto text) returns boolean
+language sql stable security definer set search_path = '' as $$
+  select case when split_part(coalesce(objeto, ''), '/', 1) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+              then public.tiene_permiso(split_part(objeto, '/', 1)::uuid, 'negocio') else false end
+$$;
+revoke all on function public.puede_subir_foto(text) from public, anon;
+grant execute on function public.puede_subir_foto(text) to authenticated;
+do $$ begin
+  if to_regclass('storage.objects') is not null then  -- en Supabase siempre está; en una base de prueba, solo si se simula
+    insert into storage.buckets (id, name, public) values ('negocios', 'negocios', true)
+      on conflict (id) do update set public = true;
+    execute 'drop policy if exists "fotos: el negocio ve las suyas" on storage.objects';
+    execute 'create policy "fotos: el negocio ve las suyas" on storage.objects for select to authenticated using (bucket_id = ''negocios'' and public.puede_subir_foto(name))';
+    execute 'drop policy if exists "fotos: el negocio sube las suyas" on storage.objects';
+    execute 'create policy "fotos: el negocio sube las suyas" on storage.objects for insert to authenticated with check (bucket_id = ''negocios'' and public.puede_subir_foto(name))';
+    execute 'drop policy if exists "fotos: el negocio cambia las suyas" on storage.objects';
+    execute 'create policy "fotos: el negocio cambia las suyas" on storage.objects for update to authenticated using (bucket_id = ''negocios'' and public.puede_subir_foto(name)) with check (bucket_id = ''negocios'' and public.puede_subir_foto(name))';
+    execute 'drop policy if exists "fotos: el negocio borra las suyas" on storage.objects';
+    execute 'create policy "fotos: el negocio borra las suyas" on storage.objects for delete to authenticated using (bucket_id = ''negocios'' and public.puede_subir_foto(name))';
+  end if;
+end $$;
+
 revoke all on function public.tiene_mercado_pago(uuid) from public, anon, authenticated;
+revoke all on function public.foto_publica(uuid, text) from public, anon, authenticated;
+revoke all on function public.red_social(text) from public, anon, authenticated;
 revoke all on function public.lugar_listo(jsonb) from public, anon, authenticated;
 revoke all on function public.ocupados_de(uuid) from public, anon, authenticated;
 revoke all on function public.lugar_publico(public.negocios) from public, anon, authenticated;

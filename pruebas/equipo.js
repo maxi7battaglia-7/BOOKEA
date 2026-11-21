@@ -32,7 +32,7 @@ const ok = (c, m) => { hechas++; if (!c) fallas++; console.log((c ? 'OK    ' : '
       await p.goto(B, { waitUntil: 'load' }); await p.waitForTimeout(500);
       await entrar('demo@example.com', 'bookea2026');
       // dueño: Equipo está en el menú (en el celular, en la barra de abajo, igual a la del sitio)
-      if (movil) ok(await p.evaluate(() => { const m = document.querySelector('.menu'), r = m.getBoundingClientRect(); return getComputedStyle(m).position === 'fixed' && Math.abs(r.bottom - innerHeight) < 2 && [...m.querySelectorAll('.menu__i')].filter((b) => !b.hidden).every((b) => b.getBoundingClientRect().height >= 44); }), `${w}: en el celular el menú es la barra de abajo, con íconos y nombres`);
+      if (movil) ok(await p.evaluate(() => { const m = document.querySelector('.menu'), r = m.getBoundingClientRect(); return getComputedStyle(m).position === 'fixed' && Math.abs(r.bottom - innerHeight) < 2 && [...m.querySelectorAll('.menu__i')].filter((b) => !b.hidden && getComputedStyle(b).display !== 'none').every((b) => b.getBoundingClientRect().height >= 44); }), `${w}: en el celular el menú es la barra de abajo, con íconos y nombres`);
       ok(await p.isVisible('.menu__i[data-vista="equipo"]'), `${w}: el dueño ve Equipo en el menú`); await toca('.menu__i[data-vista="equipo"]');
       if (movil) { await p.waitForTimeout(450); ok((await p.getAttribute('.menu__i[data-vista="equipo"]', 'aria-current')) === 'page' && await p.evaluate(() => getComputedStyle(document.querySelector('.menu__i[data-vista="equipo"]')).color === 'rgb(228, 87, 46)'), `${w}: la sección elegida queda en naranja, como en el sitio`); }
       await p.waitForTimeout(600);
@@ -126,7 +126,7 @@ const ok = (c, m) => { hechas++; if (!c) fallas++; console.log((c ? 'OK    ' : '
       await p.fill('#i-email', 'demo@example.com'); await p.fill('#i-clave', 'bookea2026'); await toca('#f-ingresar button[type="submit"]'); await p.waitForTimeout(3600);
       await irA('equipo'); await p.waitForTimeout(500);
       await p.evaluate(() => document.dispatchEvent(new Event('visibilitychange'))); await p.waitForTimeout(500);
-      ok((await p.textContent('#vista h1')) === 'Equipo' && (await p.$$eval('.menu__i', (l) => l.filter((b) => !b.hidden).length)) === 6, `${w}: con datos viejos, al volver a la pestaña el dueño sigue en Equipo con las seis secciones`);
+      ok((await p.textContent('#vista h1')) === 'Equipo' && (await p.$$eval('.menu__i', (l) => l.filter((b) => !b.hidden).length)) === 7, `${w}: con datos viejos, al volver a la pestaña el dueño sigue en Equipo con las siete secciones`);
       const sw = await p.evaluate(() => document.documentElement.scrollWidth);
       ok(sw <= w, `${w}: sin desborde (${sw})`);
       ok(errs.length === 0, `${w}: sin errores ${errs.join(' | ')}`);

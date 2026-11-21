@@ -6,13 +6,14 @@
   <title>Bookea</title>
   <meta name="robots" content="noindex" />
   <link rel="icon" href="/marca/isotipo.svg" type="image/svg+xml" />
-  <!-- GitHub Pages muestra esta página cuando una dirección no existe.
-       bookea.ar/su-link (el link de reservas que cada negocio ve en Mi negocio) lleva a la ficha de ese
-       negocio en la página: bookea.ar/?lugar=su-link (sitio.js la abre apenas llega de la base). -->
+  <!-- GitHub Pages muestra esta página cuando una dirección no existe. Las de los negocios van a index.html:
+       bookea.ar/nombre (su página) → bookea.ar/?pagina=nombre, y bookea.ar/nombre/reservar → bookea.ar/?lugar=nombre.
+       sitio.js abre esa pantalla apenas llega el negocio de la base y vuelve a poner la dirección limpia.
+       En un servidor que sirve index.html en cualquier dirección (Cloudflare Pages), esta página no hace falta. -->
   <script>
     (function () {
-      var m = /^\/([A-Za-z0-9]{1,30})\/?$/.exec(location.pathname);
-      if (m) location.replace("/?lugar=" + m[1].toLowerCase());
+      var m = /^\/([A-Za-z0-9]{1,30})(\/reservar)?\/?$/.exec(location.pathname);
+      if (m) location.replace("/?" + (m[2] ? "lugar=" : "pagina=") + m[1].toLowerCase());
     })();
   </script>
   <style>

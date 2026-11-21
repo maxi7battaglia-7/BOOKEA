@@ -168,6 +168,36 @@ incógnito: el turno tiene que aparecer en la agenda del negocio (se actualiza s
 Los links `admin`, `index`, `privacidad`, `reservar`, `assets` y `marca` son de páginas de Bookea: el panel no los
 deja elegir.
 
+## La página de cada negocio y "Tu página" (21/11)
+
+Cada negocio tiene dos direcciones: `bookea.ar/nombre` es su página (su portada, su historia, sus fotos, sus redes y sus
+turnos libres) y `bookea.ar/nombre/reservar`, sus turnos para reservar. Lo carga el dueño en **Tu página** del panel.
+
+- **Base:** la columna `negocios.pagina` (frase, historia, redes, si muestra su WhatsApp y las direcciones de sus fotos).
+  `lugares_publicos` la manda a la página, pero solo con fotos de su propia carpeta y su WhatsApp si lo eligió.
+- **Fotos:** Supabase Storage, bucket público `negocios`. Cada negocio sube a su carpeta (`negocios/<id del negocio>/`) y
+  solo quien puede cambiar Mi negocio (`puede_subir_foto`). `esquema.sql` crea el bucket y sus permisos.
+- **Para que funcione en bookea.ar:** correr de nuevo `esquema.sql` y después `avisos-por-mail.sql` (en ese orden).
+
+### Pasar el sitio a Cloudflare Pages (para que las direcciones queden limpias y Google las encuentre)
+
+Hoy el sitio está en GitHub Pages: `bookea.ar/nombre` anda gracias a `404.html`, pero Google ve esa página como "no
+encontrada" y no la muestra. En Cloudflare Pages, cualquier dirección abre `index.html` como una página normal. El dominio
+ya está en Cloudflare, así que es gratis y son unos clics:
+
+1. En Cloudflare: **Workers & Pages** → **Create** → pestaña **Pages** → **Connect to Git** → GitHub → elegí el repo
+   **BOOKEA** (si te pide permiso para ver tus repos, dáselo solo a ese).
+2. Configuración: rama **main**, *Framework preset* **None**, *Build command* vacío, *Build output directory* `/`.
+   **Save and Deploy**. Te da una dirección de prueba (`algo.pages.dev`): abrila y fijate que ande.
+3. En ese proyecto: **Custom domains** → **Set up a custom domain** → `bookea.ar`. Cloudflare cambia solo el registro
+   DNS que hoy apunta a GitHub. Hacé lo mismo con `www.bookea.ar` si lo usás.
+4. Avisame: borro `404.html` del repo (sin ese archivo, Cloudflare abre `index.html` en cualquier dirección) y reviso
+   bookea.ar/nombre en vivo.
+5. Cuando todo ande, en GitHub: el repo → **Settings** → **Pages** → apagar GitHub Pages.
+
+Nada cambia en Supabase: los links de los mails (`bookea.ar/admin.html`, `bookea.ar/?cuenta=…`) siguen andando.
+Cloudflare abre `admin.html` también como `bookea.ar/admin`.
+
 ## Qué falta para la siguiente etapa
 
 - **Mercado Pago:** que cada negocio conecte su cuenta desde el panel, que la seña se cobre de verdad (y vaya a la

@@ -85,7 +85,8 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
     // ---------- Cargar un turno ----------
     await a.click('[data-vista="agenda"]'); await a.waitForTimeout(300);
     await a.click('[data-nuevo]'); await a.waitForSelector('#f-nuevo');
-    const manana = await a.evaluate(() => { const d = new Date(Date.now() + 864e5); return d.toISOString().slice(0, 10); });
+    // mañana (o pasado, si mañana es domingo: un negocio nuevo cierra los domingos)
+    const manana = await a.evaluate(() => { let d = new Date(Date.now() + 864e5); if (d.getUTCDay() === 0) d = new Date(d.getTime() + 864e5); return d.toISOString().slice(0, 10); });
     await a.fill('#n-fecha', manana); await a.dispatchEvent('#n-fecha', 'change'); await a.waitForTimeout(150);
     const hora = await a.evaluate(() => [...document.querySelectorAll('#n-hora option')].find((o) => o.value && !o.disabled).value);
     await a.selectOption('#n-hora', hora);
@@ -420,11 +421,18 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
     const f4 = await nueva();
     await f4.goto(F + '?rubro=padel'); await frenteListo(f4);
     ok(!/Los Álamos Pádel/.test(await f4.textContent('#r-list')), 'negocio de verdad: sin Mercado Pago todavía no aparece en la lista de la página');
-    await f4.goto('http://localhost:8787/losalamospadel'); await f4.waitForURL(/\/\?lugar=losalamospadel/, { timeout: 8000 }).catch(() => {});
-    await frenteListo(f4); await f4.waitForFunction(() => document.querySelector('.page:not([hidden])').dataset.page === 'ficha', null, { timeout: 8000 }).catch(() => {});
+    // bookea.ar/nombre: su página; bookea.ar/nombre/reservar: sus turnos (con la dirección limpia)
+    await f4.goto('http://localhost:8787/losalamospadel'); await frenteListo(f4);
+    await f4.waitForFunction(() => document.querySelector('.page:not([hidden])').dataset.page === 'local', null, { timeout: 8000 }).catch(() => {});
+    ok((await pag(f4)) === 'local' && /Los Álamos Pádel/.test(await f4.textContent('#local-root h1').catch(() => '')) && new URL(f4.url()).pathname === '/losalamospadel'
+      && (await f4.title()) === 'Los Álamos Pádel · Bookea', 'negocio de verdad: bookea.ar/nombre abre su página (y la dirección queda bookea.ar/nombre)');
+    await f4.click('.loc__acts [data-act="ficha"]'); await f4.waitForTimeout(500);
+    ok((await pag(f4)) === 'ficha' && new URL(f4.url()).pathname === '/losalamospadel/reservar', 'negocio de verdad: "Reservar turno" lleva a bookea.ar/nombre/reservar');
+    await f4.goto('http://localhost:8787/losalamospadel/reservar'); await frenteListo(f4);
+    await f4.waitForFunction(() => document.querySelector('.page:not([hidden])').dataset.page === 'ficha', null, { timeout: 8000 }).catch(() => {});
     const ficha = (await pag(f4)) === 'ficha' ? await f4.textContent('#ficha-root') : '';
     ok(/Los Álamos Pádel/.test(await f4.textContent('#ficha-root h1').catch(() => '')) && /Tunuyán/.test(ficha) && /Turnos de 60 min/.test(ficha) && /Seña 25 %/.test(ficha),
-      'negocio de verdad: bookea.ar/su-link abre su ficha con su nombre, su ciudad, la duración y la seña de Mi negocio');
+      'negocio de verdad: bookea.ar/nombre/reservar abre su ficha con su nombre, su ciudad, la duración y la seña de Mi negocio');
     ok(/Todos los días/.test(ficha) && /08:00 a 23:00/.test(ficha) && /Belgrano 450/.test(ficha) && /\$\s20\.000/.test(ficha) && /\$\s26\.000/.test(ficha) && !/Negocio de ejemplo/.test(ficha)
       && (await f4.getAttribute('.dir__ir', 'href') || '').startsWith('https://www.google.com/maps/search/'),
       'negocio de verdad: sus horarios, sus precios por franja, su dirección con "Cómo llegar" y sin el cartel de ejemplo');
@@ -471,7 +479,38 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
     await f4.goto('http://localhost:8787/no/existe');
     ok(/No encontramos esta página/.test(await f4.textContent('h1')), 'una dirección que no existe: "No encontramos esta página"');
     await f4.screenshot({ path: `${out}/nb-404.png` });
-    for (const [n, p] of [['f1', f1], ['f2', f2], ['f3', f3], ['f4', f4]]) ok(!p.errs.filter((x) => !/Failed to load resource/.test(x)).length, `frente: sin errores en la consola (${n}) ${p.errs.join(' | ')}`);
+
+    // ---------- Tu página: Ana sube portada y logo, escribe su historia y sus redes; se ve en bookea.ar/nombre ----------
+    const RAIZ = require('path').resolve(AQUI, '../../..');
+    const an = await nueva();
+    await an.goto(URL_); await an.waitForSelector('#f-ingresar:not([hidden])');
+    await ingresar(an, 'ana@prueba.com', 'recuperada26'); await an.waitForSelector('#panel:not([hidden])'); await listo(an); // la que eligió al recuperarla, más arriba
+    ok(await an.isVisible('.menu__i[data-vista="pagina"]'), 'Tu página: la dueña la tiene en el menú');
+    await an.click('.menu__i[data-vista="pagina"]'); await an.waitForSelector('#f-pag');
+    const guardadoPg = () => an.waitForFunction(() => /Guardado/.test(document.querySelector('#p-msg').textContent), null, { timeout: 10000 }).catch(() => {});
+    await an.setInputFiles('#p-portada', RAIZ + '/assets/r-padel.webp'); await an.waitForSelector('#p-port .port__bg', { timeout: 10000 }).catch(() => {}); await guardadoPg();
+    await an.setInputFiles('#p-logo', RAIZ + '/marca/isotipo-192.png'); await an.waitForSelector('#p-port .port__logo img', { timeout: 10000 }).catch(() => {}); await guardadoPg();
+    await an.fill('#p-frase', 'Pádel entre álamos'); await an.fill('#p-historia', 'Empezamos con una cancha.\nHoy tenemos dos.');
+    await an.fill('#p-ig', 'https://www.instagram.com/losalamospadel/'); await an.press('#p-ig', 'Tab');
+    await an.waitForTimeout(1600); await guardadoPg();
+    const pgA = await sql("select to_json(pagina) from negocios where slug = 'losalamospadel'");
+    const enStorage = /\/storage\/v1\/object\/public\/negocios\/[0-9a-f-]{36}\//;
+    ok(pgA && enStorage.test(pgA.portada || '') && /\/portada-/.test(pgA.portada) && enStorage.test(pgA.logo || '') && pgA.frase === 'Pádel entre álamos' && pgA.instagram === 'losalamospadel',
+      'Tu página: las fotos van a Storage (a la carpeta del negocio) y la frase, la historia y las redes a la base');
+    ok((await sql("select count(*) from storage.objects where bucket_id = 'negocios'")) === 2, 'Tu página: quedan dos fotos guardadas (portada y logo)');
+    await an.setInputFiles('#p-portada', RAIZ + '/assets/r-tenis.webp'); await an.waitForTimeout(800); await guardadoPg(); await an.waitForTimeout(600);
+    const pgA2 = await sql("select to_json(pagina) from negocios where slug = 'losalamospadel'");
+    ok(pgA2.portada !== pgA.portada && (await sql("select count(*) from storage.objects where bucket_id = 'negocios'")) === 2, 'Tu página: al cambiar la portada, la vieja se borra');
+    await an.screenshot({ path: `${out}/nb-tu-pagina.png`, fullPage: true });
+    await f4.goto('http://localhost:8787/losalamospadel'); await frenteListo(f4);
+    await f4.waitForFunction(() => document.querySelector('.page:not([hidden])').dataset.page === 'local', null, { timeout: 8000 }).catch(() => {});
+    const portadaVista = await f4.evaluate(() => { const i = document.querySelector('.loc__bg'); return i ? { src: i.src, ancho: i.naturalWidth } : null; });
+    ok(portadaVista && portadaVista.src === pgA2.portada && portadaVista.ancho > 0, 'la página del negocio muestra su portada (la foto se carga)');
+    const loc = await f4.textContent('#local-root');
+    ok(/Pádel entre álamos/.test(loc) && /Empezamos con una cancha\./.test(loc) && /Hoy tenemos dos\./.test(loc) && /@losalamospadel/.test(loc) && await f4.isVisible('.loc__logo img'),
+      'la página del negocio muestra su logo, su frase, su historia y su Instagram');
+    await entera(f4, `${out}/nb-pagina-real.png`);
+    for (const [n, p] of [['f1', f1], ['f2', f2], ['f3', f3], ['f4', f4], ['an', an]]) ok(!p.errs.filter((x) => !/Failed to load resource/.test(x)).length, `frente: sin errores en la consola (${n}) ${p.errs.join(' | ')}`);
   } catch (e) {
     console.log('FALLA (excepción)', e.message); process.exitCode = 1;
   } finally {

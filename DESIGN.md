@@ -532,3 +532,19 @@ El dueño mandó una página de referencia ("mirá lo limpia que se ve, así qui
 - **Mientras Bookea esté en prueba:** el pago dice "Bookea está en prueba: todavía no se cobra la seña. El turno queda reservado igual en la agenda del lugar"; en la agenda del negocio el turno va con seña 0 y una nota; el pie del sitio dice "En prueba: los lugares de la lista son ejemplos y la seña todavía no se cobra".
 - **Mails al negocio:** "Tenés un turno nuevo" (día, cancha, cliente con su WhatsApp, precio, seña, código y "Ver la agenda") y "Se canceló un turno". Al cliente, si cancela el negocio: "{Lugar} canceló tu turno", con lo que pasa con la seña.
 - **Página de "no encontramos":** `404.html`, blanca, con el isotipo, "No encontramos esta página" y "Buscar turnos" en naranja.
+
+## La página del negocio y "Tu página" (21/11)
+
+"Aparte de las reservas le quería crear un link para que tengan una página web y así ofrecer un servicio personalizado y diferencial", tomando como referencia la página de cada bodega de Mendoza Icons (misma estructura para todos; cambian el logo, las fotos y los textos). Dos direcciones: **bookea.ar/nombre** es su página y **bookea.ar/nombre/reservar**, sus turnos ("lleva la lógica del local").
+
+- **La página (pantalla `local` de `sitio.js`):**
+  1. Portada a todo el ancho: su foto con un velo noche para leer encima (o, sin foto, noche), su logo en un cuadrado redondeado (o sus iniciales en crema), rubro y ciudad en mono, el nombre grande, su frase, "Reservar turno" en naranja y "Cómo llegar" de borde claro; abajo, la franja verde agua y naranja de la marca.
+  2. Datos rápidos en una tira: turnos de, desde, cuántas canchas, el horario de hoy.
+  3. "Para reservar ya": la fila de turnos libres (las mismas tarjetas que "Libres ahora"), hoy y los dos días que siguen. Así la pantalla nunca queda vacía.
+  4. "Nuestra historia" con su texto y hasta 6 fotos en mosaico.
+  5. Canchas (o barberos) en tarjetas y la tabla de precios por franja, con su seña.
+  6. Horarios por día, dónde queda (dirección y "Cómo llegar") y sus redes (Instagram, TikTok, Facebook y su WhatsApp, solo si lo eligió).
+  7. Cierre noche: "Reservá tu turno en {nombre}" con el botón naranja.
+  Los de ejemplo también la tienen (con sus fotos de muestra y el cartel de ejemplo); su dirección no cambia.
+- **Tu página (panel):** misma forma que Mi negocio (tarjetas con ícono verde agua y guardado solo). Portada y logo (se ve igual que en la página, con la franja), Tus links en noche (las dos direcciones con "Copiar"), Tu historia (frase y texto), Redes y contacto (con el WhatsApp opcional) y Fotos del lugar (hasta 6, con "Agregar fotos" punteado). Las fotos se achican antes de subir (portada 1920 px, fotos 1600, logo 512 con transparencia). En la compu está en el menú; en el celular se abre desde Mi negocio ("Tu página"), porque la barra de abajo ya está llena, y ahí queda marcado Negocio.
+- **Mi negocio:** el campo es "Tu dirección en Bookea" y "Copiar" copia el link para reservar; "Ver la página de reservas" abre bookea.ar/nombre/reservar.

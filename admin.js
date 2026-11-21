@@ -342,6 +342,11 @@
         yo = c;
         return { ok: true, datos: datosDe(c) };
       },
+      // "Tu página" en el modo de prueba: las fotos quedan dentro del navegador (achicadas: el lugar es poco)
+      subirFoto(blob) {
+        return new Promise((ok) => { const r = new FileReader(); r.onload = () => ok({ ok: true, url: String(r.result) }); r.onerror = () => ok({ ok: false, error: "otro" }); r.readAsDataURL(blob); });
+      },
+      async borrarFoto() { return { ok: true }; },
       async aceptarInvitacion(token) {
         const c = sinNegocio || yo;
         if (!c) return { ok: false, error: "sesion" };
@@ -363,6 +368,7 @@
     "sin-negocio": "Tu cuenta no está en ningún negocio. Si te invitaron a un equipo, abrí el link que te mandaron.",
     cliente: "Esta cuenta es para reservar turnos: tus turnos están en Mis turnos, en la página de reservas (bookea.ar). El panel es para negocios.",
     permiso: "No tenés permiso para hacer eso. Si lo necesitás, pedíselo al dueño del negocio.",
+    "sin-fotos": "Todavía no se pueden guardar fotos: falta un paso de configuración en Bookea.",
     "ya-en-equipo": "Esa persona ya está en tu equipo.",
     "ya-en-negocio": "Esa cuenta ya está en un negocio. Usá otro email.",
     "invitacion-vencida": "Este link ya se usó o venció. Pedile al dueño del negocio uno nuevo.",
@@ -665,8 +671,11 @@
     return !texto;
   };
   const slugDe = (t) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "").slice(0, 24) || "minegocio";
-  // La página del negocio en bookea.ar (bookea.ar/su-link lleva ahí: ver 404.html). Estos links son de páginas de Bookea.
+  // Las dos direcciones del negocio (pedido del dueño, 21/11): bookea.ar/nombre es su página y bookea.ar/nombre/reservar,
+  // sus turnos (ver 404.html). Desde el panel se abren con ?pagina= y ?lugar=, que andan en cualquier lado.
+  // Estos nombres son de páginas de Bookea: ningún negocio los puede usar.
   const linkPagina = (slug) => "./?lugar=" + encodeURIComponent(slug);
+  const linkWeb = (slug) => "./?pagina=" + encodeURIComponent(slug);
   const LINKS_DE_BOOKEA = ["admin", "index", "privacidad", "reservar", "assets", "marca"];
   const negocioNuevo = (id, nombre, rubro, slugDado) => {
     let slug = slugDado || slugDe(nombre), k = 2;
@@ -726,7 +735,7 @@
   // ¿Puede hacer "p"? El dueño, todo.
   const puede = (p) => !!YO && (YO.rol === "dueno" || (YO.permisos || []).includes(p));
   const esDueno = () => !!YO && YO.rol === "dueno";
-  const VISTA_PERMISO = { agenda: "agenda", finanzas: "finanzas", clientes: "clientes", negocio: "negocio" };
+  const VISTA_PERMISO = { agenda: "agenda", finanzas: "finanzas", clientes: "clientes", negocio: "negocio", pagina: "negocio" };
   const puedeVer = (v) => {
     if (v === "cuenta") return true;
     if (v === "equipo") return esDueno();
@@ -740,7 +749,7 @@
   };
   // Si se sale de Mi negocio con cambios sin guardar, primero se guardan; si hay un dato mal cargado, se queda ahí
   let salirNegocio = null;
-  const dejarNegocio = async (v) => !(salirNegocio && vistaActual === "negocio" && v !== "negocio") || (await salirNegocio());
+  const dejarNegocio = async (v) => !(salirNegocio && (vistaActual === "negocio" || vistaActual === "pagina") && v !== vistaActual) || (await salirNegocio());
   const ir = (v, { foco = true } = {}) => {
     if (!VISTAS[v] || !puedeVer(v)) v = primeraVista();
     vistaActual = v;
@@ -1506,7 +1515,7 @@
     const durs = DURACIONES.includes(n.duracion) ? DURACIONES : [...DURACIONES, n.duracion].sort((a, b) => a - b);
     $("#vista").innerHTML = `
       <header class="vhead"><div><h1>Mi negocio</h1><p class="vhead__frase">Lo que ven tus clientes cuando reservan y las reglas de tu agenda. Cada cambio se guarda solo.</p></div>
-        <div class="vhead__acc"><p class="guardado" id="g-msg" role="status" aria-live="polite">Se guarda solo</p><a class="btn btn--line" id="g-ver" href="${linkPagina(n.slug)}" target="_blank" rel="noopener">${ico("afuera")}Ver la página de reservas</a></div></header>
+        <div class="vhead__acc"><p class="guardado" id="g-msg" role="status" aria-live="polite">Se guarda solo</p><button type="button" class="btn btn--line" id="g-tu-pagina">${ico("web")}Tu página</button><a class="btn btn--line" id="g-ver" href="${linkPagina(n.slug)}" target="_blank" rel="noopener">${ico("afuera")}Ver la página de reservas</a></div></header>
       <form class="ng" id="f-neg" novalidate>
           ${tarjeta("ng-0", "negocio", "Tu negocio", "Lo primero que ven tus clientes al reservar.", `
             <div class="perfil">
@@ -1526,7 +1535,7 @@
             <div class="field campo"><label for="g-wa">WhatsApp</label><input id="g-wa" type="tel" inputmode="tel" autocomplete="tel" value="${esc(n.whatsapp)}" /></div>
             <div class="field campo"><label for="g-dir">Dirección</label><input id="g-dir" value="${esc(n.direccion)}" autocomplete="street-address" placeholder="Calle y número…" /></div>
             <div class="field campo"><label for="g-ciudad">Ciudad</label><input id="g-ciudad" value="${esc(n.ciudad)}" autocomplete="address-level2" /></div>
-            <div class="field campo campo--arriba"><label for="g-slug">Tu link de reservas</label><div class="slug"><span>bookea.ar/</span><input id="g-slug" value="${esc(n.slug)}" autocapitalize="none" autocomplete="off" spellcheck="false" translate="no" aria-describedby="g-slug-err" /><button type="button" class="btn btn--ghost btn--sm" id="g-copiar">${ico("copiar")}Copiar</button></div><p class="field__err" id="g-slug-err" hidden></p></div>`)}
+            <div class="field campo campo--arriba"><label for="g-slug">Tu dirección en Bookea</label><div class="slug"><span>bookea.ar/</span><input id="g-slug" value="${esc(n.slug)}" autocapitalize="none" autocomplete="off" spellcheck="false" translate="no" aria-describedby="g-slug-err" /><button type="button" class="btn btn--ghost btn--sm" id="g-copiar">${ico("copiar")}Copiar</button></div><p class="field__err" id="g-slug-err" hidden></p></div>`)}
           ${tarjeta("ng-3", "agenda", "Horario", "Los días y horas en que se puede reservar.", `
             <div class="filas filas--hr" id="g-hor">${ORDEN_DIAS.map(filaDia).join("")}</div>
             <p class="field__help">¿Cerrás después de medianoche? Elegí la hora igual (00:30).</p>`)}
@@ -1558,9 +1567,9 @@
     const msg = $("#g-msg");
     const estadoMsg = (tipo, html) => { msg.className = "guardado" + (tipo ? " " + tipo : ""); msg.innerHTML = html; };
     $("#g-copiar").addEventListener("click", async (e) => {
-      const b = e.currentTarget, link = `https://bookea.ar/${slugDe($("#g-slug").value)}`;
+      const b = e.currentTarget, link = `https://bookea.ar/${slugDe($("#g-slug").value)}/reservar`;
       try { await navigator.clipboard.writeText(link); } catch { const i = $("#g-slug"); i.select(); try { document.execCommand("copy"); } catch {} }
-      b.innerHTML = tilde() + "Copiado"; aviso(`Link copiado: ${link}`);
+      b.innerHTML = tilde() + "Copiado"; aviso(`Link para reservar copiado: ${link}`);
       setTimeout(() => { if (b.isConnected) b.innerHTML = ico("copiar") + "Copiar"; }, 2200);
     });
     // foto: se ve enseguida y se guarda sola
@@ -1629,7 +1638,8 @@
         <div class="prev__hoy"><p>${horas.length ? `Hoy, ${DIAS[hoyD]}: ${plural(horas.length, "turno", "turnos")} de ${durCorto(dur)}` : `Hoy, ${DIAS[hoyD]}, está cerrado`}</p>
           ${horas.length ? `<ul class="prev__horas">${verHoras.map((t) => `<li>${aHora(t)}</li>`).join("")}${horas.length > verHoras.length ? `<li class="prev__mas">+${horas.length - verHoras.length}</li>` : ""}</ul>` : ""}</div>
         <dl class="prev__datos"><div><dt>Turnos de</dt><dd>${durCorto(+$("#g-dur").value)}</dd></div><div><dt>Desde</dt><dd>${desde ? plata(desde) : "Sin precio"}</dd></div><div><dt>Seña</dt><dd>${desde ? plata(senaDe({ senaPct: pc }, desde)) : `${pc} %`}</dd></div></dl>`;
-      $("#g-prev-link").innerHTML = `${ico("afuera")}<span>bookea.ar/<b>${esc(slugDe($("#g-slug").value) || n.slug)}</b></span>`;
+      const sl = esc(slugDe($("#g-slug").value) || n.slug);
+      $("#g-prev-link").innerHTML = `${ico("afuera")}<span>bookea.ar/<b>${sl}</b>/reservar</span>`;
       $("#g-prev-link").href = $("#g-ver").href = linkPagina(n.slug); // el link guardado (el que se está escribiendo todavía no existe)
     };
     const programar = (ms = 1100) => { pintarPrev(); clearTimeout(espera); espera = setTimeout(() => { espera = null; if (estado() !== inicial) guardar({ auto: true }); }, ms); };
@@ -1686,6 +1696,165 @@
       return true;
     };
     f.addEventListener("submit", (e) => { e.preventDefault(); guardar(); });
+    salirNegocio = async () => { clearTimeout(espera); return estado() === inicial ? true : guardar(); };
+    $("#g-tu-pagina").addEventListener("click", async () => { if (await dejarNegocio("pagina")) ir("pagina"); });
+  };
+
+  // ---------- Tu página (bookea.ar/nombre), pedido del dueño 21/11 ----------
+  // La presentación del negocio, como la página de cada bodega de Mendoza Icons: portada con su logo, una frase, su
+  // historia, fotos y redes; con sus turnos para reservar abajo (eso sale de Mi negocio). Cada cambio se guarda solo.
+  // Las fotos van a Supabase Storage (modo nube) o, en el modo de prueba, achicadas dentro de este navegador.
+  const FOTOS_MAX = 6;
+  const achicarImagen = (archivo, max, conTransparencia = false) => new Promise((ok, mal) => {
+    const url = URL.createObjectURL(archivo), img = new Image();
+    img.onload = () => {
+      const k = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+      const c = document.createElement("canvas"); c.width = Math.max(1, Math.round(img.naturalWidth * k)); c.height = Math.max(1, Math.round(img.naturalHeight * k));
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      const quiere = conTransparencia ? "image/webp" : "image/jpeg";
+      c.toBlob((b) => {
+        if (b && b.type === quiere) return ok(b);
+        c.toBlob((b2) => (b2 ? ok(b2) : mal(new Error("imagen"))), conTransparencia ? "image/png" : "image/jpeg", 0.85);
+      }, quiere, 0.85);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); mal(new Error("no es una imagen")); };
+    img.src = url;
+  });
+  // "https://www.instagram.com/losalamos/?hl=es" o "@losalamos" → "losalamos" (igual que red_social en la base)
+  const usuarioRed = (t) => String(t || "").trim().replace(/^(https?:\/\/)?(www\.|m\.)?(instagram\.com|tiktok\.com|facebook\.com|fb\.com)\//i, "").split("/")[0].split("?")[0].replace(/[^A-Za-z0-9._-]/g, "").slice(0, 60);
+  VISTAS.pagina = () => {
+    const n = NEG;
+    const pg = Object.assign({ frase: "", historia: "", logo: "", portada: "", galeria: [], instagram: "", tiktok: "", facebook: "", mostrar_whatsapp: false }, n.pagina || {});
+    if (!Array.isArray(pg.galeria)) pg.galeria = [];
+    const MAX = store.modo === "nube" ? { portada: 1920, galeria: 1600, logo: 512 } : { portada: 960, galeria: 640, logo: 256 };
+    const tarjeta = (id, icono, t, d, cuerpo, cls = "") => `<section class="card ng-card${cls ? " " + cls : ""}" aria-labelledby="${id}"><header class="ng-card__h">${ico(icono)}<div><h2 id="${id}">${t}</h2><p>${d}</p></div></header>${cuerpo}</section>`;
+    const red = (id, rot, pre, val) => `<div class="field campo"><label for="${id}">${rot}</label><div class="slug"><span>${pre}</span><input id="${id}" value="${esc(val)}" autocapitalize="none" autocomplete="off" spellcheck="false" translate="no" /></div></div>`;
+    $("#vista").innerHTML = `
+      <header class="vhead"><div><h1>Tu página</h1><p class="vhead__frase">Tu página web en Bookea: tu logo, tus fotos y tu historia, con tus turnos para reservar. Cada cambio se guarda solo.</p></div>
+        <div class="vhead__acc"><p class="guardado" id="p-msg" role="status" aria-live="polite">Se guarda solo</p><a class="btn btn--line" id="p-ver" href="${linkWeb(n.slug)}" target="_blank" rel="noopener">${ico("afuera")}Ver tu página</a></div></header>
+      <form class="ng pg" id="f-pag" novalidate>
+        ${tarjeta("pg-1", "camara", "Portada y logo", "Lo primero que se ve: una foto horizontal del lugar, a todo el ancho, con tu logo arriba.", `
+          <div class="port" id="p-port"></div>
+          <div class="port__acc">
+            <label class="btn btn--line btn--sm" for="p-portada">${ico("camara")}<span id="p-portada-l"></span></label>
+            <input class="sr-only" type="file" id="p-portada" accept="image/*" />
+            <label class="btn btn--line btn--sm" for="p-logo">${ico("negocio")}<span id="p-logo-l"></span></label>
+            <input class="sr-only" type="file" id="p-logo" accept="image/*" />
+            <button type="button" class="btn btn--warn btn--sm" id="p-portada-quitar">Quitar portada</button>
+            <button type="button" class="btn btn--warn btn--sm" id="p-logo-quitar">Quitar logo</button>
+          </div>
+          <p class="field__help">Sin logo se ven tus iniciales; sin portada, un fondo noche con los colores de Bookea.</p>
+          <p class="field__err" id="p-port-err" hidden></p>`, "pg-card--port")}
+        ${tarjeta("pg-2", "afuera", "Tus links", "Para compartir en Instagram, WhatsApp o un QR en el mostrador.", `
+          <div class="pg-link"><p>Tu página</p><a href="${linkWeb(n.slug)}" target="_blank" rel="noopener">bookea.ar/<b>${esc(n.slug)}</b></a><button type="button" class="btn btn--line btn--sm" data-copiar="https://bookea.ar/${esc(n.slug)}">${ico("copiar")}Copiar</button></div>
+          <div class="pg-link"><p>Para reservar directo</p><a href="${linkPagina(n.slug)}" target="_blank" rel="noopener">bookea.ar/<b>${esc(n.slug)}</b>/reservar</a><button type="button" class="btn btn--line btn--sm" data-copiar="https://bookea.ar/${esc(n.slug)}/reservar">${ico("copiar")}Copiar</button></div>
+          <p class="pg-link__nota">El de reservar va directo a tus horarios libres: sirve para el botón "Reservar" de Instagram o la respuesta automática de WhatsApp. El nombre se cambia en Mi negocio.</p>`, "ng-card--prev pg-card--links")}
+        ${tarjeta("pg-3", "texto", "Tu historia", "Una frase corta para la portada y la historia del lugar.", `
+          <div class="field campo campo--arriba"><label for="p-frase">Frase de la portada</label><input id="p-frase" maxlength="160" value="${esc(pg.frase)}" placeholder="Por ejemplo: Pádel entre álamos, desde 2010" /></div>
+          <div class="field campo campo--arriba ng-desc"><label for="p-historia">Historia</label><textarea id="p-historia" maxlength="3000" placeholder="Cómo empezó el lugar, qué lo hace distinto, quiénes lo atienden…">${esc(pg.historia)}</textarea><p class="field__help ng-cuenta" id="p-historia-cuenta"></p></div>`, "ng-card--desc")}
+        ${tarjeta("pg-4", "ig", "Redes y contacto", "Se ven al final de tu página. Podés pegar el link entero.", `
+          ${red("p-ig", "Instagram", "instagram.com/", pg.instagram)}
+          ${red("p-tt", "TikTok", "tiktok.com/@", pg.tiktok)}
+          ${red("p-fb", "Facebook", "facebook.com/", pg.facebook)}
+          <label class="check-pg"><input type="checkbox" id="p-wa" ${pg.mostrar_whatsapp ? "checked" : ""} ${n.whatsapp ? "" : "disabled"} /><span>${n.whatsapp ? `Mostrar mi WhatsApp (${esc(n.whatsapp)})` : "Mostrar mi WhatsApp (cargalo primero en Mi negocio)"}</span></label>`)}
+        ${tarjeta("pg-5", "camara", "Fotos del lugar", `Hasta ${FOTOS_MAX}. Se ven al lado de tu historia: las canchas, el lugar, la gente.`, `
+          <div class="galp" id="p-gal"></div>
+          <input class="sr-only" type="file" id="p-fotos" accept="image/*" multiple />
+          <p class="field__err" id="p-gal-err" hidden></p>`, "pg-card--gal")}
+      </form>`;
+    const f = $("#f-pag"), msg = $("#p-msg");
+    const estadoMsg = (tipo, html) => { msg.className = "guardado" + (tipo ? " " + tipo : ""); msg.innerHTML = html; };
+    const pintarPort = () => {
+      const nom = esc(n.nombre), fr = esc($("#p-frase").value.trim());
+      $("#p-port").innerHTML = `${pg.portada ? `<img class="port__bg" src="${esc(pg.portada)}" alt="" />` : ""}
+        <div class="port__in"><span class="port__logo${pg.logo ? " has-img" : ""}">${pg.logo ? `<img src="${esc(pg.logo)}" alt="Logo de ${nom}" />` : `<span aria-hidden="true">${esc(iniciales(n.nombre))}</span>`}</span>
+          <b>${nom}</b>${fr ? `<small>${fr}</small>` : ""}</div><i class="port__franja" aria-hidden="true"></i>`;
+      $("#p-port").classList.toggle("has-foto", !!pg.portada);
+      $("#p-portada-l").textContent = pg.portada ? "Cambiar portada" : "Subir portada";
+      $("#p-logo-l").textContent = pg.logo ? "Cambiar logo" : "Subir logo";
+      $("#p-portada-quitar").hidden = !pg.portada; $("#p-logo-quitar").hidden = !pg.logo;
+    };
+    const pintarGal = () => {
+      $("#p-gal").innerHTML = pg.galeria.map((u, i) => `<figure class="galp__f"><img src="${esc(u)}" alt="Foto ${i + 1} del lugar" loading="lazy" /><button type="button" class="quitar" data-foto="${i}" aria-label="Quitar la foto ${i + 1}">${ico("x")}</button></figure>`).join("")
+        + (pg.galeria.length < FOTOS_MAX ? `<label class="galp__mas" for="p-fotos">${ico("mas")}<span>Agregar fotos</span></label>` : "");
+    };
+    const cuenta = () => { $("#p-historia-cuenta").textContent = `${$("#p-historia").value.length} de 3000 letras`; };
+    pintarPort(); pintarGal(); cuenta();
+    const leer = () => ({
+      frase: $("#p-frase").value.trim().slice(0, 160), historia: $("#p-historia").value.trim().slice(0, 3000),
+      logo: pg.logo, portada: pg.portada, galeria: pg.galeria.slice(0, FOTOS_MAX),
+      instagram: usuarioRed($("#p-ig").value), tiktok: usuarioRed($("#p-tt").value), facebook: usuarioRed($("#p-fb").value),
+      mostrar_whatsapp: !!n.whatsapp && $("#p-wa").checked,
+    });
+    const estado = () => JSON.stringify(leer());
+    let inicial = estado(), espera = null;
+    const guardar = async () => {
+      clearTimeout(espera); espera = null;
+      const nueva = leer();
+      if (JSON.stringify(nueva) === inicial) { estadoMsg("ok", tilde() + "Guardado"); return true; }
+      const antes = n.pagina;
+      n.pagina = nueva;
+      estadoMsg("", "Guardando…");
+      const r = await sincronizar();
+      if (!r.ok) { n.pagina = antes; estadoMsg("err", "No se pudo guardar. " + esc(MENSAJES[r.error] || MENSAJES.otro)); return false; }
+      // modo de prueba: si una foto no entró en el navegador, se avisa
+      const ultima = [nueva.portada, nueva.logo, ...nueva.galeria].filter(Boolean).pop();
+      if (store.modo === "local" && ultima && local.get(CLAVE) && !local.get(CLAVE).includes(ultima.slice(-40))) aviso("No entró la foto en este navegador. Probá con una más chica.");
+      inicial = JSON.stringify(nueva);
+      estadoMsg("ok", tilde() + "Guardado");
+      return true;
+    };
+    const programar = (ms = 1100) => { clearTimeout(espera); espera = setTimeout(guardar, ms); };
+    f.addEventListener("input", (e) => { if (e.target.id === "p-historia") cuenta(); if (e.target.id === "p-frase") pintarPort(); programar(); });
+    f.addEventListener("change", (e) => { if (e.target.type !== "file") programar(); });
+    f.addEventListener("submit", (e) => { e.preventDefault(); guardar(); });
+    // las redes quedan como usuario apenas se sale del campo
+    ["#p-ig", "#p-tt", "#p-fb"].forEach((id) => $(id).addEventListener("blur", (e) => { e.target.value = usuarioRed(e.target.value); }));
+    // fotos: se achican, se suben y la página se guarda enseguida; la que se reemplaza o se quita, se borra
+    const subir = async (archivo, tipo, err) => {
+      err.hidden = true;
+      if (!/^image\//.test(archivo.type)) { err.textContent = "Elegí una imagen (JPG, PNG o WEBP)."; err.hidden = false; return ""; }
+      if (archivo.size > 20 * 1024 * 1024) { err.textContent = "La imagen pesa más de 20 MB. Probá con otra."; err.hidden = false; return ""; }
+      let blob;
+      try { blob = await achicarImagen(archivo, MAX[tipo], tipo === "logo"); } catch { err.textContent = "No pudimos abrir esa imagen. Probá con otra."; err.hidden = false; return ""; }
+      const r = await store.subirFoto(blob, tipo);
+      if (!r.ok) { err.textContent = "No se pudo subir la foto. " + (MENSAJES[r.error] || MENSAJES.otro); err.hidden = false; return ""; }
+      return r.url;
+    };
+    const cambiarFoto = (tipo) => async (e) => {
+      const a = e.target.files && e.target.files[0]; e.target.value = "";
+      if (!a) return;
+      estadoMsg("", "Subiendo la foto…");
+      const url = await subir(a, tipo, $("#p-port-err"));
+      if (!url) return estadoMsg("err", "Revisá la foto");
+      const vieja = pg[tipo]; pg[tipo] = url; pintarPort();
+      if (await guardar() && vieja) store.borrarFoto(vieja);
+    };
+    $("#p-portada").addEventListener("change", cambiarFoto("portada"));
+    $("#p-logo").addEventListener("change", cambiarFoto("logo"));
+    const quitarFoto = (tipo) => async () => { const vieja = pg[tipo]; pg[tipo] = ""; pintarPort(); if (await guardar() && vieja) store.borrarFoto(vieja); };
+    $("#p-portada-quitar").addEventListener("click", quitarFoto("portada"));
+    $("#p-logo-quitar").addEventListener("click", quitarFoto("logo"));
+    $("#p-fotos").addEventListener("change", async (e) => {
+      const lista = [...(e.target.files || [])].slice(0, FOTOS_MAX - pg.galeria.length); e.target.value = "";
+      if (!lista.length) return;
+      estadoMsg("", lista.length > 1 ? `Subiendo ${lista.length} fotos…` : "Subiendo la foto…");
+      for (const a of lista) { const url = await subir(a, "galeria", $("#p-gal-err")); if (url) { pg.galeria.push(url); pintarGal(); } }
+      await guardar();
+    });
+    $("#p-gal").addEventListener("click", async (e) => {
+      const b = e.target.closest("[data-foto]"); if (!b) return;
+      const [vieja] = pg.galeria.splice(+b.dataset.foto, 1); pintarGal();
+      const sig = $("[data-foto], .galp__mas", $("#p-gal")); sig && sig.focus();
+      if (await guardar() && vieja) store.borrarFoto(vieja);
+    });
+    $$("[data-copiar]", f).forEach((b) => b.addEventListener("click", async () => {
+      const link = b.dataset.copiar;
+      try { await navigator.clipboard.writeText(link); } catch { /* sin portapapeles: el link se ve igual */ }
+      b.innerHTML = tilde() + "Copiado"; aviso(`Link copiado: ${link}`);
+      setTimeout(() => { if (b.isConnected) b.innerHTML = ico("copiar") + "Copiar"; }, 2200);
+    }));
     salirNegocio = async () => { clearTimeout(espera); return estado() === inicial ? true : guardar(); };
   };
 
@@ -1928,7 +2097,7 @@
             <div class="cu-yo__q"><h2 id="cu-0">${esc(YO.nombre || "Tu cuenta")}</h2><p>${esDueno() ? "Podés hacer todo y manejar el equipo" : "Parte del equipo"}</p></div></div>
           <div class="cu-yo__neg"><span class="mono" aria-hidden="true">${NEG.foto ? `<img src="${NEG.foto}" alt="" />` : esc(iniciales(NEG.nombre))}</span>
             <div><p class="cu-yo__rol">${esDueno() ? "Dueño de" : "En el equipo de"}</p><b>${esc(NEG.nombre)}</b><small>${esc([NEG.rubro, NEG.ciudad].filter(Boolean).join(" · "))}</small></div></div>
-          <a class="cu-yo__link" href="${linkPagina(NEG.slug)}" target="_blank" rel="noopener">${ico("afuera")}<span>bookea.ar/<b>${esc(NEG.slug)}</b></span></a>
+          <a class="cu-yo__link" href="${linkWeb(NEG.slug)}" target="_blank" rel="noopener">${ico("afuera")}<span>bookea.ar/<b>${esc(NEG.slug)}</b></span></a>
           ${esDueno() ? `<div class="cu-yo__eq"><h3 id="cu-5">Tu equipo</h3><p>Sumá a las personas que te ayudan y elegí qué puede ver y hacer cada una.</p>
             <button type="button" class="btn btn--crema" id="cu-equipo">${ico("equipo")}Ver y sumar personas</button></div>`
           : `<div class="cu-yo__eq"><h3 id="cu-5">Tu lugar en el equipo</h3><p>Lo que podés hacer lo elige el dueño del negocio. En este panel podés:</p>

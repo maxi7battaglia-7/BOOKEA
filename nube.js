@@ -23,12 +23,17 @@
   });
 
   // ---------- De la base al panel y vuelta ----------
+  // "pagina" (la de bookea.ar/nombre) se manda solo si la base ya la tiene (si todavía no se corrió esquema.sql, no
+  // se manda, así guardar Mi negocio sigue andando)
+  let conPagina = false;
   const negDeFila = (f) => {
     // estado: pendiente / aprobado / rechazado (lo cambia solo el equipo de Bookea). Si la base todavía no
     // tiene la columna (esquema viejo), se toma como aprobado para no dejar a nadie afuera.
     const n = { id: f.id, estado: f.estado || "aprobado" };
     for (const c of COLS_NEG) n[c] = f[c] ?? "";
     for (const c of AJUSTES) if (f.ajustes && f.ajustes[c] !== undefined) n[c] = f.ajustes[c];
+    conPagina = "pagina" in f;
+    n.pagina = f.pagina && typeof f.pagina === "object" && !Array.isArray(f.pagina) ? f.pagina : {};
     return n;
   };
   const filaDeNeg = (n) => {
@@ -36,6 +41,7 @@
     for (const c of COLS_NEG) f[c] = n[c] ?? "";
     f.ajustes = {};
     for (const c of AJUSTES) if (n[c] !== undefined) f.ajustes[c] = n[c];
+    if (conPagina) f.pagina = n.pagina && typeof n.pagina === "object" ? n.pagina : {};
     return f;
   };
   const resDeFila = (f) => ({
@@ -59,6 +65,7 @@
     if (cod === "email_address_not_authorized" || /not authorized/i.test(msj)) return "email-no-autorizado";
     if (cod === "email_address_invalid" || /invalid.*email|email.*invalid/i.test(msj)) return "email-invalido";
     if (cod === "over_request_rate_limit" || cod === "over_email_send_rate_limit" || st === 429) return "muchos";
+    if (/bucket not found/i.test(msj)) return "sin-fotos"; // falta correr esquema.sql (el bucket de las fotos)
     if (cod === "23505" && /slug/.test(msj)) return "slug";
     if (/ya est[aá] en el equipo/i.test(msj)) return "ya-en-equipo";
     if (/ya est[aá] en un negocio/i.test(msj)) return "ya-en-negocio";
@@ -356,6 +363,25 @@
           if (!data || !data.session) return { ok: false, error: "sesion" };
           return cargarTodo(data.session.user);
         } catch (e) { return fallo(e); }
+      },
+
+      // Una foto de "Tu página": va a Supabase Storage, a la carpeta del negocio (negocios/<id>/...). Devuelve su dirección.
+      async subirFoto(blob, tipo) {
+        if (!sb || !negId) return { ok: false, error: "sesion" };
+        try {
+          const ext = blob.type === "image/png" ? "png" : blob.type === "image/webp" ? "webp" : "jpg";
+          const ruta = `${negId}/${tipo}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}.${ext}`;
+          const { error } = await sb.storage.from("negocios").upload(ruta, blob, { contentType: blob.type, cacheControl: "31536000", upsert: false });
+          if (error) return fallo(error);
+          return { ok: true, url: sb.storage.from("negocios").getPublicUrl(ruta).data.publicUrl };
+        } catch (e) { return fallo(e); }
+      },
+      // La que se reemplazó o se quitó: se borra (si no se puede, queda guardada y no molesta)
+      async borrarFoto(url) {
+        if (!sb || !negId) return { ok: false, error: "sesion" };
+        const m = /\/storage\/v1\/object\/public\/negocios\/([0-9a-f-]{36}\/[a-z0-9._-]+)$/i.exec(url || "");
+        if (m && m[1].startsWith(negId + "/")) { try { await sb.storage.from("negocios").remove([m[1]]); } catch { /* queda guardada */ } }
+        return { ok: true };
       },
 
       async ponerClave(nueva) {
