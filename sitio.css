@@ -87,8 +87,12 @@ h1, h2, h3 { font-weight: 600; letter-spacing: -.03em; line-height: 1.05; text-w
 /* ---------- Header ---------- */
 .top { position: sticky; top: 0; z-index: 50; background: rgba(255,255,255,.9); backdrop-filter: saturate(1.4) blur(14px); -webkit-backdrop-filter: saturate(1.4) blur(14px); border-bottom: 1px solid var(--ink-100); }
 .top__in { height: var(--header-h); display: flex; align-items: center; gap: 28px; }
-.brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; }
-.brand__mark { width: 34px; height: 34px; border-radius: 9px; }
+/* El logo (pedido del dueño, 21/11: "el botón de Bookea ahora no hace nada"): con el mouse, el verde agua barre desde la B
+   hasta la palabra y la B se inclina con un rebote; con el dedo, se aprieta, se pone verde agua y rebota al soltar.
+   El relleno y el margen negativo dejan el logo en el mismo lugar. */
+.brand { position: relative; isolation: isolate; display: inline-flex; align-items: center; gap: 10px; text-decoration: none; padding: 6px 12px 6px 6px; margin-left: -6px; border-radius: 12px; }
+.brand::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; background: var(--ok); clip-path: inset(0 100% 0 0 round 12px); transition: clip-path 380ms var(--ease); }
+.brand__mark { width: 34px; height: 34px; border-radius: 9px; transition: transform 460ms var(--ease-rebote); }
 .brand__word { font-size: 21px; font-weight: 700; letter-spacing: -.04em; }
 .tlink { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; font-size: 15px; font-weight: 500; text-decoration: none; color: var(--ink-600); transition: background-color .18s, color .18s; }
 .tlink:hover { background: var(--ink-100); color: var(--ink-900); }
@@ -833,9 +837,11 @@ dialog .row { margin-top: 6px; }
 
   /* ---------- Entrada del primer pantallazo, mientras sube la persiana ---------- */
   /* baja la barra de arriba */
-  .js .top__in > * { opacity: .001; transform: translateY(-10px); transition: opacity 600ms var(--ease), transform 600ms var(--ease); }
-  .js .top__in > :nth-child(2) { transition-delay: 90ms; }
-  .js.is-ready .top__in > * { opacity: 1; transform: none; }
+  /* (con animation y translate, no con transition y transform: así el logo y los botones conservan su propio movimiento) */
+  .js .top__in > * { opacity: .001; }
+  .js.is-ready .top__in > * { animation: bajaBarra 600ms var(--ease) both; }
+  .js.is-ready .top__in > :nth-child(2) { animation-delay: 90ms; }
+  @keyframes bajaBarra { from { opacity: .001; translate: 0 -10px; } to { opacity: 1; translate: none; } }
   /* el título sube renglón por renglón desde una ranura */
   .js .hero h1 .ln { display: block; overflow: hidden; padding-bottom: .08em; margin-bottom: -.08em; }
   .js .hero h1 .ln > * { display: inline-block; transform: translateY(110%); transition: transform 900ms var(--ease-expo); transition-delay: calc(260ms + var(--i, 0) * 110ms); }
@@ -890,6 +896,8 @@ dialog .row { margin-top: 6px; }
   .btn--primary:hover:not(:disabled), .btn--ink:hover, .top__neg:hover, .tlink:hover { color: var(--ink-900); border-color: var(--ok); }
   .tlink:hover { background: transparent; }
   .rubro:hover { transform: translateY(-2px); }
+  .brand:hover::before { clip-path: inset(0 round 12px); }
+  .brand:hover .brand__mark { transform: rotate(-8deg) scale(1.08); }
 }
 
 /* ---------- Con el dedo: se aprieta al tocar y rebota al soltar (toque.js) ---------- */
@@ -904,6 +912,8 @@ dialog .row { margin-top: 6px; }
   /* el verde agua del barrido, de una, mientras el dedo apoya y un momento después */
   .btn:is(.is-apreta, .is-suelta), .copy:is(.is-apreta, .is-suelta), .tlink:is(.is-apreta, .is-suelta) { background: var(--ok); border-color: var(--ok); color: var(--ink-900); }
   .tabbar button:is(.is-apreta, .is-suelta) { color: var(--ok-ink); }
+  .brand::before { clip-path: none; opacity: 0; transition: opacity 360ms ease; }
+  .brand:is(.is-apreta, .is-suelta)::before { opacity: 1; transition-duration: 60ms; }
 }
 
 /* =========================================================
@@ -979,4 +989,7 @@ dialog .row { margin-top: 6px; }
   .loc__gal.n5 figure:first-child { grid-row: auto; grid-column: 1 / -1; }
 }
 
-@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; } }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+  .brand:hover .brand__mark { transform: none; }
+}

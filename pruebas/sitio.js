@@ -367,6 +367,8 @@ const medir = () => {
       await q.evaluate(() => window.scrollTo(0, 0)); await q.waitForTimeout(300);
       await q.hover('.top a.btn--ink'); await q.waitForTimeout(500);
       ok(await q.evaluate(() => { const b = document.querySelector('.top a.btn--ink'); return getComputedStyle(b, '::before').clipPath === 'inset(0px)' && getComputedStyle(b).color === 'rgb(17, 21, 28)'; }), 'movimiento: con el mouse, "Ingresar" se llena de verde agua de izquierda a derecha');
+      await q.hover('.top .brand'); await q.waitForTimeout(600);
+      ok(await q.evaluate(() => { const b = document.querySelector('.top .brand'); return getComputedStyle(b, '::before').clipPath === 'inset(0px round 12px)' && getComputedStyle(b.querySelector('.brand__mark')).transform !== 'none'; }), 'movimiento: con el mouse, el logo de Bookea se llena de verde agua y la B se inclina');
       await q.hover('#finder button[type=submit]'); await q.waitForTimeout(500);
       ok(await q.evaluate(() => getComputedStyle(document.querySelector('#finder button[type=submit]'), '::before').clipPath === 'inset(0px)'), 'movimiento: "Buscar turnos" también barre en verde agua');
       await q.click('#f-rubros .rubro[data-k="tenis"]');
@@ -380,6 +382,11 @@ const medir = () => {
       await c.dispatchEvent('#finder button[type=submit]', 'pointerup', { pointerType: 'touch', isPrimary: true });
       const suelta = await c.evaluate(() => document.querySelector('#finder button[type=submit]').classList.contains('is-suelta'));
       ok(apreta && suelta, 'movimiento: con el dedo, el botón se aprieta y rebota al soltar');
+      // el logo: que de verdad se mueva y se ponga verde (antes la entrada de la barra de arriba lo dejaba quieto)
+      await c.dispatchEvent('.top .brand', 'pointerdown', { pointerType: 'touch', isPrimary: true }); await c.waitForTimeout(220);
+      const logo = await c.evaluate(() => { const b = document.querySelector('.top .brand'); return { tr: getComputedStyle(b).transform, verde: getComputedStyle(b, '::before').opacity }; });
+      await c.dispatchEvent('.top .brand', 'pointerup', { pointerType: 'touch', isPrimary: true });
+      ok(logo.tr !== 'none' && logo.verde === '1', `movimiento: con el dedo, el logo de Bookea se aprieta y se pone verde agua (${JSON.stringify(logo)})`);
       await c.context().close();
     }
 
