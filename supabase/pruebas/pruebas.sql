@@ -834,7 +834,8 @@ begin
     'portada', 'https://otro-sitio.com/foto.jpg',
     'galeria', jsonb_build_array('https://x.supabase.co/storage/v1/object/public/negocios/' || n || '/g1.webp',
                                  'https://x.supabase.co/storage/v1/object/public/negocios/00000000-0000-0000-0000-000000000000/ajena.webp'),
-    'instagram', 'https://www.instagram.com/canchaeva/?hl=es', 'tiktok', '@canchaeva', 'facebook', 'Cancha Eva', 'mostrar_whatsapp', false)
+    'instagram', 'https://www.instagram.com/canchaeva/?hl=es', 'tiktok', '@canchaeva', 'facebook', 'Cancha Eva', 'mostrar_whatsapp', false,
+    'servicios', jsonb_build_array('vest', 'est', '<script>', 5, 'Parrilla con espacios'))
   where id = n::uuid;
   assert found, 'Eva no pudo cambiar su página';
   -- las fotos: a su carpeta sí; a la de otro negocio, o sueltas, no
@@ -860,12 +861,13 @@ begin
   assert pg ->> 'logo' like '%/negocios/' || current_setting('prueba.neg_eva') || '/logo-1.webp' and pg -> 'portada' = 'null'::jsonb
      and jsonb_array_length(pg -> 'galeria') = 1, 'fotos de la página (solo las de su carpeta): ' || pg::text;
   assert pg ->> 'instagram' = 'canchaeva' and pg ->> 'tiktok' = 'canchaeva' and pg ->> 'facebook' = 'CanchaEva' and pg ->> 'whatsapp' = '', 'redes: ' || pg::text;
+  assert pg -> 'servicios' = '["vest", "est"]'::jsonb, 'servicios (solo claves cortas): ' || coalesce(pg -> 'servicios', 'null'::jsonb)::text;
   begin
     insert into storage.objects (bucket_id, name) values ('negocios', current_setting('prueba.neg_eva') || '/sin-cuenta.webp');
     raise exception 'FALLA: sin cuenta se subió una foto';
   exception when insufficient_privilege then null;
   end;
-  raise notice 'OK  la página del negocio: su frase, su historia, solo sus propias fotos y sus redes (sin su WhatsApp si no lo eligió)';
+  raise notice 'OK  la página del negocio: su frase, su historia, solo sus propias fotos, sus servicios y sus redes (sin su WhatsApp si no lo eligió)';
 end $$;
 reset role;
 update public.negocios set pagina = pagina || '{"mostrar_whatsapp": true}' where id = current_setting('prueba.neg_eva')::uuid;

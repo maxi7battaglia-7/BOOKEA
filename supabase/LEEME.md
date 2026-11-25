@@ -170,11 +170,14 @@ deja elegir.
 
 ## La página de cada negocio y "Tu página" (21/11)
 
-Cada negocio tiene dos direcciones: `bookea.ar/nombre` es su página (su portada, su historia, sus fotos, sus redes y sus
-turnos libres) y `bookea.ar/nombre/reservar`, sus turnos para reservar. Lo carga el dueño en **Tu página** del panel.
+Cada negocio tiene dos direcciones: `bookea.ar/nombre` es su página (su portada, su historia, sus características y
+servicios, sus fotos, dónde queda y sus redes, con un botón para reservar al final) y `bookea.ar/nombre/reservar`, sus
+turnos para reservar. Lo carga el dueño en **Tu página** del panel.
 
-- **Base:** la columna `negocios.pagina` (frase, historia, redes, si muestra su WhatsApp y las direcciones de sus fotos).
-  `lugares_publicos` la manda a la página, pero solo con fotos de su propia carpeta y su WhatsApp si lo eligió.
+- **Base:** la columna `negocios.pagina` (frase, historia, redes, si muestra su WhatsApp, sus servicios y las
+  direcciones de sus fotos). `lugares_publicos` la manda a la página, pero solo con fotos de su propia carpeta, su
+  WhatsApp si lo eligió y sus servicios como claves cortas (`vest`, `est`…). Los servicios se suman el 25/11: hasta
+  correr de nuevo `esquema.sql`, se guardan pero no se ven en la página.
 - **Fotos:** Supabase Storage, bucket público `negocios`. Cada negocio sube a su carpeta (`negocios/<id del negocio>/`) y
   solo quien puede cambiar Mi negocio (`puede_subir_foto`). `esquema.sql` crea el bucket y sus permisos.
 - **Para que funcione en bookea.ar:** correr de nuevo `esquema.sql` y después `avisos-por-mail.sql` (en ese orden).

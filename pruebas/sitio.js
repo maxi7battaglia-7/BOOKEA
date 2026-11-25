@@ -60,6 +60,7 @@ const medir = () => {
     const ctx = await br.newContext({ viewport: { width: w, height: h }, hasTouch: w < 900, isMobile: w < 500, ...extra });
     // config.js del repo apunta a la base real: acá siempre modo de prueba
     await ctx.route('**/config.js*', (r) => r.fulfill({ contentType: 'application/javascript', body: 'window.BOOKEA_CONFIG = {};' }));
+    await ctx.route(/^https:\/\/(maps|www)\.google\.com\//, (r) => r.fulfill({ contentType: 'text/html', body: '<!doctype html><title>Mapa</title>' }));
     const p = await ctx.newPage();
     p.errs = [];
     p.on('pageerror', (e) => p.errs.push(e.message));
@@ -308,6 +309,24 @@ const medir = () => {
       ok((await p.getAttribute('.top a.btn--ink', 'href')) === 'admin.html', `${w} "Ingresar" lleva al panel`);
       await p.ir(B + 'index.html');
       ok(new URL(p.url()).pathname === '/', `${w} entrar por /index.html deja la dirección limpia (bookea.ar/)`);
+      // ---------- La página de un negocio (bookea.ar/nombre; acá ?pagina=), rehecha el 25/11 (pedido del dueño) ----------
+      await p.goto(B + '?pagina=losalamos', { waitUntil: 'load' });
+      await p.waitForFunction(() => document.documentElement.classList.contains('is-ready') && document.querySelector('#page-local:not([hidden]) .loc'), null, { timeout: 8000 }).catch(() => {});
+      await espera(p, 600);
+      const loc = await p.evaluate(() => ({
+        pagina: (document.querySelector('.page:not([hidden])') || {}).dataset?.page,
+        splash: !!document.querySelector('.splash') && getComputedStyle(document.querySelector('.splash')).display !== 'none',
+        sinBookea: ['.top', '.tabbar', '.foot'].every((s) => getComputedStyle(document.querySelector(s)).display === 'none'),
+        marca: !!document.querySelector('.loc__hero .loc__bookea'), turnos: document.querySelectorAll('#local-root .slot, #local-root .now, #local-root .ptable').length,
+        botones: document.querySelectorAll('#local-root [data-act="ficha"]').length, alFinal: !!document.querySelector('.loc__fin [data-act="ficha"]'),
+        texto: document.querySelector('#local-root').textContent, mapa: (document.querySelector('.loc__mapa iframe') || {}).src || '',
+      }));
+      ok(loc.pagina === 'local' && !loc.splash && loc.sinBookea && loc.marca, `${w} página del negocio: sin la barra, la de abajo, el pie ni la pantalla de carga de Bookea; solo el logo de Bookea sobre la foto`);
+      ok(loc.turnos === 0 && loc.botones === 1 && loc.alFinal && /Características/.test(loc.texto) && /Vestuarios/.test(loc.texto) && /Conocé el lugar/.test(loc.texto) && /Dónde estamos/.test(loc.texto) && /maps\.google\.com/.test(loc.mapa),
+        `${w} página del negocio: características, fotos, ubicación con mapa y un solo botón para reservar, al final (sin turnos ni precios)`);
+      await p.limpio('página del negocio');
+      await p.toca('.loc__fin [data-act="ficha"]'); await espera(p);
+      ok((await p.pagina()) === 'ficha' && await p.evaluate(() => getComputedStyle(document.querySelector('.top')).display !== 'none'), `${w} página del negocio: "Reservar turno" lleva a sus turnos (y ahí vuelve la barra de Bookea)`);
       ok((await p.evaluate(() => document.documentElement.scrollWidth)) <= w, `${w}: sin desplazamiento horizontal`);
       ok(p.errs.length === 0, `${w}: sin errores en la consola ni archivos que falten ${p.errs.join(' | ')}`);
       await p.context().close();

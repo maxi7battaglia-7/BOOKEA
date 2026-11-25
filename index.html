@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <!-- bookea.ar/nombre (la página de un negocio) y bookea.ar/nombre/reservar se sirven con esta misma página:
        los archivos (css, js, fotos) se buscan siempre desde la raíz del sitio, aunque la dirección sea más larga -->
-  <script>(function () { try { var b = document.createElement("base"); b.href = /^\/[a-z0-9]{1,30}(\/reservar)?\/?$/i.test(location.pathname) ? location.origin + "/" : new URL(".", location.href).href; document.head.appendChild(b); } catch (e) { /* una copia sin dirección (vista previa): no hace falta */ } })();</script>
+  <script>(function () { try { var b = document.createElement("base"); b.href = /^\/[a-z0-9]{1,30}(\/reservar)?\/?$/i.test(location.pathname) ? location.origin + "/" : new URL(".", location.href).href; document.head.appendChild(b); } catch (e) { /* una copia sin dirección (vista previa): no hace falta */ }
+    if (/^\/[a-z0-9]{1,30}\/?$/i.test(location.pathname) || /[?&]pagina=/.test(location.search)) document.documentElement.classList.add("sin-splash"); })();</script>
   <title>Bookea · Reservá turnos en segundos</title>
   <meta name="description" content="Bookea: reservá turnos de pádel, fútbol 5, tenis, barbería y más negocios con turnos, en segundos. Para negocios: agenda online con seña y aviso al cliente por mail." />
   <meta name="theme-color" content="#ffffff" />
@@ -13,7 +14,7 @@
   <link rel="icon" href="marca/isotipo-32.png" sizes="32x32" type="image/png" />
   <link rel="apple-touch-icon" href="marca/isotipo-192.png" />
   <link rel="preload" href="assets/fuentes/inter-tight.woff2" as="font" type="font/woff2" crossorigin />
-  <link rel="stylesheet" href="sitio.css?v=22" />
+  <link rel="stylesheet" href="sitio.css?v=23" />
 </head>
 <body>
   <script>document.documentElement.classList.add("js");</script>
@@ -51,6 +52,9 @@
         <path d="M391,180 H520 A175,175 0 0 1 520,530 H391 Z" fill="#fff"/><path d="M391,426 H545 A197,197 0 0 1 545,820 H391 Z" fill="#fff"/>
         <path d="M391,284 H520 A71,71 0 0 1 520,426 H391 Z" fill="#000"/><path d="M391,530 H545 A93,93 0 0 1 545,716 H391 Z" fill="#000"/>
       </mask>
+      <symbol id="bk-b" viewBox="250 170 510 660">
+        <g transform="translate(8,0)"><g mask="url(#bk-panzas)"><rect width="1000" height="1000" fill="currentColor"/></g><rect x="255" y="180" width="136" height="640" fill="currentColor"/></g>
+      </symbol>
       <symbol id="bk-mark" viewBox="0 0 1000 1000">
         <rect width="1000" height="1000" rx="200" fill="#11151c"/>
         <g transform="translate(8,0)">
@@ -372,9 +376,9 @@
   <dialog id="dlg"><h2 id="dlg-t"></h2><p id="dlg-p"></p><div class="row"><button class="btn btn--line" type="button" id="dlg-no">Volver</button><button class="btn btn--primary" type="button" id="dlg-si">Confirmar</button></div></dialog>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-  <script src="config.js?v=22"></script>
-  <script src="cuenta.js?v=22"></script>
-  <script src="sitio.js?v=22"></script>
-  <script src="toque.js?v=22"></script>
+  <script src="config.js?v=23"></script>
+  <script src="cuenta.js?v=23"></script>
+  <script src="sitio.js?v=23"></script>
+  <script src="toque.js?v=23"></script>
 </body>
 </html>

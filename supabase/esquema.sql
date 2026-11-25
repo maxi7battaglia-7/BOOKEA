@@ -857,6 +857,11 @@ language sql stable set search_path = '' as $$
       'instagram', public.red_social(x.pagina ->> 'instagram'),
       'tiktok', public.red_social(x.pagina ->> 'tiktok'),
       'facebook', public.red_social(x.pagina ->> 'facebook'),
+      -- sus servicios (estacionamiento, vestuarios…): solo claves cortas; la página muestra las que conoce
+      'servicios', (select coalesce(jsonb_agg(s order by i), '[]'::jsonb)
+                      from jsonb_array_elements_text(case when jsonb_typeof(x.pagina -> 'servicios') = 'array' then x.pagina -> 'servicios' else '[]'::jsonb end)
+                           with ordinality as e(s, i)
+                     where s ~ '^[a-z]{2,10}$' and i <= 30),
       'whatsapp', case when x.pagina ->> 'mostrar_whatsapp' = 'true' then x.whatsapp else '' end),
     'publicado', public.tiene_mercado_pago(x.id),
     'ocupados', public.ocupados_de(x.id))

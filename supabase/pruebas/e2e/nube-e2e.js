@@ -426,7 +426,7 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
     await f4.waitForFunction(() => document.querySelector('.page:not([hidden])').dataset.page === 'local', null, { timeout: 8000 }).catch(() => {});
     ok((await pag(f4)) === 'local' && /Los Álamos Pádel/.test(await f4.textContent('#local-root h1').catch(() => '')) && new URL(f4.url()).pathname === '/losalamospadel'
       && (await f4.title()) === 'Los Álamos Pádel · Bookea', 'negocio de verdad: bookea.ar/nombre abre su página (y la dirección queda bookea.ar/nombre)');
-    await f4.click('.loc__acts [data-act="ficha"]'); await f4.waitForTimeout(500);
+    await f4.click('.loc__fin [data-act="ficha"]'); await f4.waitForTimeout(500);
     ok((await pag(f4)) === 'ficha' && new URL(f4.url()).pathname === '/losalamospadel/reservar', 'negocio de verdad: "Reservar turno" lleva a bookea.ar/nombre/reservar');
     await f4.goto('http://localhost:8787/losalamospadel/reservar'); await frenteListo(f4);
     await f4.waitForFunction(() => document.querySelector('.page:not([hidden])').dataset.page === 'ficha', null, { timeout: 8000 }).catch(() => {});
@@ -492,11 +492,12 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
     await an.setInputFiles('#p-logo', RAIZ + '/marca/isotipo-192.png'); await an.waitForSelector('#p-port .port__logo img', { timeout: 10000 }).catch(() => {}); await guardadoPg();
     await an.fill('#p-frase', 'Pádel entre álamos'); await an.fill('#p-historia', 'Empezamos con una cancha.\nHoy tenemos dos.');
     await an.fill('#p-ig', 'https://www.instagram.com/losalamospadel/'); await an.press('#p-ig', 'Tab');
+    await an.click('#f-pag .servp__i:has(input[value="vest"])'); await an.click('#f-pag .servp__i:has(input[value="clases"])');
     await an.waitForTimeout(1600); await guardadoPg();
     const pgA = await sql("select to_json(pagina) from negocios where slug = 'losalamospadel'");
     const enStorage = /\/storage\/v1\/object\/public\/negocios\/[0-9a-f-]{36}\//;
-    ok(pgA && enStorage.test(pgA.portada || '') && /\/portada-/.test(pgA.portada) && enStorage.test(pgA.logo || '') && pgA.frase === 'Pádel entre álamos' && pgA.instagram === 'losalamospadel',
-      'Tu página: las fotos van a Storage (a la carpeta del negocio) y la frase, la historia y las redes a la base');
+    ok(pgA && enStorage.test(pgA.portada || '') && /\/portada-/.test(pgA.portada) && enStorage.test(pgA.logo || '') && pgA.frase === 'Pádel entre álamos' && pgA.instagram === 'losalamospadel' && JSON.stringify(pgA.servicios) === '["vest","clases"]',
+      'Tu página: las fotos van a Storage (a la carpeta del negocio) y la frase, la historia, las redes y los servicios a la base');
     ok((await sql("select count(*) from storage.objects where bucket_id = 'negocios'")) === 2, 'Tu página: quedan dos fotos guardadas (portada y logo)');
     await an.setInputFiles('#p-portada', RAIZ + '/assets/r-tenis.webp'); await an.waitForTimeout(800); await guardadoPg(); await an.waitForTimeout(600);
     const pgA2 = await sql("select to_json(pagina) from negocios where slug = 'losalamospadel'");
@@ -507,8 +508,8 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
     const portadaVista = await f4.evaluate(() => { const i = document.querySelector('.loc__bg'); return i ? { src: i.src, ancho: i.naturalWidth } : null; });
     ok(portadaVista && portadaVista.src === pgA2.portada && portadaVista.ancho > 0, 'la página del negocio muestra su portada (la foto se carga)');
     const loc = await f4.textContent('#local-root');
-    ok(/Pádel entre álamos/.test(loc) && /Empezamos con una cancha\./.test(loc) && /Hoy tenemos dos\./.test(loc) && /@losalamospadel/.test(loc) && await f4.isVisible('.loc__logo img'),
-      'la página del negocio muestra su logo, su frase, su historia y su Instagram');
+    ok(/Pádel entre álamos/.test(loc) && /Empezamos con una cancha\./.test(loc) && /Hoy tenemos dos\./.test(loc) && /@losalamospadel/.test(loc) && /Vestuarios/.test(loc) && /Clases/.test(loc) && await f4.isVisible('.loc__logo img'),
+      'la página del negocio muestra su logo, su frase, su historia, sus servicios y su Instagram');
     await entera(f4, `${out}/nb-pagina-real.png`);
     for (const [n, p] of [['f1', f1], ['f2', f2], ['f3', f3], ['f4', f4], ['an', an]]) ok(!p.errs.filter((x) => !/Failed to load resource/.test(x)).length, `frente: sin errores en la consola (${n}) ${p.errs.join(' | ')}`);
   } catch (e) {

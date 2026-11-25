@@ -102,7 +102,7 @@
     { id: "barba", n: "Barba", min: 45, p: P(c, c, c) },
   ];
   const REG = { "Valle de Uco": ["tunuyan", "tupungato", "san-carlos"] };
-  const AM = { vest: "Vestuarios", est: "Estacionamiento", palas: "Alquiler de paletas", buf: "Buffet", led: "Iluminación LED", cesped: "Césped sintético", luz: "Iluminación nocturna", parr: "Parrilla", polvo: "Polvo de ladrillo", raq: "Alquiler de raquetas", wifi: "Wi-Fi", mate: "Café y mate", qr: "Pago con QR", aire: "Aire acondicionado", cuen: "Mercado Pago", tv: "TV y música" };
+  const AM = { vest: "Vestuarios", est: "Estacionamiento", palas: "Alquiler de paletas", buf: "Buffet", led: "Iluminación LED", cesped: "Césped sintético", luz: "Iluminación nocturna", parr: "Parrilla", polvo: "Polvo de ladrillo", raq: "Alquiler de raquetas", wifi: "Wi-Fi", mate: "Café y mate", qr: "Pago con QR", aire: "Aire acondicionado", cuen: "Mercado Pago", tv: "TV y música", duchas: "Duchas", clases: "Clases", torneos: "Torneos", cumple: "Cumpleaños" };
   const VENUES = [
     { id: "losalamos", rubro: "padel", name: "Los Álamos", zona: "tupungato", fotos: ["canchas", "padel", "paletas"], dur: 90, bloques: [["17:00", "24:30"]], units: cs(3, [3]), p: P(28000, 34000, 36000), ocup: 34, cancel: 6, desc: "Tres canchas de cristal, una de ellas techada. Turnos de 90 minutos para jugar entre amigos o en pareja.", ame: ["vest", "est", "palas", "buf", "led"] },
     { id: "aconcagua", rubro: "padel", name: "Aconcagua Pádel Club", zona: "tunuyan", fotos: ["padel", "paletas", "canchas"], dur: 90, bloques: [["15:00", "24:00"]], units: cs(4, [1, 2]), p: P(30000, 36000, 38000), ocup: 42, cancel: 12, desc: "Cuatro canchas con fácil acceso, dos de ellas techadas. Ideal para jugar después de la oficina.", ame: ["vest", "palas", "buf", "led", "tv"] },
@@ -160,6 +160,7 @@
       frase: String(pg.frase || "").trim(), historia: String(pg.historia || "").trim(), logo: fotoOk(pg.logo), portada: fotoOk(pg.portada),
       galeria: (Array.isArray(pg.galeria) ? pg.galeria : []).map(fotoOk).filter(Boolean).slice(0, 8),
       instagram: usuario(pg.instagram), tiktok: usuario(pg.tiktok), facebook: usuario(pg.facebook), whatsapp: String(pg.whatsapp || "").trim(),
+      servicios: (Array.isArray(pg.servicios) ? pg.servicios : []).filter((k, i, a) => AM[k] && k !== "cuen" && a.indexOf(k) === i).slice(0, 20),
     };
   };
   const lugarDeFila = (f) => {
@@ -348,6 +349,7 @@
     // Sin cuenta abierta: en Mis turnos (o si este navegador ya tuvo una cuenta) se ofrece entrar; al pagar por primera vez, crearla
     if (!S.yo && (page === "pago" || page === "turnos")) S.modoCu = page === "turnos" || store.get("tuvo-cuenta", false) ? "entrar" : "nueva";
     S.page = page;
+    document.documentElement.classList.toggle("en-local", page === "local");
     document.body.classList.remove("con-irpagar");
     $$(".page").forEach((el) => (el.hidden = el.dataset.page !== page));
     ({ home: renderHome, resultados: renderResultados, ficha: renderFicha, pago: renderPago, turnos: renderTurnos, negocios: () => {}, local: renderLocal })[page](st);
@@ -615,85 +617,101 @@
     if (r) toast("Cambiaste de turno: el anterior quedó libre");
   }
 
-  // ---------- La página del negocio (bookea.ar/nombre): su presentación, con sus turnos para reservar ----------
-  // Como la página de cada bodega de Mendoza Icons (pedido del dueño, 21/11): portada con su logo y su foto, sus turnos
-  // libres, su historia con fotos, sus canchas y precios, horarios, dónde queda y sus redes. "Reservar" lleva a su ficha
-  // (bookea.ar/nombre/reservar). Los de ejemplo también la tienen, con sus fotos de muestra y el cartel de ejemplo.
+  // ---------- La página del negocio (bookea.ar/nombre) ----------
+  // Rehecha el 25/11, pedido del dueño: "esta página no es para reservar, es para que los negocios tengan su propio lugar"
+  // y "nuestros colores no debemos utilizarlos tanto, es de los negocios". Sin la barra de arriba, la de abajo ni el pie de
+  // Bookea; en blanco, negro y grises (el color lo ponen sus fotos); el logo de Bookea chico y transparente arriba a la
+  // izquierda, sobre la portada. Portada, el lugar (su historia y sus características), fotos, ubicación con mapa, horarios
+  // y contacto, y al final "Reservar turno", que lleva a sus turnos (bookea.ar/nombre/reservar). Los de ejemplo también la
+  // tienen, con sus fotos de muestra y el cartel de ejemplo.
   const paginaDe = (v) => (v.real ? v.pagina : {
     frase: "", historia: v.desc, logo: "", portada: IMG[v.fotos[0]] || "", galeria: v.fotos.slice(1).map((k) => IMG[k]).filter(Boolean),
-    instagram: "", tiktok: "", facebook: "", whatsapp: "",
+    instagram: "", tiktok: "", facebook: "", whatsapp: "", servicios: v.ame || [],
   });
   const parrafos = (t) => String(t || "").split(/\n\s*\n|\n/).map((x) => x.trim()).filter(Boolean).map((x) => `<p>${esc(x)}</p>`).join("");
   const waDe = (n) => { const d = String(n || "").replace(/\D/g, "").replace(/^0/, ""); return d ? "https://wa.me/" + (d.startsWith("54") ? d : "549" + d) : ""; };
   const RED = (ico, txt, href) => `<li><a href="${esc(href)}" target="_blank" rel="noopener"><svg class="icon" aria-hidden="true"><use href="#i-${ico}"/></svg><span>${esc(txt)}</span></a></li>`;
+  // El mapa de la sección Ubicación: Google Maps con su dirección (los de ejemplo, su zona)
+  const mapaDe = (v) => {
+    const q = v.real ? [v.direccion, v.ciudad].filter(Boolean).join(", ") : `${ZONAS[v.zona]}, Mendoza`;
+    return q ? "https://maps.google.com/maps?q=" + encodeURIComponent(q + ", Argentina") + "&z=15&hl=es&output=embed" : "";
+  };
   function renderLocal(st) {
-    const v = venue(st.v), R = RUBROS[v.rubro], pg = paginaDe(v), maps = v.real ? comoLlegar(v) : "";
+    const v = venue(st.v), R = RUBROS[v.rubro], pg = paginaDe(v);
     const logo = pg.logo || (v.real ? IMG[v.id] || "" : "");
+    const maps = v.real ? comoLlegar(v) : "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(`${ZONAS[v.zona]}, Mendoza`);
+    const mapa = mapaDe(v), ciudad = v.real && v.ciudad ? v.ciudad : ZONAS[v.zona];
     const hoy = (() => {
       if (!v.real) return horariosDe(v)[0][1];
       const h = v.horario[dayInfo(0).dow];
       return !h || h.cerrado ? "Cerrado" : `${h.abre} a ${h.cierra}`;
     })();
-    // los primeros horarios libres (hoy y los dos días que siguen), hasta llenar la fila
-    const libres = [];
-    for (let d = 0; d < 3 && libres.length < 8; d++) slotsFor(v, d).filter((x) => x.libres.length).slice(0, 8 - libres.length).forEach((x) => libres.push({ v, s: x, d }));
     const redes = [
       pg.whatsapp && waDe(pg.whatsapp) ? RED("wa", pg.whatsapp, waDe(pg.whatsapp)) : "",
       pg.instagram ? RED("ig", "@" + pg.instagram, `https://www.instagram.com/${pg.instagram}/`) : "",
       pg.tiktok ? RED("tt", "@" + pg.tiktok, `https://www.tiktok.com/@${pg.tiktok}`) : "",
       pg.facebook ? RED("fb", pg.facebook, `https://www.facebook.com/${pg.facebook}`) : "",
     ].filter(Boolean);
-    const gal = pg.galeria.slice(0, 6);
-    const reservar = (txt, cls = "btn btn--primary btn--lg") => `<button type="button" class="${cls}" data-act="ficha" data-v="${v.id}">${txt}</button>`;
-    const precios = `<div class="loc__precios">
-              <ul class="loc__unis">${v.units.map((u) => { const [nom, det] = u.split(" · "); return `<li><b>${esc(nom)}</b><span>${det ? esc(cap(det)) : `Turnos de ${v.dur} min`}</span></li>`; }).join("")}</ul>
-              <table class="ptable"><caption class="sr-only">Precios</caption><tbody>${preciosHTML(v)}</tbody></table>
-            </div>`;
-    // con historia y sin fotos, las canchas y los precios van al lado de la historia (la fila no queda a medias)
-    const alLado = pg.historia && !gal.length;
+    const gal = pg.galeria.slice(0, 6), fotoFin = gal[gal.length - 1] || pg.portada || "";
+    const servs = (pg.servicios || []).filter((k) => AM[k]);
+    const carac = [
+      [secDe(v.rubro) === "deportes" ? "Deporte" : "Rubro", R.n],
+      [cap(R.uns), String(v.units.length)],
+      ["Turnos de", `${v.dur} min`],
+      ["Hoy", hoy],
+      ["Zona", ciudad],
+    ];
+    const B = `<svg class="loc__bk" aria-hidden="true"><use href="#bk-b"/></svg>`;
     $("#local-root").innerHTML = `
       <div class="loc">
         <header class="loc__hero${pg.portada ? " has-foto" : ""}">
           ${pg.portada ? `<img class="loc__bg" src="${esc(pg.portada)}" alt="" />` : ""}
+          <div class="loc__arriba"><div class="wrap"><a class="loc__bookea" href="#" data-go="home" aria-label="Bookea, ir al inicio">${B}<span>Bookea</span></a></div></div>
           <div class="wrap loc__in">
             <span class="loc__logo${logo ? " has-img" : ""}" aria-hidden="true">${logo ? `<img src="${esc(logo)}" alt="" />` : esc(iniciales(v.name))}</span>
-            <p class="loc__rubro">${esc(R.n)} · ${esc(ZONAS[v.zona])}</p>
+            <p class="loc__rubro">${esc(R.n)} · ${esc(ciudad)}</p>
             <h1>${esc(v.name)}</h1>
             ${pg.frase ? `<p class="loc__frase">${esc(pg.frase)}</p>` : ""}
-            <div class="loc__acts">${reservar("Reservar turno")}${maps ? `<a class="btn btn--lg btn--claro" href="${esc(maps)}" target="_blank" rel="noopener">Cómo llegar</a>` : ""}</div>
           </div>
-          <i class="loc__franja" aria-hidden="true"></i>
         </header>
         <div class="wrap">
-          <dl class="loc__datos">
-            <div><dt>Turnos de</dt><dd>${v.dur} min</dd></div>
-            <div><dt>Desde</dt><dd>${money(minPrecio(v))}</dd></div>
-            <div><dt>${esc(cap(R.uns))}</dt><dd>${v.units.length}</dd></div>
-            <div><dt>Hoy</dt><dd>${esc(hoy)}</dd></div>
-          </dl>
-          ${v.real ? "" : `<span class="demo">Negocio de ejemplo · demo</span>`}
-          <section class="loc__sec" aria-labelledby="loc-libres">
-            <div class="sec__head"><div><p class="eyebrow">Turnos libres</p><h2 id="loc-libres">Para reservar ya</h2></div>${reservar("Ver todos los horarios", "link")}</div>
-            ${libres.length ? `<div class="rail">${libres.map(slotCard).join("")}</div>` : `<p class="loc__vacio">No quedan turnos libres hasta pasado mañana. ${reservar("Ver los días que siguen", "link")}</p>`}
+          ${v.real ? "" : `<span class="demo loc__demo">Negocio de ejemplo · demo</span>`}
+          <section class="loc__sec loc__lugar${pg.historia ? "" : " is-solo"}" aria-labelledby="loc-lugar">
+            ${pg.historia ? `<div class="loc__texto"><p class="loc__k">El lugar</p><h2 id="loc-lugar">${v.real ? "Nuestra historia" : "Sobre el lugar"}</h2>${parrafos(pg.historia)}</div>` : ""}
+            <div class="loc__carac">
+              ${pg.historia ? `<h3 class="loc__k">Características</h3>` : `<p class="loc__k">El lugar</p><h2 id="loc-lugar">Características</h2>`}
+              <dl class="loc__lista">${carac.map(([k, x]) => `<div><dt>${esc(k)}</dt><dd>${esc(x)}</dd></div>`).join("")}</dl>
+              <div class="loc__grupos">
+                <div><h4 class="loc__sub">${esc(cap(R.uns))}</h4><ul class="loc__unis">${v.units.map((u) => { const [nom, det] = u.split(" · "); return `<li><b>${esc(nom)}</b>${det ? `<span>${esc(cap(det))}</span>` : ""}</li>`; }).join("")}</ul></div>
+                ${servs.length ? `<div><h4 class="loc__sub">Servicios</h4><ul class="loc__servs">${servs.map((k) => `<li>${AMI}${esc(AM[k])}</li>`).join("")}</ul></div>` : ""}
+              </div>
+            </div>
           </section>
-          ${pg.historia || gal.length ? `<section class="loc__sec loc__hist" aria-labelledby="loc-hist">
-            <div class="loc__texto"><p class="eyebrow">El lugar</p><h2 id="loc-hist">${v.real ? "Nuestra historia" : "Sobre el lugar"}</h2>${parrafos(pg.historia) || `<p>${esc(v.name)} trabaja con turnos en Bookea.</p>`}</div>
-            ${gal.length ? `<div class="loc__gal n${gal.length}">${gal.map((u) => `<figure><img src="${esc(u)}" alt="" loading="lazy" /></figure>`).join("")}</div>`
-              : `<div class="loc__lado"><p class="eyebrow">${esc(R.n)}</p><h2 id="loc-uni">${esc(cap(R.uns))} y precios</h2>${precios}</div>`}
+          ${gal.length ? `<section class="loc__sec loc__fotos" aria-labelledby="loc-fotos">
+            <p class="loc__k">Fotos</p><h2 id="loc-fotos">Conocé el lugar</h2>
+            <div class="loc__gal n${gal.length}">${gal.map((u, i) => `<figure><img src="${esc(u)}" alt="Foto ${i + 1} de ${esc(v.name)}" loading="lazy" /></figure>`).join("")}</div>
           </section>` : ""}
-          ${alLado ? "" : `<section class="loc__sec" aria-labelledby="loc-uni">
-            <div class="sec__head"><div><p class="eyebrow">${esc(R.n)}</p><h2 id="loc-uni">${esc(cap(R.uns))} y precios</h2></div></div>
-            ${precios}
-          </section>`}
-          <section class="loc__sec loc__info">
-            <div><h2>Horarios</h2><table class="ptable"><caption class="sr-only">Horarios</caption><tbody>${horariosDe(v).map(([d, h]) => `<tr><th scope="row">${d}</th><td>${esc(h)}</td></tr>`).join("")}</tbody></table></div>
-            <div><h2>Dónde queda</h2>${v.real ? dondeReal(v) : `<div class="mapbox">${mapSVG(v.id)}<div class="mapbox__t"><b>${ZONAS[v.zona]}</b>Valle de Uco, Mendoza</div></div>`}</div>
-            ${redes.length ? `<div><h2>Contacto</h2><ul class="loc__redes">${redes.join("")}</ul></div>` : ""}
+          <section class="loc__sec loc__ubi${mapa ? "" : " is-solo"}" aria-labelledby="loc-ubi">
+            <div class="loc__ubi-t">
+              <p class="loc__k">Ubicación</p>
+              <h2 id="loc-ubi">Dónde estamos</h2>
+              <p class="loc__dir">${v.real && v.direccion ? `<b>${esc(v.direccion)}</b>${v.ciudad ? `<span>${esc(v.ciudad)}</span>` : ""}` : `<b>${esc(ciudad)}</b><span>${v.real ? "" : "Ubicación aproximada: es un negocio de ejemplo"}</span>`}</p>
+              ${maps ? `<a class="loc__btn loc__btn--linea" href="${esc(maps)}" target="_blank" rel="noopener">Cómo llegar</a>` : ""}
+              <div class="loc__bloque"><h3>Horarios</h3><table class="loc__hor"><caption class="sr-only">Horarios</caption><tbody>${horariosDe(v).map(([d, h]) => `<tr><th scope="row">${d}</th><td>${esc(h)}</td></tr>`).join("")}</tbody></table></div>
+              ${redes.length ? `<div class="loc__bloque"><h3>Contacto</h3><ul class="loc__redes">${redes.join("")}</ul></div>` : ""}
+            </div>
+            ${mapa ? `<div class="loc__mapa"><iframe title="Mapa: dónde queda ${esc(v.name)}" src="${esc(mapa)}" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe></div>` : ""}
           </section>
         </div>
-        <section class="loc__cta" aria-labelledby="loc-cta">
-          <div class="wrap"><h2 id="loc-cta">Reservá tu turno en ${esc(v.name)}</h2><p>Elegís el día y el horario, pagás la seña y te llega la confirmación por mail.</p>${reservar("Ver horarios libres")}</div>
+        <section class="loc__fin${fotoFin ? " has-foto" : ""}" aria-labelledby="loc-fin">
+          ${fotoFin ? `<img class="loc__bg" src="${esc(fotoFin)}" alt="" loading="lazy" />` : ""}
+          <div class="wrap loc__fin-in">
+            <h2 id="loc-fin">Reservá tu turno en ${esc(v.name)}</h2>
+            <p>Elegís el día y el horario, y te llega la confirmación por mail.</p>
+            <button type="button" class="loc__btn loc__btn--claro loc__btn--grande" data-act="ficha" data-v="${v.id}">Reservar turno</button>
+          </div>
         </section>
+        <footer class="loc__pie"><div class="wrap"><a href="#" data-go="home">Reservas online con ${B}<b>Bookea</b></a></div></footer>
       </div>`;
     const desc = document.querySelector('meta[name="description"]');
     if (desc && v.real) desc.setAttribute("content", (pg.frase || pg.historia || `${v.name}: reservá tu turno en Bookea.`).slice(0, 160));
@@ -1246,7 +1264,7 @@
     if (splash) { splash.classList.add("is-out"); setTimeout(() => splash.remove(), 1000); }
     pendientes.splice(0).forEach(revelar);
   };
-  if (splash) {
+  if (splash && !document.documentElement.classList.contains("sin-splash")) {
     const minimo = new Promise((ok) => setTimeout(ok, Math.max(0, (reduce ? 600 : 1500) - performance.now())));
     const cargada = new Promise((ok) => (document.readyState === "complete" ? ok() : addEventListener("load", ok, { once: true })));
     Promise.all([minimo, cargada]).then(arrancar);
