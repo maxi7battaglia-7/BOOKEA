@@ -1,0 +1,37 @@
+# Aviso automático para que Supabase no pause el proyecto (pedido del dueño, 25/11).
+# En el plan gratis, Supabase pausa un proyecto que pasa 7 días casi sin uso. Cada 3 días esto hace una lectura
+# chica a la base: la misma que hace bookea.ar al abrirse (lugares_publicos), con la clave publishable de
+# config.js y sin datos de nadie. Cuando los complejos usen Bookea todos los días, ya no hace falta.
+# Para correrlo a mano: en GitHub, Actions → "Mantener Supabase activo" → Run workflow.
+name: Mantener Supabase activo
+
+on:
+  schedule:
+    - cron: "23 11 */3 * *" # cada 3 días, a las 8:23 de Argentina
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  leer-la-base:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: config.js
+          sparse-checkout-cone-mode: false
+      - name: Leer la base (lo mismo que hace la página al abrirse)
+        run: |
+          URL=$(grep -oE 'https://[a-z0-9]+\.supabase\.co' config.js | head -1)
+          KEY=$(grep -oE 'sb_publishable_[A-Za-z0-9_-]+' config.js | head -1)
+          if [ -z "$URL" ] || [ -z "$KEY" ]; then echo "::error::No encontré la dirección o la clave de Supabase en config.js"; exit 1; fi
+          for intento in 1 2 3; do
+            codigo=$(curl -s -o respuesta.txt -w '%{http_code}' -X POST "$URL/rest/v1/rpc/lugares_publicos" \
+              -H "apikey: $KEY" -H "Authorization: Bearer $KEY" -H 'Content-Type: application/json' -d '{}' || echo 000)
+            if [ "$codigo" = "200" ]; then echo "Supabase respondió bien (200): el proyecto sigue activo."; exit 0; fi
+            echo "Intento $intento: Supabase respondió $codigo"; cat respuesta.txt 2>/dev/null; echo; sleep 20
+          done
+          echo "::error::Supabase no respondió bien. Fijate en supabase.com si el proyecto BOOKEA quedó pausado (se reactiva con Restore)."
+          exit 1

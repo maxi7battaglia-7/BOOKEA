@@ -198,6 +198,22 @@ ya está en Cloudflare, así que es gratis y son unos clics:
 Nada cambia en Supabase: los links de los mails (`bookea.ar/admin.html`, `bookea.ar/?cuenta=…`) siguen andando.
 Cloudflare abre `admin.html` también como `bookea.ar/admin`.
 
+## Que Supabase no pause el proyecto (25/11)
+
+En el plan gratis, Supabase pausa un proyecto que pasa 7 días casi sin uso (avisa por mail antes). Pausado, bookea.ar
+se sigue viendo pero no andan el panel, las cuentas, las reservas ni los mails; se reactiva desde supabase.com
+(**Restore**) dentro de los 90 días, sin perder datos.
+
+Para evitarlo mientras no haya complejos usándolo todos los días, `.github/workflows/mantener-supabase.yml` hace cada
+3 días (8:23 de Argentina) la misma lectura que bookea.ar al abrirse (`lugares_publicos`, sin datos de nadie, con la
+clave publishable de `config.js`).
+
+- **Ver que anda:** en GitHub, el repo → **Actions** → "Mantener Supabase activo": cada corrida en verde es una lectura
+  que funcionó. Si queda en rojo, fijate en supabase.com si el proyecto quedó pausado.
+- **Correrlo a mano:** en esa misma pantalla, **Run workflow**.
+- **Ojo:** GitHub apaga las tareas programadas de un repo que pasa 60 días sin cambios. Si pasa, en esa pantalla
+  aparece un botón para volver a prenderla.
+
 ## Qué falta para la siguiente etapa
 
 - **Mercado Pago:** que cada negocio conecte su cuenta desde el panel, que la seña se cobre de verdad (y vaya a la
