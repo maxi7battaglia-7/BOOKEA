@@ -320,10 +320,12 @@ const medir = () => {
         marca: !!document.querySelector('.loc__hero .loc__bookea'), turnos: document.querySelectorAll('#local-root .slot, #local-root .now, #local-root .ptable').length,
         botones: document.querySelectorAll('#local-root [data-act="ficha"]').length, alFinal: !!document.querySelector('.loc__fin [data-act="ficha"]'),
         texto: document.querySelector('#local-root').textContent, mapa: (document.querySelector('.loc__mapa iframe') || {}).src || '',
+        tarjetas: document.querySelectorAll('.loc__cards .loc__card').length, hoy: document.querySelectorAll('.loc__hor tr.is-hoy').length,
       }));
       ok(loc.pagina === 'local' && !loc.splash && loc.sinBookea && loc.marca, `${w} página del negocio: sin la barra, la de abajo, el pie ni la pantalla de carga de Bookea; solo el logo de Bookea sobre la foto`);
-      ok(loc.turnos === 0 && loc.botones === 1 && loc.alFinal && /Características/.test(loc.texto) && /Vestuarios/.test(loc.texto) && /Conocé el lugar/.test(loc.texto) && /Dónde estamos/.test(loc.texto) && /maps\.google\.com/.test(loc.mapa),
-        `${w} página del negocio: características, fotos, ubicación con mapa y un solo botón para reservar, al final (sin turnos ni precios)`);
+      ok(loc.turnos === 0 && loc.botones === 1 && loc.alFinal && loc.tarjetas >= 8 && !/Características/.test(loc.texto) && /3 canchas de pádel/.test(loc.texto) && /Vestuarios/.test(loc.texto)
+        && /Galería/.test(loc.texto) && loc.hoy === 1 && /Dónde estamos/.test(loc.texto) && /maps\.google\.com/.test(loc.mapa),
+        `${w} página del negocio: tarjetas con lo que tiene el lugar (canchas, horarios, servicios), galería, horarios con hoy marcado, mapa y un solo botón para reservar, al final (sin turnos ni precios) ${loc.tarjetas}`);
       await p.limpio('página del negocio');
       await p.toca('.loc__fin [data-act="ficha"]'); await espera(p);
       ok((await p.pagina()) === 'ficha' && await p.evaluate(() => getComputedStyle(document.querySelector('.top')).display !== 'none'), `${w} página del negocio: "Reservar turno" lleva a sus turnos (y ahí vuelve la barra de Bookea)`);

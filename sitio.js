@@ -102,7 +102,7 @@
     { id: "barba", n: "Barba", min: 45, p: P(c, c, c) },
   ];
   const REG = { "Valle de Uco": ["tunuyan", "tupungato", "san-carlos"] };
-  const AM = { vest: "Vestuarios", est: "Estacionamiento", palas: "Alquiler de paletas", buf: "Buffet", led: "Iluminación LED", cesped: "Césped sintético", luz: "Iluminación nocturna", parr: "Parrilla", polvo: "Polvo de ladrillo", raq: "Alquiler de raquetas", wifi: "Wi-Fi", mate: "Café y mate", qr: "Pago con QR", aire: "Aire acondicionado", cuen: "Mercado Pago", tv: "TV y música", duchas: "Duchas", clases: "Clases", torneos: "Torneos", cumple: "Cumpleaños" };
+  const AM = { vest: "Vestuarios", est: "Estacionamiento", palas: "Alquiler de paletas", buf: "Buffet", led: "Iluminación LED", cesped: "Césped sintético", luz: "Iluminación nocturna", parr: "Parrilla", polvo: "Polvo de ladrillo", raq: "Alquiler de raquetas", wifi: "Wi-Fi", mate: "Café y mate", qr: "Pago con QR", aire: "Aire acondicionado", cuen: "Mercado Pago", tv: "TV y música", duchas: "Duchas", clases: "Clases", torneos: "Torneos", cumple: "Cumpleaños", pileta: "Pileta", quincho: "Quincho" };
   const VENUES = [
     { id: "losalamos", rubro: "padel", name: "Los Álamos", zona: "tupungato", fotos: ["canchas", "padel", "paletas"], dur: 90, bloques: [["17:00", "24:30"]], units: cs(3, [3]), p: P(28000, 34000, 36000), ocup: 34, cancel: 6, desc: "Tres canchas de cristal, una de ellas techada. Turnos de 90 minutos para jugar entre amigos o en pareja.", ame: ["vest", "est", "palas", "buf", "led"] },
     { id: "aconcagua", rubro: "padel", name: "Aconcagua Pádel Club", zona: "tunuyan", fotos: ["padel", "paletas", "canchas"], dur: 90, bloques: [["15:00", "24:00"]], units: cs(4, [1, 2]), p: P(30000, 36000, 38000), ocup: 42, cancel: 12, desc: "Cuatro canchas con fácil acceso, dos de ellas techadas. Ideal para jugar después de la oficina.", ame: ["vest", "palas", "buf", "led", "tv"] },
@@ -636,71 +636,89 @@
     const q = v.real ? [v.direccion, v.ciudad].filter(Boolean).join(", ") : `${ZONAS[v.zona]}, Mendoza`;
     return q ? "https://maps.google.com/maps?q=" + encodeURIComponent(q + ", Argentina") + "&z=15&hl=es&output=embed" : "";
   };
+  // El ícono de cada servicio en las tarjetas de la página del negocio (íconos de línea de index.html)
+  const AMIC = { est: "auto", vest: "vest", duchas: "ducha", pileta: "pileta", quincho: "quincho", buf: "taza", parr: "parrilla", wifi: "wifi", mate: "taza",
+    qr: "qr", cuen: "qr", tv: "tv", aire: "aire", led: "luz", luz: "luz", cesped: "cesped", polvo: "cancha", palas: "paleta", raq: "paleta", clases: "clases", torneos: "copa", cumple: "torta" };
+  const DIAL = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+  // La semana entera, de lunes a domingo, con el día de hoy marcado
+  const semanaDe = (v) => [1, 2, 3, 4, 5, 6, 0].map((d) => {
+    let t;
+    if (v.real) { const h = v.horario[d]; t = !h || h.cerrado || hhmm(h.abre) === null || hhmm(h.cierra) === null ? "Cerrado" : `${h.abre} a ${h.cierra}`; }
+    else t = v.bloques.map(([a, b]) => `${a} a ${fmt(toMin(b))}`).join(" y ");
+    return { d: DIAL[d], t, hoy: d === dayInfo(0).dow };
+  });
+  // Segunda vuelta (25/11, pedido del dueño, con la página de Penedo Borges en Mendoza Icons de referencia): la foto
+  // del lugar a toda la pantalla, que baja más despacio al bajar; abajo, tarjetas sutiles con lo que tiene el lugar
+  // (cuántas canchas, turnos, horarios, dónde queda y cada servicio: pileta, vestuarios…), sin decir "Características";
+  // su historia, la galería, los horarios con el día de hoy marcado, el mapa y al final el botón para reservar.
   function renderLocal(st) {
     const v = venue(st.v), R = RUBROS[v.rubro], pg = paginaDe(v);
     const logo = pg.logo || (v.real ? IMG[v.id] || "" : "");
     const maps = v.real ? comoLlegar(v) : "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(`${ZONAS[v.zona]}, Mendoza`);
     const mapa = mapaDe(v), ciudad = v.real && v.ciudad ? v.ciudad : ZONAS[v.zona];
-    const hoy = (() => {
-      if (!v.real) return horariosDe(v)[0][1];
-      const h = v.horario[dayInfo(0).dow];
-      return !h || h.cerrado ? "Cerrado" : `${h.abre} a ${h.cierra}`;
-    })();
+    const semana = semanaDe(v), hoy = semana.find((x) => x.hoy) || semana[0];
+    const icono = (n) => `<svg class="icon" aria-hidden="true"><use href="#i-${n}"/></svg>`;
     const redes = [
-      pg.whatsapp && waDe(pg.whatsapp) ? RED("wa", pg.whatsapp, waDe(pg.whatsapp)) : "",
-      pg.instagram ? RED("ig", "@" + pg.instagram, `https://www.instagram.com/${pg.instagram}/`) : "",
-      pg.tiktok ? RED("tt", "@" + pg.tiktok, `https://www.tiktok.com/@${pg.tiktok}`) : "",
-      pg.facebook ? RED("fb", pg.facebook, `https://www.facebook.com/${pg.facebook}`) : "",
+      pg.whatsapp && waDe(pg.whatsapp) ? ["wa", pg.whatsapp, waDe(pg.whatsapp), "WhatsApp"] : null,
+      pg.instagram ? ["ig", "@" + pg.instagram, `https://www.instagram.com/${pg.instagram}/`, "Instagram"] : null,
+      pg.tiktok ? ["tt", "@" + pg.tiktok, `https://www.tiktok.com/@${pg.tiktok}`, "TikTok"] : null,
+      pg.facebook ? ["fb", pg.facebook, `https://www.facebook.com/${pg.facebook}`, "Facebook"] : null,
     ].filter(Boolean);
     const gal = pg.galeria.slice(0, 6), fotoFin = gal[gal.length - 1] || pg.portada || "";
     const servs = (pg.servicios || []).filter((k) => AM[k]);
-    const carac = [
-      [secDe(v.rubro) === "deportes" ? "Deporte" : "Rubro", R.n],
-      [cap(R.uns), String(v.units.length)],
-      ["Turnos de", `${v.dur} min`],
-      ["Hoy", hoy],
-      ["Zona", ciudad],
+    // las tarjetas: primero lo del lugar (canchas, turnos, horarios, dónde queda) y después cada servicio
+    const esDep = secDe(v.rubro) === "deportes", nU = v.units.length;
+    // el detalle de las canchas: si todas lo tienen, solo el detalle ("Techada"); si no, cuáles ("Cancha 3: techada")
+    const grupos = {};
+    v.units.forEach((u) => { const [nom, det] = u.split(" · "); if (det && det.trim()) (grupos[det.trim().toLowerCase()] ||= []).push(nom); });
+    const dets = Object.entries(grupos).map(([det, noms]) => (noms.length === nU ? cap(det) : `${noms.join(", ")}: ${det}`));
+    const tarjetas = [
+      [v.rubro === "barberia" ? "tijera" : esDep ? "cancha" : "shop",
+        `${nU} ${nU === 1 ? R.un.toLowerCase() : R.uns}${esDep ? ` de ${R.n.toLowerCase()}` : ""}`,
+        dets.length ? dets.join(" · ") : esDep ? "" : v.units.map((u) => u.split(" · ")[0]).join(", ")],
+      ["clock", `Turnos de ${v.dur} min`, "Se reservan online"],
+      ["cal", "Horarios", hoy.t === "Cerrado" ? "Hoy está cerrado" : `Hoy de ${hoy.t}`],
+      ["pin", ciudad, v.real && v.direccion ? v.direccion : "Mendoza"],
+      ...servs.map((k) => [AMIC[k] || "check", AM[k], ""]),
     ];
+    const dir = v.real && v.direccion ? `${v.direccion}${v.ciudad ? ", " + v.ciudad : ""}` : `${ciudad}, Mendoza`;
     const B = `<svg class="loc__bk" aria-hidden="true"><use href="#bk-b"/></svg>`;
     $("#local-root").innerHTML = `
       <div class="loc">
         <header class="loc__hero${pg.portada ? " has-foto" : ""}">
           ${pg.portada ? `<img class="loc__bg" src="${esc(pg.portada)}" alt="" />` : ""}
-          <div class="loc__arriba"><div class="wrap"><a class="loc__bookea" href="#" data-go="home" aria-label="Bookea, ir al inicio">${B}<span>Bookea</span></a></div></div>
+          <div class="loc__arriba"><div class="wrap loc__arriba-in">
+            <a class="loc__bookea" href="#" data-go="home" aria-label="Bookea, ir al inicio">${B}<span>Bookea</span></a>
+            ${redes.length ? `<ul class="loc__redes-top">${redes.map(([i, , h, n]) => `<li><a href="${esc(h)}" target="_blank" rel="noopener" aria-label="${n} de ${esc(v.name)}">${icono(i)}</a></li>`).join("")}</ul>` : ""}
+          </div></div>
           <div class="wrap loc__in">
             <span class="loc__logo${logo ? " has-img" : ""}" aria-hidden="true">${logo ? `<img src="${esc(logo)}" alt="" />` : esc(iniciales(v.name))}</span>
             <p class="loc__rubro">${esc(R.n)} · ${esc(ciudad)}</p>
             <h1>${esc(v.name)}</h1>
-            ${pg.frase ? `<p class="loc__frase">${esc(pg.frase)}</p>` : ""}
           </div>
         </header>
         <div class="wrap">
-          ${v.real ? "" : `<span class="demo loc__demo">Negocio de ejemplo · demo</span>`}
-          <section class="loc__sec loc__lugar${pg.historia ? "" : " is-solo"}" aria-labelledby="loc-lugar">
-            ${pg.historia ? `<div class="loc__texto"><p class="loc__k">El lugar</p><h2 id="loc-lugar">${v.real ? "Nuestra historia" : "Sobre el lugar"}</h2>${parrafos(pg.historia)}</div>` : ""}
-            <div class="loc__carac">
-              ${pg.historia ? `<h3 class="loc__k">Características</h3>` : `<p class="loc__k">El lugar</p><h2 id="loc-lugar">Características</h2>`}
-              <dl class="loc__lista">${carac.map(([k, x]) => `<div><dt>${esc(k)}</dt><dd>${esc(x)}</dd></div>`).join("")}</dl>
-              <div class="loc__grupos">
-                <div><h4 class="loc__sub">${esc(cap(R.uns))}</h4><ul class="loc__unis">${v.units.map((u) => { const [nom, det] = u.split(" · "); return `<li><b>${esc(nom)}</b>${det ? `<span>${esc(cap(det))}</span>` : ""}</li>`; }).join("")}</ul></div>
-                ${servs.length ? `<div><h4 class="loc__sub">Servicios</h4><ul class="loc__servs">${servs.map((k) => `<li>${AMI}${esc(AM[k])}</li>`).join("")}</ul></div>` : ""}
-              </div>
-            </div>
+          <section class="loc__sec loc__intro" aria-labelledby="loc-intro">
+            <h2 id="loc-intro">${esc(pg.frase || `Conocé ${v.name}`)}</h2>
+            <p class="loc__bajada">${esc(R.n)} en ${esc(ciudad)}. Todo lo que tiene el lugar, de un vistazo.</p>
+            ${v.real ? "" : `<p class="loc__demo"><span class="demo">Negocio de ejemplo · demo</span></p>`}
+            <ul class="loc__cards">${tarjetas.map(([i, t, c]) => `<li class="loc__card">${icono(i)}<b>${esc(t)}</b>${c ? `<span>${esc(c)}</span>` : ""}</li>`).join("")}</ul>
           </section>
-          ${gal.length ? `<section class="loc__sec loc__fotos" aria-labelledby="loc-fotos">
-            <p class="loc__k">Fotos</p><h2 id="loc-fotos">Conocé el lugar</h2>
+          ${pg.historia ? `<section class="loc__sec loc__hist" aria-labelledby="loc-hist"><h2 id="loc-hist">${v.real ? "Nuestra historia" : "Sobre el lugar"}</h2><div class="loc__texto">${parrafos(pg.historia)}</div></section>` : ""}
+          ${gal.length ? `<section class="loc__sec" aria-labelledby="loc-fotos"><h2 id="loc-fotos">Galería</h2>
             <div class="loc__gal n${gal.length}">${gal.map((u, i) => `<figure><img src="${esc(u)}" alt="Foto ${i + 1} de ${esc(v.name)}" loading="lazy" /></figure>`).join("")}</div>
           </section>` : ""}
-          <section class="loc__sec loc__ubi${mapa ? "" : " is-solo"}" aria-labelledby="loc-ubi">
-            <div class="loc__ubi-t">
-              <p class="loc__k">Ubicación</p>
-              <h2 id="loc-ubi">Dónde estamos</h2>
-              <p class="loc__dir">${v.real && v.direccion ? `<b>${esc(v.direccion)}</b>${v.ciudad ? `<span>${esc(v.ciudad)}</span>` : ""}` : `<b>${esc(ciudad)}</b><span>${v.real ? "" : "Ubicación aproximada: es un negocio de ejemplo"}</span>`}</p>
-              ${maps ? `<a class="loc__btn loc__btn--linea" href="${esc(maps)}" target="_blank" rel="noopener">Cómo llegar</a>` : ""}
-              <div class="loc__bloque"><h3>Horarios</h3><table class="loc__hor"><caption class="sr-only">Horarios</caption><tbody>${horariosDe(v).map(([d, h]) => `<tr><th scope="row">${d}</th><td>${esc(h)}</td></tr>`).join("")}</tbody></table></div>
-              ${redes.length ? `<div class="loc__bloque"><h3>Contacto</h3><ul class="loc__redes">${redes.join("")}</ul></div>` : ""}
-            </div>
+          <section class="loc__sec" aria-labelledby="loc-hor">
+            <h2 id="loc-hor">Horarios</h2>
+            <p class="loc__bajada">Los días y horarios de ${esc(v.name)}.</p>
+            <table class="loc__hor"><caption class="sr-only">Horarios de ${esc(v.name)}</caption><tbody>${semana.map((x) => `<tr${x.hoy ? ' class="is-hoy"' : ""}><th scope="row">${x.d}</th><td>${esc(x.t)}</td><td>${x.hoy ? `<span class="loc__hoy">Hoy</span>` : ""}</td></tr>`).join("")}</tbody></table>
+          </section>
+          <section class="loc__sec loc__ubi" aria-labelledby="loc-ubi">
+            <h2 id="loc-ubi">Dónde estamos</h2>
+            <p class="loc__bajada">${esc(dir)}${v.real ? "" : ". Ubicación aproximada: es un negocio de ejemplo."}</p>
             ${mapa ? `<div class="loc__mapa"><iframe title="Mapa: dónde queda ${esc(v.name)}" src="${esc(mapa)}" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe></div>` : ""}
+            ${maps ? `<p class="loc__ubi-acc"><a class="loc__btn loc__btn--linea" href="${esc(maps)}" target="_blank" rel="noopener">Cómo llegar</a></p>` : ""}
+            ${redes.length ? `<ul class="loc__redes" aria-label="Redes y contacto">${redes.map(([i, t, h]) => `<li><a href="${esc(h)}" target="_blank" rel="noopener">${icono(i)}<span>${esc(t)}</span></a></li>`).join("")}</ul>` : ""}
           </section>
         </div>
         <section class="loc__fin${fotoFin ? " has-foto" : ""}" aria-labelledby="loc-fin">
@@ -716,6 +734,18 @@
     const desc = document.querySelector('meta[name="description"]');
     if (desc && v.real) desc.setAttribute("content", (pg.frase || pg.historia || `${v.name}: reservá tu turno en Bookea.`).slice(0, 160));
   }
+  // La portada: al bajar, la foto baja más despacio que la página y el nombre se va apagando (como en Mendoza Icons).
+  // Con "reducir movimiento", quieta.
+  let portadaRaf = 0;
+  const moverPortada = () => {
+    portadaRaf = 0;
+    const hero = S.page === "local" && $(".loc__hero");
+    if (!hero) return;
+    const y = Math.max(0, Math.min(window.scrollY, hero.offsetHeight)), bg = $(".loc__bg", hero), tx = $(".loc__in", hero);
+    if (bg) bg.style.transform = `translate3d(0, ${(y * 0.4).toFixed(1)}px, 0)`;
+    if (tx) { tx.style.transform = `translate3d(0, ${(y * 0.15).toFixed(1)}px, 0)`; tx.style.opacity = Math.max(0, 1 - y / (hero.offsetHeight * 0.8)).toFixed(3); }
+  };
+  if (!reduce) window.addEventListener("scroll", () => { if (S.page === "local" && !portadaRaf) portadaRaf = requestAnimationFrame(moverPortada); }, { passive: true });
 
   // ---------- Pagar la seña: un solo turno, guardado 10 minutos ----------
   const mmss = (ms) => { const s = Math.max(0, Math.ceil(ms / 1000)); return String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0"); };

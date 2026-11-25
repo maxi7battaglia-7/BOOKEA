@@ -1707,7 +1707,7 @@
   // Las fotos van a Supabase Storage (modo nube) o, en el modo de prueba, achicadas dentro de este navegador.
   const FOTOS_MAX = 6;
   // Los servicios que se pueden marcar (los mismos nombres que AM en sitio.js, que es quien los muestra)
-  const SERVICIOS = [["est", "Estacionamiento"], ["vest", "Vestuarios"], ["duchas", "Duchas"], ["buf", "Buffet"], ["parr", "Parrilla"],
+  const SERVICIOS = [["est", "Estacionamiento"], ["vest", "Vestuarios"], ["duchas", "Duchas"], ["pileta", "Pileta"], ["quincho", "Quincho"], ["buf", "Buffet"], ["parr", "Parrilla"],
     ["wifi", "Wi-Fi"], ["mate", "Café y mate"], ["qr", "Pago con QR"], ["tv", "TV y música"], ["aire", "Aire acondicionado"],
     ["led", "Iluminación LED"], ["luz", "Iluminación nocturna"], ["cesped", "Césped sintético"], ["polvo", "Polvo de ladrillo"],
     ["palas", "Alquiler de paletas"], ["raq", "Alquiler de raquetas"], ["clases", "Clases"], ["torneos", "Torneos"], ["cumple", "Cumpleaños"]];
@@ -1765,7 +1765,7 @@
           ${red("p-tt", "TikTok", "tiktok.com/@", pg.tiktok)}
           ${red("p-fb", "Facebook", "facebook.com/", pg.facebook)}
           <label class="check-pg"><input type="checkbox" id="p-wa" ${pg.mostrar_whatsapp ? "checked" : ""} ${n.whatsapp ? "" : "disabled"} /><span>${n.whatsapp ? `Mostrar mi WhatsApp (${esc(n.whatsapp)})` : "Mostrar mi WhatsApp (cargalo primero en Mi negocio)"}</span></label>`)}
-        ${tarjeta("pg-6", "check", "Servicios del lugar", "Marcá lo que tiene tu lugar: se ve en tu página, en Características.", `
+        ${tarjeta("pg-6", "check", "Servicios del lugar", "Marcá lo que tiene tu lugar: cada uno se ve como una tarjeta en tu página.", `
           <div class="servp" role="group" aria-label="Servicios del lugar">${SERVICIOS.map(([k, t]) => `<label class="servp__i"><input type="checkbox" value="${k}" ${pg.servicios.includes(k) ? "checked" : ""} /><span>${t}</span></label>`).join("")}</div>`, "pg-card--serv")}
         ${tarjeta("pg-5", "camara", "Fotos del lugar", `Hasta ${FOTOS_MAX}. Se ven en tu página, en "Conocé el lugar": las canchas, el lugar, la gente.`, `
           <div class="galp" id="p-gal"></div>
