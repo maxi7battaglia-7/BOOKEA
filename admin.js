@@ -735,12 +735,14 @@
   // ¿Puede hacer "p"? El dueño, todo.
   const puede = (p) => !!YO && (YO.rol === "dueno" || (YO.permisos || []).includes(p));
   const esDueno = () => !!YO && YO.rol === "dueno";
-  const VISTA_PERMISO = { agenda: "agenda", finanzas: "finanzas", clientes: "clientes", negocio: "negocio", pagina: "negocio" };
+  const VISTA_PERMISO = { agenda: "agenda", finanzas: "finanzas", clientes: "clientes", negocio: "negocio" };
   const puedeVer = (v) => {
     if (v === "cuenta") return true;
     if (v === "equipo") return esDueno();
     if (v === "solicitudes") return !!(YO && YO.admin);
     if (v === "paginade") return !!(YO && YO.admin && PAGINA_DE);
+    // la página web del negocio la arma solo el equipo de Bookea (pedido del dueño, 25/11: "la voy a vender como un servicio")
+    if (v === "pagina") return false;
     return puede(VISTA_PERMISO[v]);
   };
   const primeraVista = (pref) => [pref, "agenda", "clientes", "finanzas", "negocio", "cuenta"].find((v) => v && VISTAS[v] && puedeVer(v));
@@ -1516,7 +1518,7 @@
     const durs = DURACIONES.includes(n.duracion) ? DURACIONES : [...DURACIONES, n.duracion].sort((a, b) => a - b);
     $("#vista").innerHTML = `
       <header class="vhead"><div><h1>Mi negocio</h1><p class="vhead__frase">Lo que ven tus clientes cuando reservan y las reglas de tu agenda. Cada cambio se guarda solo.</p></div>
-        <div class="vhead__acc"><p class="guardado" id="g-msg" role="status" aria-live="polite">Se guarda solo</p><button type="button" class="btn btn--line" id="g-tu-pagina">${ico("web")}Tu página</button><a class="btn btn--line" id="g-ver" href="${linkPagina(n.slug)}" target="_blank" rel="noopener">${ico("afuera")}Ver la página de reservas</a></div></header>
+        <div class="vhead__acc"><p class="guardado" id="g-msg" role="status" aria-live="polite">Se guarda solo</p><a class="btn btn--line" id="g-web" href="${linkWeb(n.slug)}" target="_blank" rel="noopener">${ico("web")}Ver tu página web</a><a class="btn btn--line" id="g-ver" href="${linkPagina(n.slug)}" target="_blank" rel="noopener">${ico("afuera")}Ver la página de reservas</a></div></header>
       <form class="ng" id="f-neg" novalidate>
           ${tarjeta("ng-0", "negocio", "Tu negocio", "Lo primero que ven tus clientes al reservar.", `
             <div class="perfil">
@@ -1698,7 +1700,6 @@
     };
     f.addEventListener("submit", (e) => { e.preventDefault(); guardar(); });
     salirNegocio = async () => { clearTimeout(espera); return estado() === inicial ? true : guardar(); };
-    $("#g-tu-pagina").addEventListener("click", async () => { if (await dejarNegocio("pagina")) ir("pagina"); });
   };
 
   // ---------- Tu página (bookea.ar/nombre), pedido del dueño 21/11, rehecha el 25/11 ----------
@@ -1730,9 +1731,10 @@
   });
   // "https://www.instagram.com/losalamos/?hl=es" o "@losalamos" → "losalamos" (igual que red_social en la base)
   const usuarioRed = (t) => String(t || "").trim().replace(/^(https?:\/\/)?(www\.|m\.)?(instagram\.com|tiktok\.com|facebook\.com|fb\.com)\//i, "").split("/")[0].split("?")[0].replace(/[^A-Za-z0-9._-]/g, "").slice(0, 60);
-  // "otro": la página de otro negocio, que arma el equipo de Bookea desde Solicitudes (pedido del dueño, 25/11: "son
-  // todas iguales, solo cambia lo que caracteriza a cada lugar, y lo voy a cargar yo"). Es el mismo editor; guarda solo
-  // la página (guardar_pagina) y las fotos van a la carpeta de ese negocio.
+  // La página de un negocio la arma solo el equipo de Bookea, desde Solicitudes → "Editar su página" (pedido del dueño,
+  // 25/11: "son todas iguales, solo cambia lo que caracteriza a cada lugar", "lo voy a cargar yo" y "lo voy a vender como
+  // un servicio más"). Guarda solo la página (guardar_pagina) y las fotos van a la carpeta de ese negocio. El dueño y su
+  // equipo no la editan: en Mi negocio tienen "Ver tu página web".
   let PAGINA_DE = null;
   VISTAS.paginade = () => VISTAS.pagina(PAGINA_DE);
   VISTAS.pagina = (otro) => {

@@ -961,11 +961,15 @@ dialog .row { margin-top: 6px; }
 
 /* lo que tiene el lugar: tarjetas sutiles, centradas (cuántas canchas, turnos, horarios, dónde queda y cada servicio) */
 .loc__cards { list-style: none; padding: 0; max-width: 1080px; margin: clamp(36px, 4vw, 56px) auto 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 14px; }
-.loc__card { flex: 0 1 236px; display: grid; justify-items: center; align-content: start; gap: 6px; padding: 26px 18px 24px; border: 1px solid var(--l-line); border-radius: 20px; background: #fff; text-align: center; transition: border-color .25s ease, transform .25s var(--ease), box-shadow .25s ease; }
+.loc__card { flex: 0 1 236px; display: grid; justify-items: center; align-content: start; gap: 6px; padding: 26px 18px 24px; border: 1px solid var(--l-line); border-radius: 20px; background: #fff; text-align: center; }
 .loc__card .icon { width: 30px; height: 30px; stroke-width: 1.4; color: var(--l-ink); margin-bottom: 8px; }
 .loc__card b { font-size: 17px; font-weight: 500; line-height: 1.3; letter-spacing: -.01em; }
-.loc__card span { font-size: 14px; line-height: 1.45; color: var(--l-mute); }
-@media (hover: hover) and (pointer: fine) { .loc__card:hover { border-color: #d6d6d6; transform: translateY(-2px); box-shadow: 0 12px 30px rgba(0, 0, 0, .05); } }
+.loc__card span { font-size: 14px; line-height: 1.45; color: var(--l-mute); font-variant-numeric: tabular-nums; }
+/* los servicios, debajo de las cuatro del lugar: más chicas, para que se lean como un segundo grupo */
+.loc__cards--serv { max-width: 960px; margin-top: 18px; gap: 12px; }
+.loc__cards--serv .loc__card { flex-basis: 172px; padding: 20px 14px 18px; border-radius: 16px; background: var(--l-suave); border-color: transparent; }
+.loc__cards--serv .loc__card .icon { width: 24px; height: 24px; margin-bottom: 4px; }
+.loc__cards--serv .loc__card b { font-size: 15px; }
 
 /* su historia: centrada, en una columna angosta */
 .loc__texto { max-width: 680px; margin: 26px auto 0; }
@@ -975,19 +979,18 @@ dialog .row { margin-top: 6px; }
 /* galería: mosaico a lo ancho, según cuántas fotos haya */
 .loc__gal { display: grid; gap: 10px; margin-top: clamp(32px, 3.6vw, 48px); grid-template-columns: repeat(6, minmax(0, 1fr)); grid-auto-rows: clamp(150px, 17vw, 260px); }
 .loc__gal figure { grid-column: span 3; overflow: hidden; border-radius: 16px; background: var(--l-suave); }
-.loc__gal img { width: 100%; height: 100%; object-fit: cover; transition: transform .7s var(--ease); }
+.loc__gal img { width: 100%; height: 100%; object-fit: cover; }
 .loc__gal.n1 figure { grid-column: 1 / -1; grid-row: span 2; }
 .loc__gal.n2 figure { grid-row: span 2; }
 .loc__gal.n3 figure:first-child, .loc__gal.n5 figure:first-child { grid-column: span 4; grid-row: span 2; }
 .loc__gal.n3 figure:not(:first-child), .loc__gal.n5 figure:nth-child(2), .loc__gal.n5 figure:nth-child(3) { grid-column: span 2; }
 .loc__gal.n6 figure { grid-column: span 2; }
-@media (hover: hover) and (pointer: fine) { .loc__gal figure:hover img { transform: scale(1.03); } }
 
 /* horarios: la semana entera, con el día de hoy marcado */
 .loc__hor { width: 100%; max-width: 760px; margin: clamp(28px, 3vw, 40px) auto 0; border-collapse: separate; border-spacing: 0; }
 .loc__hor th, .loc__hor td { padding: 15px 18px; border-bottom: 1px solid var(--l-line); text-align: left; font-size: 16px; }
 .loc__hor th { width: 36%; font-weight: 600; }
-.loc__hor td { color: var(--l-txt); }
+.loc__hor td { color: var(--l-txt); font-variant-numeric: tabular-nums; }
 .loc__hor td:last-child { width: 1%; text-align: right; white-space: nowrap; }
 .loc__hor tr.is-hoy > * { background: var(--l-suave); border-bottom-color: transparent; }
 .loc__hor tr.is-hoy th { border-radius: 12px 0 0 12px; }
@@ -1036,6 +1039,9 @@ dialog .row { margin-top: 6px; }
   .loc__card .icon { width: 26px; height: 26px; margin-bottom: 4px; }
   .loc__card b { font-size: 15px; }
   .loc__card span { font-size: 13px; }
+  .loc__cards--serv { gap: 8px; margin-top: 14px; }
+  .loc__cards--serv .loc__card { flex-basis: calc(50% - 4px); padding: 16px 12px 14px; }
+  .loc__cards--serv .loc__card b { font-size: 14px; }
   .loc__hor th, .loc__hor td { padding: 13px 12px; font-size: 15px; }
   .loc__gal { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 44vw; }
   .loc__gal figure, .loc__gal[class] figure:nth-child(n) { grid-column: span 1; grid-row: auto; }

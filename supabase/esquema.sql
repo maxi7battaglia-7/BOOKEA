@@ -417,7 +417,8 @@ grant select on public.invitaciones to authenticated;  -- el dueño las ve; se c
 revoke all on public.negocios from authenticated;
 grant select on public.negocios to authenticated;
 -- Los datos que el dueño puede cambiar. El estado (aprobado o no) NO está: solo cambia con revisar_negocio.
-grant update (slug, nombre, rubro, ciudad, direccion, whatsapp, foto, descripcion, mapa, ajustes, pagina) on public.negocios to authenticated;
+-- La página (bookea.ar/nombre) no: la arma solo el equipo de Bookea con guardar_pagina (pedido del dueño, 25/11).
+grant update (slug, nombre, rubro, ciudad, direccion, whatsapp, foto, descripcion, mapa, ajustes) on public.negocios to authenticated;
 grant select on public.miembros to authenticated;
 grant select, insert, update, delete on public.reservas to authenticated;
 grant select on public.admins_bookea to authenticated;
@@ -921,22 +922,22 @@ create trigger reserva_web_cancelada after update of estado on public.reservas
 
 -- ---------- Las fotos de la página (Supabase Storage) ----------
 -- Un bucket público, "negocios": cada negocio sube sus fotos a su carpeta (negocios/<id del negocio>/...) y solo puede
--- quien cambia Mi negocio (el dueño, o quien tenga el permiso "negocio") y el equipo de Bookea, que arma la página de
--- cada negocio (pedido del dueño, 25/11: "lo voy a cargar yo"). Las ve cualquiera: son las de su página.
+-- solo el equipo de Bookea, que arma la página de cada negocio como un servicio (pedido del dueño, 25/11: "lo voy a
+-- cargar yo"; el negocio no la toca). Las ve cualquiera: son las de su página.
 create or replace function public.puede_subir_foto(objeto text) returns boolean
 language sql stable security definer set search_path = '' as $$
   select case when split_part(coalesce(objeto, ''), '/', 1) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-              then public.tiene_permiso(split_part(objeto, '/', 1)::uuid, 'negocio') or public.es_admin_bookea() else false end
+              then public.es_admin_bookea() else false end
 $$;
 revoke all on function public.puede_subir_foto(text) from public, anon;
 grant execute on function public.puede_subir_foto(text) to authenticated;
 
--- La página de un negocio, guardada por el equipo de Bookea (desde Solicitudes → "Editar su página") o por quien cambia
--- su Mi negocio. Cambia solo la página (fotos, frase, historia, servicios, redes): nada más del negocio.
+-- La página de un negocio, guardada por el equipo de Bookea (desde Solicitudes → "Editar su página"). Cambia solo la
+-- página (fotos, frase, historia, servicios, redes): nada más del negocio. El negocio no la puede cambiar.
 create or replace function public.guardar_pagina(n uuid, p jsonb) returns void
 language plpgsql security definer set search_path = '' as $$
 begin
-  if not (public.es_admin_bookea() or public.tiene_permiso(n, 'negocio')) then
+  if not public.es_admin_bookea() then
     raise exception 'sin permiso para cambiar la página de este negocio' using errcode = '42501';
   end if;
   update public.negocios set pagina = coalesce(p, '{}'::jsonb) where id = n;

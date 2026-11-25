@@ -126,7 +126,7 @@ const ok = (c, m) => { hechas++; if (!c) fallas++; console.log((c ? 'OK    ' : '
       await p.fill('#i-email', 'demo@example.com'); await p.fill('#i-clave', 'bookea2026'); await toca('#f-ingresar button[type="submit"]'); await p.waitForTimeout(3600);
       await irA('equipo'); await p.waitForTimeout(500);
       await p.evaluate(() => document.dispatchEvent(new Event('visibilitychange'))); await p.waitForTimeout(500);
-      ok((await p.textContent('#vista h1')) === 'Equipo' && (await p.$$eval('.menu__i', (l) => l.filter((b) => !b.hidden).length)) === 7, `${w}: con datos viejos, al volver a la pestaña el dueño sigue en Equipo con las siete secciones`);
+      ok((await p.textContent('#vista h1')) === 'Equipo' && (await p.$$eval('.menu__i', (l) => l.filter((b) => !b.hidden).length)) === 6, `${w}: con datos viejos, al volver a la pestaña el dueño sigue en Equipo con las seis secciones`);
       const sw = await p.evaluate(() => document.documentElement.scrollWidth);
       ok(sw <= w, `${w}: sin desborde (${sw})`);
       ok(errs.length === 0, `${w}: sin errores ${errs.join(' | ')}`);

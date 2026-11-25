@@ -679,8 +679,9 @@
       ["clock", `Turnos de ${v.dur} min`, "Se reservan online"],
       ["cal", "Horarios", hoy.t === "Cerrado" ? "Hoy está cerrado" : `Hoy de ${hoy.t}`],
       ["pin", ciudad, v.real && v.direccion ? v.direccion : "Mendoza"],
-      ...servs.map((k) => [AMIC[k] || "check", AM[k], ""]),
     ];
+    const extras = servs.map((k) => [AMIC[k] || "check", AM[k], ""]);
+    const tarjeta = ([i, t, c]) => `<li class="loc__card">${icono(i)}<b>${esc(t)}</b>${c ? `<span>${esc(c)}</span>` : ""}</li>`;
     const dir = v.real && v.direccion ? `${v.direccion}${v.ciudad ? ", " + v.ciudad : ""}` : `${ciudad}, Mendoza`;
     const B = `<svg class="loc__bk" aria-hidden="true"><use href="#bk-b"/></svg>`;
     $("#local-root").innerHTML = `
@@ -700,9 +701,9 @@
         <div class="wrap">
           <section class="loc__sec loc__intro" aria-labelledby="loc-intro">
             <h2 id="loc-intro">${esc(pg.frase || `Conocé ${v.name}`)}</h2>
-            <p class="loc__bajada">${esc(R.n)} en ${esc(ciudad)}. Todo lo que tiene el lugar, de un vistazo.</p>
             ${v.real ? "" : `<p class="loc__demo"><span class="demo">Negocio de ejemplo · demo</span></p>`}
-            <ul class="loc__cards">${tarjetas.map(([i, t, c]) => `<li class="loc__card">${icono(i)}<b>${esc(t)}</b>${c ? `<span>${esc(c)}</span>` : ""}</li>`).join("")}</ul>
+            <ul class="loc__cards">${tarjetas.map(tarjeta).join("")}</ul>
+            ${extras.length ? `<ul class="loc__cards loc__cards--serv" aria-label="Lo que ofrece ${esc(v.name)}">${extras.map(tarjeta).join("")}</ul>` : ""}
           </section>
           ${pg.historia ? `<section class="loc__sec loc__hist" aria-labelledby="loc-hist"><h2 id="loc-hist">${v.real ? "Nuestra historia" : "Sobre el lugar"}</h2><div class="loc__texto">${parrafos(pg.historia)}</div></section>` : ""}
           ${gal.length ? `<section class="loc__sec" aria-labelledby="loc-fotos"><h2 id="loc-fotos">Galería</h2>
@@ -710,7 +711,6 @@
           </section>` : ""}
           <section class="loc__sec" aria-labelledby="loc-hor">
             <h2 id="loc-hor">Horarios</h2>
-            <p class="loc__bajada">Los días y horarios de ${esc(v.name)}.</p>
             <table class="loc__hor"><caption class="sr-only">Horarios de ${esc(v.name)}</caption><tbody>${semana.map((x) => `<tr${x.hoy ? ' class="is-hoy"' : ""}><th scope="row">${x.d}</th><td>${esc(x.t)}</td><td>${x.hoy ? `<span class="loc__hoy">Hoy</span>` : ""}</td></tr>`).join("")}</tbody></table>
           </section>
           <section class="loc__sec loc__ubi" aria-labelledby="loc-ubi">

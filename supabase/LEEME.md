@@ -172,17 +172,18 @@ deja elegir.
 
 Cada negocio tiene dos direcciones: `bookea.ar/nombre` es su página (su portada, su historia, sus características y
 servicios, sus fotos, dónde queda y sus redes, con un botón para reservar al final) y `bookea.ar/nombre/reservar`, sus
-turnos para reservar. Lo carga el dueño en **Tu página** del panel.
+turnos para reservar. La arma solo el equipo de Bookea, como un servicio: en el panel, **Solicitudes → "Editar su página"**.
 
 - **Base:** la columna `negocios.pagina` (frase, historia, redes, si muestra su WhatsApp, sus servicios y las
   direcciones de sus fotos). `lugares_publicos` la manda a la página, pero solo con fotos de su propia carpeta, su
   WhatsApp si lo eligió y sus servicios como claves cortas (`vest`, `est`…). Los servicios se suman el 25/11: hasta
   correr de nuevo `esquema.sql`, se guardan pero no se ven en la página.
 - **Fotos:** Supabase Storage, bucket público `negocios`. Cada negocio sube a su carpeta (`negocios/<id del negocio>/`) y
-  solo quien puede cambiar Mi negocio o el equipo de Bookea (`puede_subir_foto`). `esquema.sql` crea el bucket y sus permisos.
+  solo el equipo de Bookea (`puede_subir_foto`). `esquema.sql` crea el bucket y sus permisos.
 - **La carga el equipo de Bookea (25/11):** en el panel, **Solicitudes → "Editar su página"** abre la página de cualquier
   negocio para cargarle fotos, frase, historia y servicios. Guarda con `guardar_pagina` (solo la página, nada más del
-  negocio). Hace falta correr de nuevo `esquema.sql`.
+  negocio). El negocio no la puede cambiar: `pagina` no está entre las columnas que puede tocar. Hace falta correr de nuevo
+  `esquema.sql`.
 - **Para que funcione en bookea.ar:** correr de nuevo `esquema.sql` y después `avisos-por-mail.sql` (en ese orden).
 
 ### Pasar el sitio a Cloudflare Pages (para que las direcciones queden limpias y Google las encuentre)

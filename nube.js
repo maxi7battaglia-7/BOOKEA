@@ -23,16 +23,13 @@
   });
 
   // ---------- De la base al panel y vuelta ----------
-  // "pagina" (la de bookea.ar/nombre) se manda solo si la base ya la tiene (si todavía no se corrió esquema.sql, no
-  // se manda, así guardar Mi negocio sigue andando)
-  let conPagina = false;
+  // "pagina" (la de bookea.ar/nombre) se lee pero el negocio no la manda: la arma solo el equipo de Bookea (guardar_pagina)
   const negDeFila = (f) => {
     // estado: pendiente / aprobado / rechazado (lo cambia solo el equipo de Bookea). Si la base todavía no
     // tiene la columna (esquema viejo), se toma como aprobado para no dejar a nadie afuera.
     const n = { id: f.id, estado: f.estado || "aprobado" };
     for (const c of COLS_NEG) n[c] = f[c] ?? "";
     for (const c of AJUSTES) if (f.ajustes && f.ajustes[c] !== undefined) n[c] = f.ajustes[c];
-    conPagina = "pagina" in f;
     n.pagina = f.pagina && typeof f.pagina === "object" && !Array.isArray(f.pagina) ? f.pagina : {};
     return n;
   };
@@ -41,7 +38,6 @@
     for (const c of COLS_NEG) f[c] = n[c] ?? "";
     f.ajustes = {};
     for (const c of AJUSTES) if (n[c] !== undefined) f.ajustes[c] = n[c];
-    if (conPagina) f.pagina = n.pagina && typeof n.pagina === "object" ? n.pagina : {};
     return f;
   };
   const resDeFila = (f) => ({

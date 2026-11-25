@@ -822,35 +822,55 @@ do $$ begin
   assert exists (select 1 from public.clientes where id = '00000000-0000-0000-0000-0000000000e1'), 'se borró otro cliente';
   raise notice 'OK  el cliente borra su cuenta: se borran sus datos y sus turnos, y nada de los demás';
 end $$;
--- La página del negocio (bookea.ar/nombre): su frase, su historia, solo sus propias fotos, sus redes y su WhatsApp si lo elige
+-- La página del negocio (bookea.ar/nombre) la carga solo el equipo de Bookea (25/11: "la voy a vender como un servicio")
 select set_config('request.jwt.claim.sub', current_setting('prueba.eva'), false) \g /dev/null
 set role authenticated;
 do $$
 declare n text := current_setting('prueba.neg_eva');
 begin
-  update public.negocios set pagina = jsonb_build_object(
+  begin
+    update public.negocios set pagina = '{"frase": "La cambio yo"}' where id = n::uuid;
+    raise exception 'FALLA: el negocio cambió su página';
+  exception when insufficient_privilege then null;
+  end;
+  begin
+    perform public.guardar_pagina(n::uuid, '{"frase": "La cambio yo"}'::jsonb);
+    raise exception 'FALLA: el negocio guardó su página con guardar_pagina';
+  exception when insufficient_privilege then null;
+  end;
+  begin
+    insert into storage.objects (bucket_id, name) values ('negocios', n || '/mia.webp');
+    raise exception 'FALLA: el negocio subió una foto a su carpeta';
+  exception when insufficient_privilege then null;
+  end;
+  -- y Mi negocio sigue andando
+  update public.negocios set descripcion = 'Fútbol 5 en Tunuyán' where id = n::uuid;
+  assert found, 'Eva no pudo cambiar Mi negocio';
+  raise notice 'OK  la página la carga el equipo de Bookea: el negocio no la cambia ni sube fotos (Mi negocio sí)';
+end $$;
+reset role;
+-- su frase, su historia, solo sus propias fotos, sus redes y su WhatsApp si lo elige (la carga Caro, del equipo de Bookea)
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000c', false) \g /dev/null
+set role authenticated;
+do $$
+declare n text := current_setting('prueba.neg_eva');
+begin
+  perform public.guardar_pagina(n::uuid, jsonb_build_object(
     'frase', 'Fútbol con amigos desde 1998', 'historia', 'Empezamos con una cancha.' || chr(10) || 'Hoy tenemos dos.',
     'logo', 'https://x.supabase.co/storage/v1/object/public/negocios/' || n || '/logo-1.webp',
     'portada', 'https://otro-sitio.com/foto.jpg',
     'galeria', jsonb_build_array('https://x.supabase.co/storage/v1/object/public/negocios/' || n || '/g1.webp',
                                  'https://x.supabase.co/storage/v1/object/public/negocios/00000000-0000-0000-0000-000000000000/ajena.webp'),
     'instagram', 'https://www.instagram.com/canchaeva/?hl=es', 'tiktok', '@canchaeva', 'facebook', 'Cancha Eva', 'mostrar_whatsapp', false,
-    'servicios', jsonb_build_array('vest', 'est', '<script>', 5, 'Parrilla con espacios'))
-  where id = n::uuid;
-  assert found, 'Eva no pudo cambiar su página';
-  -- las fotos: a su carpeta sí; a la de otro negocio, o sueltas, no
+    'servicios', jsonb_build_array('vest', 'est', '<script>', 5, 'Parrilla con espacios')));
+  -- las fotos: a la carpeta de un negocio sí; sueltas, no
   insert into storage.objects (bucket_id, name) values ('negocios', n || '/logo-1.webp');
-  begin
-    insert into storage.objects (bucket_id, name) values ('negocios', current_setting('prueba.neg_b') || '/intruso.webp');
-    raise exception 'FALLA: un negocio subió una foto a la carpeta de otro';
-  exception when insufficient_privilege then null;
-  end;
   begin
     insert into storage.objects (bucket_id, name) values ('negocios', 'suelta.webp');
     raise exception 'FALLA: se subió una foto fuera de la carpeta de un negocio';
   exception when insufficient_privilege then null;
   end;
-  raise notice 'OK  fotos de la página: cada negocio sube a su carpeta y a ninguna otra';
+  raise notice 'OK  fotos de la página: el equipo de Bookea sube a la carpeta de un negocio, y nada suelto';
 end $$;
 reset role;
 set role anon;
