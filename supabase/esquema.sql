@@ -921,14 +921,29 @@ create trigger reserva_web_cancelada after update of estado on public.reservas
 
 -- ---------- Las fotos de la página (Supabase Storage) ----------
 -- Un bucket público, "negocios": cada negocio sube sus fotos a su carpeta (negocios/<id del negocio>/...) y solo puede
--- quien cambia Mi negocio (el dueño, o quien tenga el permiso "negocio"). Las ve cualquiera: son las de su página.
+-- quien cambia Mi negocio (el dueño, o quien tenga el permiso "negocio") y el equipo de Bookea, que arma la página de
+-- cada negocio (pedido del dueño, 25/11: "lo voy a cargar yo"). Las ve cualquiera: son las de su página.
 create or replace function public.puede_subir_foto(objeto text) returns boolean
 language sql stable security definer set search_path = '' as $$
   select case when split_part(coalesce(objeto, ''), '/', 1) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
-              then public.tiene_permiso(split_part(objeto, '/', 1)::uuid, 'negocio') else false end
+              then public.tiene_permiso(split_part(objeto, '/', 1)::uuid, 'negocio') or public.es_admin_bookea() else false end
 $$;
 revoke all on function public.puede_subir_foto(text) from public, anon;
 grant execute on function public.puede_subir_foto(text) to authenticated;
+
+-- La página de un negocio, guardada por el equipo de Bookea (desde Solicitudes → "Editar su página") o por quien cambia
+-- su Mi negocio. Cambia solo la página (fotos, frase, historia, servicios, redes): nada más del negocio.
+create or replace function public.guardar_pagina(n uuid, p jsonb) returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  if not (public.es_admin_bookea() or public.tiene_permiso(n, 'negocio')) then
+    raise exception 'sin permiso para cambiar la página de este negocio' using errcode = '42501';
+  end if;
+  update public.negocios set pagina = coalesce(p, '{}'::jsonb) where id = n;
+  if not found then raise exception 'no existe ese negocio' using errcode = 'P0002'; end if;
+end $$;
+revoke all on function public.guardar_pagina(uuid, jsonb) from public, anon;
+grant execute on function public.guardar_pagina(uuid, jsonb) to authenticated;
 do $$ begin
   if to_regclass('storage.objects') is not null then  -- en Supabase siempre está; en una base de prueba, solo si se simula
     insert into storage.buckets (id, name, public) values ('negocios', 'negocios', true)

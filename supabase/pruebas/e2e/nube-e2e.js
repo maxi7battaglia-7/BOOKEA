@@ -511,6 +511,28 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
     ok(/Pádel entre álamos/.test(loc) && /Empezamos con una cancha\./.test(loc) && /Hoy tenemos dos\./.test(loc) && /@losalamospadel/.test(loc) && /Vestuarios/.test(loc) && /Clases/.test(loc) && await f4.isVisible('.loc__logo img'),
       'la página del negocio muestra su logo, su frase, su historia, sus servicios y su Instagram');
     await entera(f4, `${out}/nb-pagina-real.png`);
+    // ---------- El equipo de Bookea arma la página de un negocio (pedido del dueño, 25/11: "lo voy a cargar yo") ----------
+    await adm.click('#ir-solicitudes'); await adm.waitForSelector('.sol');
+    await adm.locator('.sol', { hasText: 'ana@prueba.com' }).locator('[data-pagina]').click(); await adm.waitForSelector('#f-pag');
+    ok(/Página de Los Álamos Pádel/.test(await adm.textContent('#vista h1')) && (await adm.inputValue('#p-frase')) === 'Pádel entre álamos' && await adm.isChecked('#f-pag .servp input[value="vest"]'),
+      'equipo de Bookea: "Editar su página" (en Solicitudes) abre la página de ese negocio, con lo que ya tiene');
+    await adm.fill('#p-frase', 'Cargada por Bookea');
+    await adm.click('#f-pag .servp__i:has(input[value="pileta"])');
+    await adm.setInputFiles('#p-fotos', RAIZ + '/assets/r-futbol.webp');
+    await adm.waitForFunction(() => document.querySelectorAll('#p-gal .galp__f').length === 1, null, { timeout: 15000 }).catch(() => {});
+    await adm.waitForTimeout(1800);
+    await adm.waitForFunction(() => /Guardado/.test(document.querySelector('#p-msg').textContent), null, { timeout: 10000 }).catch(() => {});
+    const pgE = await sql("select to_json(pagina) from negocios where slug = 'losalamospadel'");
+    const idLA = await sql("select to_json(id) from negocios where slug = 'losalamospadel'");
+    ok(pgE.frase === 'Cargada por Bookea' && JSON.stringify(pgE.servicios) === '["vest","pileta","clases"]' && pgE.galeria.length === 1 && pgE.galeria[0].includes(`/negocios/${idLA}/`)
+      && pgE.instagram === 'losalamospadel' && pgE.portada === pgA2.portada,
+      'equipo de Bookea: guarda la página del negocio y sube la foto a su carpeta (sin tocar lo demás)');
+    await adm.click('#p-volver'); await adm.waitForSelector('.sol');
+    ok(true, 'equipo de Bookea: "Volver a Solicitudes"');
+    await f4.goto('http://localhost:8787/losalamospadel'); await frenteListo(f4);
+    await f4.waitForFunction(() => document.querySelector('.page:not([hidden])').dataset.page === 'local', null, { timeout: 8000 }).catch(() => {});
+    const loc2 = await f4.textContent('#local-root');
+    ok(/Cargada por Bookea/.test(loc2) && /Pileta/.test(loc2) && (await f4.locator('.loc__gal img').count()) === 1, 'la página del negocio muestra lo que cargó el equipo de Bookea');
     for (const [n, p] of [['f1', f1], ['f2', f2], ['f3', f3], ['f4', f4], ['an', an]]) ok(!p.errs.filter((x) => !/Failed to load resource/.test(x)).length, `frente: sin errores en la consola (${n}) ${p.errs.join(' | ')}`);
   } catch (e) {
     console.log('FALLA (excepción)', e.message); process.exitCode = 1;

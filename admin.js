@@ -740,6 +740,7 @@
     if (v === "cuenta") return true;
     if (v === "equipo") return esDueno();
     if (v === "solicitudes") return !!(YO && YO.admin);
+    if (v === "paginade") return !!(YO && YO.admin && PAGINA_DE);
     return puede(VISTA_PERMISO[v]);
   };
   const primeraVista = (pref) => [pref, "agenda", "clientes", "finanzas", "negocio", "cuenta"].find((v) => v && VISTAS[v] && puedeVer(v));
@@ -749,7 +750,7 @@
   };
   // Si se sale de Mi negocio con cambios sin guardar, primero se guardan; si hay un dato mal cargado, se queda ahí
   let salirNegocio = null;
-  const dejarNegocio = async (v) => !(salirNegocio && (vistaActual === "negocio" || vistaActual === "pagina") && v !== vistaActual) || (await salirNegocio());
+  const dejarNegocio = async (v) => !(salirNegocio && ["negocio", "pagina", "paginade"].includes(vistaActual) && v !== vistaActual) || (await salirNegocio());
   const ir = (v, { foco = true } = {}) => {
     if (!VISTAS[v] || !puedeVer(v)) v = primeraVista();
     vistaActual = v;
@@ -1729,8 +1730,13 @@
   });
   // "https://www.instagram.com/losalamos/?hl=es" o "@losalamos" → "losalamos" (igual que red_social en la base)
   const usuarioRed = (t) => String(t || "").trim().replace(/^(https?:\/\/)?(www\.|m\.)?(instagram\.com|tiktok\.com|facebook\.com|fb\.com)\//i, "").split("/")[0].split("?")[0].replace(/[^A-Za-z0-9._-]/g, "").slice(0, 60);
-  VISTAS.pagina = () => {
-    const n = NEG;
+  // "otro": la página de otro negocio, que arma el equipo de Bookea desde Solicitudes (pedido del dueño, 25/11: "son
+  // todas iguales, solo cambia lo que caracteriza a cada lugar, y lo voy a cargar yo"). Es el mismo editor; guarda solo
+  // la página (guardar_pagina) y las fotos van a la carpeta de ese negocio.
+  let PAGINA_DE = null;
+  VISTAS.paginade = () => VISTAS.pagina(PAGINA_DE);
+  VISTAS.pagina = (otro) => {
+    const n = otro || NEG;
     const pg = Object.assign({ frase: "", historia: "", logo: "", portada: "", galeria: [], instagram: "", tiktok: "", facebook: "", mostrar_whatsapp: false, servicios: [] }, n.pagina || {});
     if (!Array.isArray(pg.galeria)) pg.galeria = [];
     if (!Array.isArray(pg.servicios)) pg.servicios = [];
@@ -1738,8 +1744,9 @@
     const tarjeta = (id, icono, t, d, cuerpo, cls = "") => `<section class="card ng-card${cls ? " " + cls : ""}" aria-labelledby="${id}"><header class="ng-card__h">${ico(icono)}<div><h2 id="${id}">${t}</h2><p>${d}</p></div></header>${cuerpo}</section>`;
     const red = (id, rot, pre, val) => `<div class="field campo"><label for="${id}">${rot}</label><div class="slug"><span>${pre}</span><input id="${id}" value="${esc(val)}" autocapitalize="none" autocomplete="off" spellcheck="false" translate="no" /></div></div>`;
     $("#vista").innerHTML = `
-      <header class="vhead"><div><h1>Tu página</h1><p class="vhead__frase">Tu página web en Bookea: tu logo, tus fotos, tu historia y dónde estás, con un botón para reservar al final. Cada cambio se guarda solo.</p></div>
-        <div class="vhead__acc"><p class="guardado" id="p-msg" role="status" aria-live="polite">Se guarda solo</p><a class="btn btn--line" id="p-ver" href="${linkWeb(n.slug)}" target="_blank" rel="noopener">${ico("afuera")}Ver tu página</a></div></header>
+      <header class="vhead"><div>${otro ? `<button type="button" class="btn btn--line btn--sm p-volver" id="p-volver">${ico("izq")}Volver a Solicitudes</button>` : ""}
+        <h1>${otro ? `Página de ${esc(n.nombre)}` : "Tu página"}</h1><p class="vhead__frase">${otro ? `Estás armando la página de ${esc(n.nombre)} como equipo de Bookea: sus fotos, su historia y sus servicios. Lo demás (canchas, horarios, dirección) sale de su Mi negocio. Cada cambio se guarda solo.` : "Tu página web en Bookea: tu logo, tus fotos, tu historia y dónde estás, con un botón para reservar al final. Cada cambio se guarda solo."}</p></div>
+        <div class="vhead__acc"><p class="guardado" id="p-msg" role="status" aria-live="polite">Se guarda solo</p><a class="btn btn--line" id="p-ver" href="${linkWeb(n.slug)}" target="_blank" rel="noopener">${ico("afuera")}${otro ? "Ver su página" : "Ver tu página"}</a></div></header>
       <form class="ng pg" id="f-pag" novalidate>
         ${tarjeta("pg-1", "camara", "Portada y logo", "Lo primero que se ve: una foto horizontal del lugar, a todo el ancho, con tu logo arriba.", `
           <div class="port" id="p-port"></div>
@@ -1806,7 +1813,7 @@
       const antes = n.pagina;
       n.pagina = nueva;
       estadoMsg("", "Guardando…");
-      const r = await sincronizar();
+      const r = otro ? await store.guardarPaginaDe(n.id, nueva) : await sincronizar();
       if (!r.ok) { n.pagina = antes; estadoMsg("err", "No se pudo guardar. " + esc(MENSAJES[r.error] || MENSAJES.otro)); return false; }
       // modo de prueba: si una foto no entró en el navegador, se avisa
       const ultima = [nueva.portada, nueva.logo, ...nueva.galeria].filter(Boolean).pop();
@@ -1828,7 +1835,7 @@
       if (archivo.size > 20 * 1024 * 1024) { err.textContent = "La imagen pesa más de 20 MB. Probá con otra."; err.hidden = false; return ""; }
       let blob;
       try { blob = await achicarImagen(archivo, MAX[tipo], tipo === "logo"); } catch { err.textContent = "No pudimos abrir esa imagen. Probá con otra."; err.hidden = false; return ""; }
-      const r = await store.subirFoto(blob, tipo);
+      const r = await store.subirFoto(blob, tipo, otro ? n.id : undefined);
       if (!r.ok) { err.textContent = "No se pudo subir la foto. " + (MENSAJES[r.error] || MENSAJES.otro); err.hidden = false; return ""; }
       return r.url;
     };
@@ -1839,11 +1846,11 @@
       const url = await subir(a, tipo, $("#p-port-err"));
       if (!url) return estadoMsg("err", "Revisá la foto");
       const vieja = pg[tipo]; pg[tipo] = url; pintarPort();
-      if (await guardar() && vieja) store.borrarFoto(vieja);
+      if (await guardar() && vieja) store.borrarFoto(vieja, otro ? n.id : undefined);
     };
     $("#p-portada").addEventListener("change", cambiarFoto("portada"));
     $("#p-logo").addEventListener("change", cambiarFoto("logo"));
-    const quitarFoto = (tipo) => async () => { const vieja = pg[tipo]; pg[tipo] = ""; pintarPort(); if (await guardar() && vieja) store.borrarFoto(vieja); };
+    const quitarFoto = (tipo) => async () => { const vieja = pg[tipo]; pg[tipo] = ""; pintarPort(); if (await guardar() && vieja) store.borrarFoto(vieja, otro ? n.id : undefined); };
     $("#p-portada-quitar").addEventListener("click", quitarFoto("portada"));
     $("#p-logo-quitar").addEventListener("click", quitarFoto("logo"));
     $("#p-fotos").addEventListener("change", async (e) => {
@@ -1857,7 +1864,7 @@
       const b = e.target.closest("[data-foto]"); if (!b) return;
       const [vieja] = pg.galeria.splice(+b.dataset.foto, 1); pintarGal();
       const sig = $("[data-foto], .galp__mas", $("#p-gal")); sig && sig.focus();
-      if (await guardar() && vieja) store.borrarFoto(vieja);
+      if (await guardar() && vieja) store.borrarFoto(vieja, otro ? n.id : undefined);
     });
     $$("[data-copiar]", f).forEach((b) => b.addEventListener("click", async () => {
       const link = b.dataset.copiar;
@@ -1866,6 +1873,7 @@
       setTimeout(() => { if (b.isConnected) b.innerHTML = ico("copiar") + "Copiar"; }, 2200);
     }));
     salirNegocio = async () => { clearTimeout(espera); return estado() === inicial ? true : guardar(); };
+    if (otro) $("#p-volver").addEventListener("click", async () => { if (await dejarNegocio("solicitudes")) ir("solicitudes"); });
   };
 
   // ---------- Solicitudes (solo el equipo de Bookea) ----------
@@ -1889,11 +1897,12 @@
         : x.estado === "aprobado"
           ? `<button type="button" class="btn btn--line" data-revisar="${x.id}" data-ok="0">Quitar acceso</button>`
           : `<button type="button" class="btn btn--line" data-revisar="${x.id}" data-ok="1">Aprobar</button>`;
+      const editar = x.slug ? `<button type="button" class="btn btn--line" data-pagina="${x.id}">${ico("web")}Editar su página</button>` : "";
       return `<li class="sol">
         <div class="sol__q"><b>${esc(x.nombre)}</b><span>${esc([x.rubro, x.ciudad].filter(Boolean).join(" · ") || "Sin rubro")}</span>
           <span>${quien ? `Lo pidió ${quien}` : ""}${x.creado ? ` · ${x.estado === "pendiente" ? "se registró el" : "desde el"} ${fechaCorta(x.creado)}` : ""}</span></div>
         <span class="estado estado--${cls}"><i></i>${txt}</span>
-        <div class="sol__acc">${btns}</div></li>`;
+        <div class="sol__acc">${editar}${btns}</div></li>`;
     };
     v.innerHTML = `<header class="vhead"><div><h1>Solicitudes</h1><p class="vhead__frase">Los negocios que se registraron en Bookea. Hasta que los aprobás, no pueden usar el panel.</p></div></header>
       <section class="card" aria-labelledby="s-1">
@@ -1903,6 +1912,11 @@
       ${rev.length ? `<section class="card" aria-labelledby="s-2">
         <div class="card__head"><div><h2 id="s-2">Ya revisados</h2><p class="card__sub">Podés quitarle el acceso a un negocio o aprobar uno que habías rechazado.</p></div></div>
         <ul class="sols">${rev.map(fila).join("")}</ul></section>` : ""}`;
+    $$("[data-pagina]", v).forEach((b) => b.addEventListener("click", () => {
+      const x = r.lista.find((y) => y.id === b.dataset.pagina);
+      PAGINA_DE = { id: x.id, nombre: x.nombre, slug: x.slug, whatsapp: x.whatsapp || "", pagina: x.pagina && typeof x.pagina === "object" ? x.pagina : {} };
+      ir("paginade");
+    }));
     $$("[data-revisar]", v).forEach((b) => b.addEventListener("click", async () => {
       const ok = b.dataset.ok === "1", x = r.lista.find((y) => y.id === b.dataset.revisar);
       if (!ok && b.dataset.seguro !== "1") { b.dataset.seguro = "1"; b.textContent = "Tocá de nuevo para confirmar"; return; }

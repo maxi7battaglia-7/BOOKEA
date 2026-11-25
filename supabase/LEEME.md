@@ -179,7 +179,10 @@ turnos para reservar. Lo carga el dueño en **Tu página** del panel.
   WhatsApp si lo eligió y sus servicios como claves cortas (`vest`, `est`…). Los servicios se suman el 25/11: hasta
   correr de nuevo `esquema.sql`, se guardan pero no se ven en la página.
 - **Fotos:** Supabase Storage, bucket público `negocios`. Cada negocio sube a su carpeta (`negocios/<id del negocio>/`) y
-  solo quien puede cambiar Mi negocio (`puede_subir_foto`). `esquema.sql` crea el bucket y sus permisos.
+  solo quien puede cambiar Mi negocio o el equipo de Bookea (`puede_subir_foto`). `esquema.sql` crea el bucket y sus permisos.
+- **La carga el equipo de Bookea (25/11):** en el panel, **Solicitudes → "Editar su página"** abre la página de cualquier
+  negocio para cargarle fotos, frase, historia y servicios. Guarda con `guardar_pagina` (solo la página, nada más del
+  negocio). Hace falta correr de nuevo `esquema.sql`.
 - **Para que funcione en bookea.ar:** correr de nuevo `esquema.sql` y después `avisos-por-mail.sql` (en ese orden).
 
 ### Pasar el sitio a Cloudflare Pages (para que las direcciones queden limpias y Google las encuentre)

@@ -270,10 +270,18 @@
       async solicitudes() {
         try {
           const { data, error } = await sb.from("negocios")
-            .select("id, nombre, rubro, ciudad, slug, estado, nombre_dueno, email_dueno, creado, revisado")
+            .select("id, nombre, rubro, ciudad, slug, estado, nombre_dueno, email_dueno, creado, revisado, whatsapp, pagina")
             .order("creado", { ascending: false });
           if (error) return fallo(error);
           return { ok: true, lista: data };
+        } catch (e) { return fallo(e); }
+      },
+      // La página de otro negocio, que arma el equipo de Bookea (solo la página: guardar_pagina en la base)
+      async guardarPaginaDe(id, pagina) {
+        try {
+          const { error } = await sb.rpc("guardar_pagina", { n: id, p: pagina });
+          if (error) return fallo(error);
+          return { ok: true };
         } catch (e) { return fallo(e); }
       },
       async revisar(id, aprobar) {
@@ -366,21 +374,24 @@
       },
 
       // Una foto de "Tu página": va a Supabase Storage, a la carpeta del negocio (negocios/<id>/...). Devuelve su dirección.
-      async subirFoto(blob, tipo) {
-        if (!sb || !negId) return { ok: false, error: "sesion" };
+      // "carpeta": la de otro negocio, cuando el equipo de Bookea arma su página.
+      async subirFoto(blob, tipo, carpeta) {
+        const dueno = carpeta || negId;
+        if (!sb || !dueno) return { ok: false, error: "sesion" };
         try {
           const ext = blob.type === "image/png" ? "png" : blob.type === "image/webp" ? "webp" : "jpg";
-          const ruta = `${negId}/${tipo}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}.${ext}`;
+          const ruta = `${dueno}/${tipo}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}.${ext}`;
           const { error } = await sb.storage.from("negocios").upload(ruta, blob, { contentType: blob.type, cacheControl: "31536000", upsert: false });
           if (error) return fallo(error);
           return { ok: true, url: sb.storage.from("negocios").getPublicUrl(ruta).data.publicUrl };
         } catch (e) { return fallo(e); }
       },
       // La que se reemplazó o se quitó: se borra (si no se puede, queda guardada y no molesta)
-      async borrarFoto(url) {
-        if (!sb || !negId) return { ok: false, error: "sesion" };
+      async borrarFoto(url, carpeta) {
+        const dueno = carpeta || negId;
+        if (!sb || !dueno) return { ok: false, error: "sesion" };
         const m = /\/storage\/v1\/object\/public\/negocios\/([0-9a-f-]{36}\/[a-z0-9._-]+)$/i.exec(url || "");
-        if (m && m[1].startsWith(negId + "/")) { try { await sb.storage.from("negocios").remove([m[1]]); } catch { /* queda guardada */ } }
+        if (m && m[1].startsWith(dueno + "/")) { try { await sb.storage.from("negocios").remove([m[1]]); } catch { /* queda guardada */ } }
         return { ok: true };
       },
 

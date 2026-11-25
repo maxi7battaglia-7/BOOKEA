@@ -878,4 +878,47 @@ do $$ begin
 end $$;
 reset role;
 
+-- El equipo de Bookea arma la página de cualquier negocio (25/11: "lo voy a cargar yo"); otro negocio no puede
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000c', false) \g /dev/null
+set role authenticated;
+do $$
+declare n uuid := current_setting('prueba.neg_eva')::uuid;
+begin
+  perform public.guardar_pagina(n, jsonb_build_object('frase', 'Cargada por Bookea', 'servicios', jsonb_build_array('pileta', 'quincho')));
+  insert into storage.objects (bucket_id, name) values ('negocios', n::text || '/portada-bookea.webp');
+  raise notice 'OK  el equipo de Bookea guarda la página de cualquier negocio y sube fotos a su carpeta';
+end $$;
+reset role;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false) \g /dev/null
+set role authenticated;
+do $$
+declare n uuid := current_setting('prueba.neg_eva')::uuid;
+begin
+  begin
+    perform public.guardar_pagina(n, '{"frase": "Hackeada"}'::jsonb);
+    raise exception 'FALLA: otro negocio cambió una página que no es suya';
+  exception when insufficient_privilege then null;
+  end;
+  begin
+    insert into storage.objects (bucket_id, name) values ('negocios', n::text || '/intrusa.webp');
+    raise exception 'FALLA: otro negocio subió una foto a una carpeta que no es suya';
+  exception when insufficient_privilege then null;
+  end;
+  raise notice 'OK  un negocio no puede cambiar la página de otro ni subir fotos a su carpeta';
+end $$;
+reset role;
+set role anon;
+do $$
+declare pg jsonb := public.lugares_publicos('canchaeva') -> 0 -> 'pagina';
+begin
+  assert pg ->> 'frase' = 'Cargada por Bookea' and pg -> 'servicios' = '["pileta", "quincho"]'::jsonb, 'la página que cargó Bookea: ' || pg::text;
+  begin
+    perform public.guardar_pagina(current_setting('prueba.neg_eva')::uuid, '{}'::jsonb);
+    raise exception 'FALLA: sin cuenta se cambió una página';
+  exception when insufficient_privilege then null;
+  end;
+  raise notice 'OK  la página que cargó Bookea se ve en la página del negocio (y sin cuenta no se puede cambiar)';
+end $$;
+reset role;
+
 \echo 'Todas las pruebas del esquema pasaron.'

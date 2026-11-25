@@ -53,7 +53,7 @@ const filtros = (fs_) => {
   }).join(' and ');
 };
 
-const FUNCIONES = new Set(['revisar_negocio', 'crear_invitacion', 'ver_invitacion', 'aceptar_invitacion', 'anular_invitacion', 'cambiar_permisos', 'quitar_miembro',
+const FUNCIONES = new Set(['revisar_negocio', 'guardar_pagina', 'crear_invitacion', 'ver_invitacion', 'aceptar_invitacion', 'anular_invitacion', 'cambiar_permisos', 'quitar_miembro',
   'guardar_mis_datos', 'reservar_turno', 'cancelar_turno', 'borrar_mi_cuenta', // las de los clientes de bookea.ar (cuenta.js)
   'lugares_publicos', 'horarios_ocupados']); // las que la página pide sin cuenta (los negocios de verdad y sus horarios ocupados)
 const consulta = async (q) => {

@@ -849,6 +849,7 @@ html:has(#panel:not([hidden])) { scrollbar-gutter: stable; }
    con la franja verde agua y naranja abajo. En el celular, "Tu página" se abre desde Mi negocio (la barra de abajo ya está llena). */
 .pg-card--port { grid-column: span 2; }
 .pg-card--gal, .pg-card--serv { grid-column: 1 / -1; }
+.p-volver { margin-bottom: 12px; }
 /* la vista previa de la portada, como se ve en la página: sin los colores de Bookea (la página es del negocio, 25/11) */
 .port { position: relative; overflow: hidden; display: grid; place-items: center; min-height: 200px; border-radius: 12px; background: #1b1b1b; color: #fff; }
 .port.has-foto { color: #fff; }
