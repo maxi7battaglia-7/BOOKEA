@@ -656,7 +656,7 @@
     const v = venue(st.v), R = RUBROS[v.rubro], pg = paginaDe(v);
     const logo = pg.logo || (v.real ? IMG[v.id] || "" : "");
     const maps = v.real ? comoLlegar(v) : "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(`${ZONAS[v.zona]}, Mendoza`);
-    const mapa = mapaDe(v), ciudad = v.real && v.ciudad ? v.ciudad : ZONAS[v.zona];
+    const mapa = mapaDe(v), ciudad = v.real ? String(v.ciudad || "").trim() : ZONAS[v.zona]; // uno de verdad sin ciudad: no dice "Sin ciudad"
     const semana = semanaDe(v), hoy = semana.find((x) => x.hoy) || semana[0];
     // los días seguidos que abren igual van en una fila ("Lunes a viernes", "Sábado y domingo", "Todos los días");
     // hoy se marca solo si hay más de una fila
@@ -686,11 +686,11 @@
         dets.length ? dets.join(" · ") : esDep ? "" : v.units.map((u) => u.split(" · ")[0]).join(", ")],
       ["clock", `Turnos de ${v.dur} min`, "Se reservan online"],
       ["cal", "Horarios", hoy.t === "Cerrado" ? "Hoy está cerrado" : `Hoy de ${hoy.t}`],
-      ["pin", ciudad, v.real && v.direccion ? v.direccion : "Mendoza"],
-    ];
+      ciudad ? ["pin", ciudad, v.real ? v.direccion || "" : "Mendoza"] : v.real && v.direccion ? ["pin", v.direccion, ""] : null,
+    ].filter(Boolean);
     const extras = servs.map((k) => [AMIC[k] || "check", AM[k], ""]);
     const tarjeta = ([i, t, c]) => `<li class="loc__card">${icono(i)}<b>${esc(t)}</b>${c ? `<span>${esc(c)}</span>` : ""}</li>`;
-    const dir = v.real && v.direccion ? `${v.direccion}${v.ciudad ? ", " + v.ciudad : ""}` : `${ciudad}, Mendoza`;
+    const dir = v.real ? [v.direccion, v.ciudad].filter(Boolean).join(", ") : `${ciudad}, Mendoza`;
     const B = `<svg class="loc__bk" aria-hidden="true"><use href="#bk-b"/></svg>`;
     $("#local-root").innerHTML = `
       <div class="loc">
@@ -702,7 +702,7 @@
           </div></div>
           <div class="wrap loc__in">
             <span class="loc__logo${logo ? " has-img" : ""}" aria-hidden="true">${logo ? `<img src="${esc(logo)}" alt="" />` : esc(iniciales(v.name))}</span>
-            <p class="loc__rubro">${esc(R.n)} · ${esc(ciudad)}</p>
+            <p class="loc__rubro">${esc(R.n)}${ciudad ? ` · ${esc(ciudad)}` : ""}</p>
             <h1>${esc(v.name)}</h1>
           </div>
         </header>
@@ -725,7 +725,7 @@
                 <div><h3>Horarios</h3>
                   <table class="loc__hor"><caption class="sr-only">Horarios de ${esc(v.name)}</caption><tbody>${tramos.map(filaHor).join("")}</tbody></table></div>
                 <div><h3>Dónde estamos</h3>
-                  <p class="loc__dir">${esc(dir)}${v.real ? "" : ". Ubicación aproximada: es un negocio de ejemplo."}</p>
+                  ${dir ? `<p class="loc__dir">${esc(dir)}${v.real ? "" : ". Ubicación aproximada: es un negocio de ejemplo."}</p>` : ""}
                   ${maps || redes.length ? `<ul class="loc__acc" aria-label="Cómo llegar, redes y contacto">${maps ? `<li><a href="${esc(maps)}" target="_blank" rel="noopener">${icono("pin")}<span>Cómo llegar</span></a></li>` : ""}${redes.map(([i, t, h]) => `<li><a href="${esc(h)}" target="_blank" rel="noopener">${icono(i)}<span>${esc(t)}</span></a></li>`).join("")}</ul>` : ""}</div>
               </div>
               ${mapa ? `<div class="loc__mapa"><iframe title="Mapa: dónde queda ${esc(v.name)}" src="${esc(mapa)}" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe></div>` : ""}
@@ -766,7 +766,7 @@
     const W = Math.floor(g.getBoundingClientRect().width) - 1;
     if (W <= 0 || (!forzar && W === galAncho)) return;
     galAncho = W;
-    const gap = parseFloat(getComputedStyle(g).columnGap) || 8, alto = W < 560 ? 160 : W < 900 ? 210 : 260, tope = alto * 1.6;
+    const gap = parseFloat(getComputedStyle(g).columnGap) || 8, alto = W < 560 ? 150 : W < 900 ? 190 : 230, tope = alto * 1.35;
     const figs = [...g.children], rs = figs.map((f) => +f.dataset.r || 4 / 3), n = rs.length;
     const altoDe = (a, b) => { let t = 0; for (let i = a; i < b; i++) t += rs[i]; return (W - gap * (b - a - 1)) / t; };
     let mejor = null, puntos = Infinity;
