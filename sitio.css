@@ -1044,18 +1044,38 @@ dialog .row { margin-top: 6px; }
 @media (max-width: 700px) {
   .loc__in { padding-block: 84px 64px; }
   .loc__logo { width: 76px; height: 76px; border-radius: 19px; font-size: 26px; }
-  .loc__bloque, .loc__bloque.sin-fotos { grid-template-columns: minmax(0, 1fr); border-radius: 16px; }
-  .loc__bloque > .loc__fotos, .loc__bloque:nth-child(even) > .loc__fotos { order: -1; padding: 8px; }
+  /* en el celular parado también: el texto de un lado y las fotos del otro (una arriba de la otra), alternados */
+  .loc__bloque { grid-template-columns: minmax(0, 11fr) minmax(0, 9fr); border-radius: 16px; }
+  .loc__bloque:nth-child(even) { grid-template-columns: minmax(0, 9fr) minmax(0, 11fr); }
+  .loc__bloque.sin-fotos { grid-template-columns: minmax(0, 1fr); }
+  .loc__bloque > .loc__fotos { padding: 6px; gap: 6px; }
   .loc__bloque > .loc__fotos--mapa { padding: 0; }
+  .loc__fotos figure { border-radius: 10px; }
   .loc__fotos--mapa .loc__mapa { min-height: 220px; }
-  .loc__bloque-t { padding: 18px 18px 20px; }
-  .loc__servs li { padding: 9px 10px; font-size: 14px; }
+  .loc__bloque-t { padding: 16px 14px 18px; }
+  .loc__bloque h2 { font-size: 20px; }
+  .loc__bloque h3 { margin-top: 12px; font-size: 12px; }
+  .loc__datos { margin-top: 10px; }
+  .loc__datos li { column-gap: 10px; padding-block: 9px; }
+  .loc__datos .icon { width: 18px; height: 18px; }
+  .loc__datos b { font-size: 14px; }
+  .loc__datos span { font-size: 12.5px; }
+  .loc__servs { grid-template-columns: minmax(0, 1fr); gap: 6px; margin-top: 12px; }
+  .loc__servs li { gap: 8px; padding: 7px 9px; border-radius: 10px; font-size: 13px; }
+  .loc__servs .icon { width: 16px; height: 16px; }
+  .loc__dir { margin-top: 8px; font-size: 14px; }
+  .loc__bloque .loc__hor tr { display: block; padding-block: 6px; border-bottom: 1px solid var(--l-line); }
+  .loc__bloque .loc__hor tr:last-child { border-bottom: 0; padding-bottom: 0; }
+  .loc__bloque .loc__hor th, .loc__bloque .loc__hor td { display: block; padding: 0; border: 0; text-align: left; font-size: 13.5px; }
+  .loc__hoy { margin-left: 6px; }
+  .loc__acc { gap: 6px; margin-top: 12px; }
+  .loc__acc a { gap: 6px; padding: 0 12px; font-size: 13px; }
+  .loc__mapa--chico { display: none; } /* con fotos propias, el mapa chico no entra: queda "Cómo llegar" */
   .loc__gal { gap: 6px; }
   .loc__gal figure { width: calc((100% - 6px) / 2); border-radius: 12px; }
   .loc__fin-in { flex-direction: column; align-items: stretch; gap: 14px; padding: 22px 20px 20px; }
   .loc__fin .loc__btn { width: 100%; }
 }
-@media (max-width: 400px) { .loc__servs { grid-template-columns: minmax(0, 1fr); } }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }

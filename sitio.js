@@ -775,9 +775,11 @@
     const enTarjeta = g.classList.contains("loc__fotos");
     const gap = parseFloat(cs.columnGap) || 8, alto = W < 560 ? 160 : W < 900 ? 220 : 300;
     const tope = enTarjeta ? (W < 560 ? 360 : 560) : alto * 1.35, porFila = enTarjeta ? n : W < 700 ? 2 : 3;
+    // en una tarjeta angosta (el celular parado), las fotos una arriba de la otra, a todo el ancho de su lado
+    const apiladas = enTarjeta && W < 300;
     const rs = figs.map((f) => +f.dataset.r || 4 / 3);
     const altoDe = (a, b) => { let t = 0; for (let i = a; i < b; i++) t += rs[i]; return (W - gap * (b - a - 1)) / t; };
-    let mejor = [0, n], puntos = Infinity;
+    let mejor = apiladas ? figs.map((_, i) => i).concat(n) : [0, n], puntos = Infinity;
     if (!enTarjeta) for (let m = 0; m < 1 << Math.max(0, n - 1); m++) { // cada bit: si hay corte de fila después de esa foto
       const cortes = [0];
       for (let i = 0; i < n - 1; i++) if (m & (1 << i)) cortes.push(i + 1);
