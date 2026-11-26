@@ -86,17 +86,23 @@ const medir = () => {
 
       // ---------- Inicio ----------
       await p.ir(B);
-      ok((await p.pagina()) === 'home' && (await p.locator('#f-rubros .rubro').count()) === 3 && (await p.getAttribute('#f-secs [data-k="deportes"]', 'aria-pressed')) === 'true', `${w} inicio: arranca en Deportes, con sus tres rubros con foto`);
+      ok((await p.pagina()) === 'home' && (await p.locator('#f-rubros .rubro:not(.rubro--molde)').count()) === 3 && (await p.getAttribute('#f-secs [data-k="deportes"]', 'aria-pressed')) === 'true', `${w} inicio: arranca en Deportes, con sus tres rubros con foto`);
       ok(await p.evaluate(() => [...document.fonts].some((f) => f.family.includes('Inter Tight') && f.status === 'loaded')), `${w} inicio: la letra Inter Tight cargó desde bookea.ar`);
       ok(await p.evaluate(() => [...document.images].every((i) => !i.complete || i.naturalWidth > 0)), `${w} inicio: ninguna foto rota`);
       ok(await p.evaluate(() => { const t = [...document.querySelectorAll('.top a, .top button')].filter((e) => e.offsetParent).map((e) => e.textContent.trim()); return !t.some((x) => /Reservar turno|Mis turnos/.test(x)) && t.some((x) => x === 'Ingresar'); }), `${w} barra de arriba: sin "Reservar turno" ni "Mis turnos" (pedido del dueño, 21/11), con "Ingresar"`);
       ok((await p.locator('.foot a[data-go="turnos"]').count()) === 1, `${w} pie: "Mis turnos" está abajo, en la columna Bookea`);
       await p.limpio('inicio');
+      // las tres fotos de Deportes, del mismo tamaño (pedido del dueño, 26/11)
+      ok(await p.evaluate(() => { const r = [...document.querySelectorAll('#f-rubros .rubro:not(.rubro--molde)')].map((e) => e.getBoundingClientRect()); return r.length === 3 && r.every((x) => Math.abs(x.width - r[0].width) < 2 && Math.abs(x.height - r[0].height) < 2); }), `${w} inicio: las tres fotos de Deportes miden lo mismo`);
+      ok(!(await p.isVisible('#f-tam-l')), `${w} inicio: con pádel no aparece el campo "Cancha" (fútbol 5 o 7)`);
       await p.toca('#f-rubros .rubro[data-k="futbol"]'); await espera(p, 200);
-      ok((await p.getAttribute('#f-rubros .rubro[data-k="futbol"]', 'aria-pressed')) === 'true' && (await p.getAttribute('#f-rubros .rubro[data-k="padel"]', 'aria-pressed')) === 'false', `${w} inicio: tocar Fútbol 5 lo marca`);
-      await p.selectOption('#f-zona', 'tunuyan'); await p.selectOption('#f-dia', '1'); await p.selectOption('#f-franja', 'noche');
+      ok((await p.getAttribute('#f-rubros .rubro[data-k="futbol"]', 'aria-pressed')) === 'true' && (await p.getAttribute('#f-rubros .rubro[data-k="padel"]', 'aria-pressed')) === 'false'
+        && (await p.textContent('#f-rubros .rubro[data-k="futbol"] .rubro__n')) === 'Fútbol' && await p.isVisible('#f-tam-l'), `${w} inicio: tocar Fútbol lo marca y aparece "Cancha" para elegir de 5 o de 7`);
+      await p.selectOption('#f-tam', '7'); await p.selectOption('#f-zona', 'tunuyan'); await p.selectOption('#f-dia', '1'); await p.selectOption('#f-franja', 'noche');
       await p.toca('#finder button[type=submit]'); await espera(p);
-      ok((await p.pagina()) === 'resultados' && (await p.textContent('#r-t')) === 'Turnos de fútbol 5 en Tunuyán' && /mañana/i.test(await p.textContent('#r-s')) && /noche/.test(await p.textContent('#r-s')), `${w} buscar: resultados de fútbol 5 en Tunuyán, mañana a la noche`);
+      ok((await p.pagina()) === 'resultados' && (await p.textContent('#r-t')) === 'Turnos de fútbol en Tunuyán' && /mañana/i.test(await p.textContent('#r-s')) && /noche/.test(await p.textContent('#r-s')), `${w} buscar: resultados de fútbol en Tunuyán, mañana a la noche`);
+      ok(JSON.stringify(await p.$$eval('#r-list .rcard h3', (l) => l.map((h) => h.textContent))) === '["El Potrero Fútbol"]' && (await p.getAttribute('#r-rubros [data-act="tam-h"][data-k="7"]', 'aria-pressed')) === 'true',
+        `${w} buscar: con fútbol 7, solo los lugares con canchas de 7 (y "Fútbol 7" marcado en los resultados)`);
       await p.limpio('resultados');
       await p.goBack(); await espera(p);
       ok((await p.pagina()) === 'home', `${w} resultados: "atrás" del navegador vuelve al inicio`);

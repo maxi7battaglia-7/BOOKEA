@@ -1865,7 +1865,7 @@
         ${tarjeta("pg-7", "camara", "Fotos de las tarjetas", "La página tiene tres tarjetas anchas: el lugar, los servicios y dónde está. Cada una lleva una o dos fotos al costado; si no tiene, usa una de las fotos del lugar.", `
           <div class="tjp">${TARJETAS_PG.map(([k, t, d]) => `<div class="tjp__g"><p class="tjp__t"><b>${t}</b><span>${d}</span></p><div class="galp galp--tj" id="p-tj-${k}"></div><input class="sr-only" type="file" id="p-tjf-${k}" accept="image/*" multiple /></div>`).join("")}</div>
           <p class="field__err" id="p-tj-err" hidden></p>`, "pg-card--gal")}
-        ${tarjeta("pg-5", "camara", "Fotos del lugar", `Hasta ${FOTOS_MAX}. Si una tarjeta no tiene fotos propias, usa una de estas; las demás se ven abajo de todo, de a tres.`, `
+        ${tarjeta("pg-5", "camara", "Fotos del lugar", `Hasta ${FOTOS_MAX}. Si una tarjeta no tiene fotos propias, usa una de estas; abajo de todo se ven hasta tres más, en una fila.`, `
           <div class="galp" id="p-gal"></div>
           <input class="sr-only" type="file" id="p-fotos" accept="image/*" multiple />
           <p class="field__err" id="p-gal-err" hidden></p>`, "pg-card--gal")}

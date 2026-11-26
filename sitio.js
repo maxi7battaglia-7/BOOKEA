@@ -82,7 +82,7 @@
   const SENA = 0.25;
   const RUBROS = {
     padel: { n: "Pádel", img: "padel", un: "Cancha", uns: "canchas" },
-    futbol: { n: "Fútbol 5", img: "futbol", un: "Cancha", uns: "canchas" },
+    futbol: { n: "Fútbol", img: "futbol", un: "Cancha", uns: "canchas" },
     tenis: { n: "Tenis", img: "tenis", un: "Cancha", uns: "canchas" },
     barberia: { n: "Barbería", img: "barberia", un: "Barbero", uns: "barberos" },
   };
@@ -96,6 +96,8 @@
   const ZONAS = { tunuyan: "Tunuyán", tupungato: "Tupungato", "san-carlos": "San Carlos" };
   const P = (dia, noche, finde) => ({ dia, noche, finde });
   const cs = (n, techadas = []) => Array.from({ length: n }, (_, i) => `Cancha ${i + 1}` + (techadas.includes(i + 1) ? " · techada" : ""));
+  // canchas de fútbol con su tamaño: cf(5, 5, 7) = Cancha 1 y 2 de fútbol 5, Cancha 3 de fútbol 7
+  const cf = (...tams) => tams.map((t, i) => `Cancha ${i + 1} · Fútbol ${t}`);
   const BARB = (a, b, c) => [
     { id: "corte", n: "Corte", min: 45, p: P(a, a, a) },
     { id: "corte-barba", n: "Corte y barba", min: 45, p: P(b, b, b) },
@@ -108,9 +110,9 @@
     { id: "aconcagua", rubro: "padel", name: "Aconcagua Pádel Club", zona: "tunuyan", fotos: ["padel", "paletas", "canchas"], dur: 90, bloques: [["15:00", "24:00"]], units: cs(4, [1, 2]), p: P(30000, 36000, 38000), ocup: 42, cancel: 12, desc: "Cuatro canchas con fácil acceso, dos de ellas techadas. Ideal para jugar después de la oficina.", ame: ["vest", "palas", "buf", "led", "tv"] },
     { id: "terraza", rubro: "padel", name: "La Terraza Pádel", zona: "san-carlos", fotos: ["paletas", "canchas", "padel"], dur: 90, bloques: [["17:00", "24:30"]], units: cs(2), p: P(24000, 30000, 32000), ocup: 30, cancel: 6, desc: "Dos canchas al aire libre con buena luz de noche. Turnos de 90 minutos todos los días.", ame: ["vest", "est", "buf", "led"] },
     { id: "valleuco", rubro: "padel", name: "Valle de Uco Pádel", zona: "tunuyan", fotos: ["canchas", "paletas", "padel"], dur: 90, bloques: [["16:00", "23:30"]], units: cs(2, [1, 2]), p: P(22000, 28000, 30000), ocup: 28, cancel: 6, desc: "Dos canchas techadas para jugar con cualquier clima, con la cordillera de fondo.", ame: ["vest", "est", "palas", "mate"] },
-    { id: "potrero", rubro: "futbol", name: "El Potrero Fútbol 5", zona: "tunuyan", fotos: ["futbol", "futbolnoche"], dur: 60, bloques: [["18:00", "24:00"]], units: cs(3), p: P(38000, 48000, 52000), ocup: 40, cancel: 12, desc: "Tres canchas de césped sintético con luz. El precio es por cancha, para el equipo completo, en turnos de 60 minutos.", ame: ["cesped", "luz", "vest", "est", "buf"] },
-    { id: "laquinta", rubro: "futbol", name: "La Quinta Fútbol", zona: "tupungato", fotos: ["futbolnoche", "futbol"], dur: 60, bloques: [["18:00", "24:00"]], units: cs(2), p: P(34000, 44000, 46000), ocup: 36, cancel: 6, desc: "Dos canchas con parrilla para el tercer tiempo. El precio es por cancha.", ame: ["cesped", "luz", "parr", "vest"] },
-    { id: "loscerros", rubro: "futbol", name: "Complejo Los Cerros", zona: "san-carlos", fotos: ["futbol", "futbolnoche"], dur: 60, bloques: [["18:00", "24:00"]], units: cs(2), p: P(30000, 40000, 42000), ocup: 30, cancel: 6, desc: "Complejo en San Carlos con dos canchas de fútbol 5. El precio es por cancha.", ame: ["cesped", "luz", "est", "buf"] },
+    { id: "potrero", rubro: "futbol", name: "El Potrero Fútbol", zona: "tunuyan", fotos: ["futbol", "futbolnoche"], dur: 60, bloques: [["18:00", "24:00"]], units: cf(5, 5, 7), p: P(38000, 48000, 52000), ocup: 40, cancel: 12, desc: "Dos canchas de fútbol 5 y una de fútbol 7, de césped sintético con luz. El precio es por cancha, para el equipo completo, en turnos de 60 minutos.", ame: ["cesped", "luz", "vest", "est", "buf"] },
+    { id: "laquinta", rubro: "futbol", name: "La Quinta Fútbol", zona: "tupungato", fotos: ["futbolnoche", "futbol"], dur: 60, bloques: [["18:00", "24:00"]], units: cf(7, 7), p: P(34000, 44000, 46000), ocup: 36, cancel: 6, desc: "Dos canchas de fútbol 7 con parrilla para el tercer tiempo. El precio es por cancha.", ame: ["cesped", "luz", "parr", "vest"] },
+    { id: "loscerros", rubro: "futbol", name: "Complejo Los Cerros", zona: "san-carlos", fotos: ["futbol", "futbolnoche"], dur: 60, bloques: [["18:00", "24:00"]], units: cf(5, 5), p: P(30000, 40000, 42000), ocup: 30, cancel: 6, desc: "Complejo en San Carlos con dos canchas de fútbol 5. El precio es por cancha.", ame: ["cesped", "luz", "est", "buf"] },
     { id: "parque", rubro: "tenis", name: "Tenis Club Parque", zona: "tunuyan", fotos: ["tenis", "tenis2"], dur: 60, bloques: [["09:00", "13:00"], ["16:00", "21:00"]], units: cs(4), p: P(12000, 14000, 16000), ocup: 28, cancel: 12, desc: "Cuatro canchas de polvo de ladrillo en el corazón de la ciudad. Turnos de una hora, mañana y tarde.", ame: ["polvo", "vest", "raq", "est"] },
     { id: "nogales", rubro: "tenis", name: "Los Nogales Tenis", zona: "tupungato", fotos: ["tenis2", "tenis"], dur: 60, bloques: [["09:00", "13:00"], ["16:00", "21:00"]], units: cs(2), p: P(10000, 12000, 14000), ocup: 24, cancel: 6, desc: "Dos canchas rodeadas de álamos. Un lugar tranquilo para jugar sin apuro.", ame: ["polvo", "raq", "est", "mate"] },
     { id: "donruiz", rubro: "barberia", name: "Barbería Don Ruiz", zona: "tunuyan", fotos: ["barberia", "barbero", "peine"], dur: 45, bloques: [["10:00", "13:00"], ["17:00", "21:00"]], units: ["Ruiz", "Nahuel", "Fede"], svcs: BARB(14000, 18000, 10000), ocup: 38, cancel: 6, desc: "Barbería clásica con tres sillones. De 13 a 17 cerramos por la siesta.", ame: ["wifi", "mate", "qr", "aire"] },
@@ -243,7 +245,7 @@
   // yo: el cliente con la cuenta abierta (o null). email: entró con una cuenta que todavía no tiene sus datos de cliente.
   // turnos: los de su cuenta (los trae cuenta.js). modoCu: qué muestra la caja de la cuenta ("nueva", "entrar").
   // pend: el email que espera confirmación (la cuenta recién creada, en modo nube).
-  const S = { page: "home", hs: "padel", rubro: "padel", zona: "", dia: 0, franja: "", techada: false, svc: "", nav: 0, ys: {}, f: null, sec: "deportes", ult: { deportes: "padel", servicios: "barberia" }, res: store.get("reserva", null), vencida: null, turnos: [], yo: null, email: "", modoCu: "nueva", pend: "" };
+  const S = { page: "home", hs: "padel", rubro: "padel", zona: "", dia: 0, franja: "", techada: false, tam: "", svc: "", nav: 0, ys: {}, f: null, sec: "deportes", ult: { deportes: "padel", servicios: "barberia" }, res: store.get("reserva", null), vencida: null, turnos: [], yo: null, email: "", modoCu: "nueva", pend: "" };
   // Cuentas de los clientes (cuenta.js): con config.js completo, en la base; si no, en este navegador
   const CU = window.BookeaCuenta.crear(window.BOOKEA_CONFIG || {});
   const hoyKey = () => dayInfo(0).key;
@@ -312,11 +314,20 @@
   };
   const esTech = (u) => /techada/.test(u);
   const techOn = () => S.techada && S.rubro === "padel";
-  // Turnos libres con los filtros del home (franja y, si corresponde, cancha techada)
+  // Fútbol 5 o 7 (pedido del dueño, 26/11): el tamaño sale del detalle de cada cancha ("Cancha 3 · Fútbol 7", "F7");
+  // una cancha que no lo dice entra en los dos
+  const TAMS = ["5", "7"];
+  const tamDe = (u) => { const m = /f[uú]tbol\s*(\d{1,2})\b|\bf\s?(\d{1,2})\b/i.exec(u); return m ? m[1] || m[2] : ""; };
+  const tamOn = (rubro = S.rubro) => !!S.tam && rubro === "futbol";
+  const cabe = (u, rubro = S.rubro) => !tamOn(rubro) || !tamDe(u) || tamDe(u) === S.tam;
+  // en la ficha: solo las canchas del tamaño elegido
+  const slotsFicha = (v, d) => (tamOn(v.rubro) ? slotsFor(v, d).map((s) => ({ ...s, libres: s.libres.filter((u) => cabe(u, v.rubro)) })) : slotsFor(v, d));
+  // Turnos libres con los filtros del home (franja y, si corresponde, cancha techada o tamaño de la cancha)
   const libresF = (v, d, fr = S.franja) => slotsFor(v, d)
     .map((s) => (techOn() ? { ...s, libres: s.libres.filter(esTech) } : s))
+    .map((s) => (tamOn(v.rubro) ? { ...s, libres: s.libres.filter((u) => cabe(u, v.rubro)) } : s))
     .filter((s) => s.libres.length && (!fr || s.franja === fr));
-  const matchV = (v) => v.rubro === S.rubro && (!S.zona || v.zona === S.zona) && (!techOn() || v.units.some(esTech));
+  const matchV = (v) => v.rubro === S.rubro && (!S.zona || v.zona === S.zona) && (!techOn() || v.units.some(esTech)) && (!tamOn() || v.units.some((u) => cabe(u)));
   const quedan = (s, v) => (s.libres.length === 1 ? `Último${v.rubro === "barberia" ? "" : " lugar"}` : `${s.libres.length} libres`);
   const franjasDe = (rubro) => {
     const set = new Set();
@@ -405,14 +416,17 @@
     }
     filaDe = S.sec;
     fr.dataset.n = rs.length;
-    // la fila de fotos mide siempre lo mismo: con tres rubros el primero va más ancho; con uno o dos, un molde invisible fija el alto
+    // la fila de fotos mide siempre lo mismo: con menos de cuatro rubros, un molde invisible (una foto común) fija el
+    // alto y las fotos se reparten el ancho en partes iguales (con tres, las tres del mismo tamaño: pedido del dueño, 26/11)
     fr.innerHTML = rs.map((k) => `<button type="button" class="rubro" data-act="tile" data-k="${k}" aria-pressed="${k === S.rubro}">${img(RUBROS[k].img, "")}<span class="rubro__n">${RUBROS[k].n}</span></button>`).join("")
-      + (rs.length <= 2 ? `<span class="rubro rubro--molde" aria-hidden="true"></span>` : "");
+      + (rs.length <= 3 ? `<span class="rubro rubro--molde" aria-hidden="true"></span>` : "");
     if (cambia) { fr.classList.remove("rubros--entra"); void fr.offsetWidth; fr.classList.add("rubros--entra"); }
     pintarSecs();
     $("#f-zona").innerHTML = zonaOpts(S.rubro); $("#f-zona").value = S.zona;
     $("#f-dia").innerHTML = Array.from({ length: 7 }, (_, i) => `<option value="${i}">${dayFull(i)}</option>`).join(""); $("#f-dia").value = S.dia;
     $("#f-franja").innerHTML = franjaOpts(S.rubro); $("#f-franja").value = S.franja;
+    const tamL = $("#f-tam-l"), conTam = S.rubro === "futbol";
+    if (tamL) { tamL.hidden = !conTam; tamL.parentElement.classList.toggle("con-tam", conTam); $("#f-tam").value = S.tam; }
     pintarCollage();
   }
   // Las tres fotos de al lado del buscador son de la sección elegida
@@ -470,6 +484,7 @@
   };
   const franjasHTML = (rubro) => btnx("franja-h", 'data-k=""', S.franja === "", "Todo el día") + franjasDe(rubro).map((f) => btnx("franja-h", `data-k="${f}"`, S.franja === f, FRANJAS[f])).join("");
   const extraHTML = () => S.rubro === "padel" ? btnx("techada-h", "", S.techada, "Solo techadas")
+    : S.rubro === "futbol" ? btnx("tam-h", 'data-k=""', !S.tam, "Fútbol 5 o 7") + TAMS.map((t) => btnx("tam-h", `data-k="${t}"`, S.tam === t, `Fútbol ${t}`)).join("")
     : S.rubro === "barberia" ? btnx("svc-h", 'data-k=""', S.svc === "", "Cualquier servicio") + Object.entries(SVCS).map(([k, n]) => btnx("svc-h", `data-k="${k}"`, S.svc === k, n)).join("") : "";
   const precioCard = (v) => { const sv = v.svcs.find((s) => s.id === S.svc); return sv ? Math.min(...Object.values(sv.p)) : minPrecio(v); };
   const slotCard = ({ v, s, d }) => {
@@ -510,7 +525,7 @@
   }
   function elegirRubro(k) {
     S.sec = secDe(k); S.ult[S.sec] = k;
-    if (S.rubro !== k) { S.rubro = k; S.techada = false; S.svc = ""; S.franja = ""; if (S.zona && !VENUES.some((v) => v.rubro === k && v.zona === S.zona)) S.zona = ""; }
+    if (S.rubro !== k) { S.rubro = k; S.techada = false; S.tam = ""; S.svc = ""; S.franja = ""; if (S.zona && !VENUES.some((v) => v.rubro === k && v.zona === S.zona)) S.zona = ""; }
     S.page === "resultados" ? renderResultados() : renderBuscador();
   }
   const refrescar = () => (S.page === "resultados" ? renderResultados() : renderBuscador());
@@ -569,7 +584,9 @@
   // Días a todo el ancho (con su cupo); al tocar uno, sus horarios abajo; con un horario elegido, el aviso verde "Ir a pagar"
   function renderBook() {
     const v = venue(S.f.v), f = S.f, R = RUBROS[v.rubro], di = dayInfo(f.dia), svc = curSvc();
-    const sl = slotsFor(v, f.dia), sel = f.abierto ? sl.find((s) => s.t === f.t && s.libres.length) : null;
+    // los tamaños de cancha del lugar (fútbol 5 y 7): si tiene los dos, se elige cuál
+    const tamsV = v.rubro === "futbol" ? TAMS.filter((t) => v.units.some((u) => tamDe(u) === t)) : [];
+    const sl = slotsFicha(v, f.dia), sel = f.abierto ? sl.find((s) => s.t === f.t && s.libres.length) : null;
     if (!sel) f.t = null;
     if (sel && !sel.libres.includes(f.unit)) f.unit = sel.libres[0]; // la primera libre queda elegida, y se ve cuál es
     // Con más de una cancha (o barbero) libre a esa hora, se elige cuál justo debajo del horario elegido (pedido del dueño, 19/11)
@@ -577,14 +594,14 @@
     const eleccion = sel && sel.libres.length > 1 ? `<div class="eleccion" id="f-eleccion"><p class="slots__g">${v.rubro === "barberia" ? "¿Con quién?" : `¿En qué ${qu}?`} · ${sel.t}</p>
       <div class="slots" role="group" aria-label="Elegí ${v.rubro === "barberia" ? qu : `la ${qu}`} para las ${sel.t}">${sel.libres.map((u) => { const [nom, det] = u.split(" · "); return `<button type="button" class="slot slot--u${f.unit === u ? " is-on" : ""}" data-act="f-unit" data-u="${esc(u)}" aria-pressed="${f.unit === u}"><b>${esc(nom)}</b><small>${det ? esc(cap(det)) : "Libre"}</small></button>`; }).join("")}</div></div>` : "";
     const dias = Array.from({ length: 7 }, (_, i) => {
-      const s7 = slotsFor(v, i), n = s7.filter((s) => s.libres.length).length, tot = s7.length || 1, d = dayInfo(i), on = f.abierto && i === f.dia;
+      const s7 = slotsFicha(v, i), n = s7.filter((s) => s.libres.length).length, tot = s7.length || 1, d = dayInfo(i), on = f.abierto && i === f.dia;
       return `<button type="button" class="cupo${on ? " is-on" : ""}${n ? "" : " is-zero"}" data-act="f-dia" data-i="${i}" aria-pressed="${on}"><span>${i === 0 ? "Hoy" : i === 1 ? "Mañana" : DOW3[d.dow]}</span><b>${d.d}</b><i style="--p:${Math.round((n / tot) * 100)}%"></i><small>${n ? `${n} ${n === 1 ? "libre" : "libres"}` : "Completo"}</small></button>`;
     }).join("");
     const grupos = ["manana", "tarde", "noche"].map((g) => [g, sl.filter((s) => s.franja === g)]).filter(([, a]) => a.length);
     const titulo = f.dia < 2 ? `Horarios de ${diaCorto(f.dia)}` : `Horarios del ${DOWL[di.dow]} ${di.d}/${di.m}`;
     const panel = !f.abierto ? `<p class="reserva__hint">Tocá un día para ver sus horarios libres.</p>` : `
       <div class="reserva__panel" id="book-panel">
-        <div class="reserva__ph"><h3>${titulo}</h3>${v.svcs.length > 1 ? `<label class="reserva__svc"><span class="eyebrow">Servicio</span><select class="sel" id="f-svc">${v.svcs.map((s) => `<option value="${s.id}"${s.id === f.svc ? " selected" : ""}>${s.n} · ${s.min} min · ${money(precioDe(s, di, 18 * 60))}</option>`).join("")}</select></label>` : ""}</div>
+        <div class="reserva__ph"><h3>${titulo}</h3>${tamsV.length > 1 ? `<label class="reserva__svc"><span class="eyebrow">Cancha</span><select class="sel" id="b-tam"><option value="">Fútbol 5 o 7</option>${tamsV.map((t) => `<option value="${t}"${S.tam === t ? " selected" : ""}>Fútbol ${t}</option>`).join("")}</select></label>` : ""}${v.svcs.length > 1 ? `<label class="reserva__svc"><span class="eyebrow">Servicio</span><select class="sel" id="f-svc">${v.svcs.map((s) => `<option value="${s.id}"${s.id === f.svc ? " selected" : ""}>${s.n} · ${s.min} min · ${money(precioDe(s, di, 18 * 60))}</option>`).join("")}</select></label>` : ""}</div>
         ${sl.length ? grupos.map(([g, a]) => `${grupos.length > 1 ? `<p class="slots__g">${FRANJAS[g]}</p>` : ""}<div class="slots">${a.map((s) => `<button type="button" class="slot${s.t === f.t ? " is-on" : ""}" data-act="f-slot" data-t="${s.t}" ${s.libres.length ? "" : "disabled"} aria-pressed="${s.t === f.t}"><b>${s.t}</b><small class="${s.libres.length === 1 ? "last" : ""}">${s.libres.length ? quedan(s, v) : "Completo"}</small></button>`).join("")}</div>${sel && a.includes(sel) ? eleccion : ""}`).join("") : `<p class="book__empty">Ya no quedan turnos para ${dayFull(f.dia).toLowerCase()}. Probá otro día.</p>`}
       </div>`;
     $("#book").innerHTML = `
@@ -604,7 +621,7 @@
     const v = venue(S.f.v), f = S.f, di = dayInfo(f.dia), svc = curSvc(), r = vigente();
     // si ya tenía guardado este mismo horario, sigue con ese y con el tiempo que le queda
     if (r && r.vid === v.id && (r.fa || r.key) === di.key && r.t === f.t && r.svc === svc.id && (f.unit === "any" || f.unit === r.unit)) return go("pago");
-    const s = slotsFor(v, f.dia).find((x) => x.t === f.t);
+    const s = slotsFicha(v, f.dia).find((x) => x.t === f.t);
     if (!s || !s.libres.length) { toast("Ese horario se acaba de ocupar"); return renderBook(); }
     const unit = f.unit !== "any" && s.libres.includes(f.unit) ? f.unit : s.libres[0];
     const precio = precioDe(svc, di, s.start), sena = senaDe(precio, v);
@@ -730,7 +747,7 @@
               ${servs.length ? bloque("loc-serv", "Servicios", `<ul class="loc__servs">${servs.map((k) => `<li>${icono(AMIC[k] || "check")}<span>${esc(AM[k])}</span></li>`).join("")}</ul>`, fServ.length ? figuras(fServ, "servicios") : "") : ""}
               ${bloque("loc-ubi", "Dónde estamos", ubiCuerpo, ubiMedia)}
             </div>
-            ${sueltas.length ? `<div class="loc__gal" role="group" aria-label="Más fotos de ${esc(v.name)}">${sueltas.map((u, i) => `<figure><img src="${esc(u)}" alt="Foto ${i + 1} de ${esc(v.name)}" loading="lazy" /></figure>`).join("")}</div>` : ""}
+            ${sueltas.length ? `<div class="loc__gal" role="group" aria-label="Más fotos de ${esc(v.name)}">${sueltas.slice(0, 3).map((u, i) => `<figure><img src="${esc(u)}" alt="Foto ${i + 1} de ${esc(v.name)}" loading="lazy" /></figure>`).join("")}</div>` : ""}
           </section>
           <section class="loc__fin${fotoFin ? " has-foto" : ""}" aria-labelledby="loc-fin">
             ${fotoFin ? `<img class="loc__bg" src="${esc(fotoFin)}" alt="" loading="lazy" />` : ""}
@@ -1237,8 +1254,9 @@
         case "franja-h": S.franja = d.k; refrescar(); break;
         case "zona-h": S.zona = d.k; refrescar(); break;
         case "techada-h": S.techada = !S.techada; refrescar(); break;
+        case "tam-h": S.tam = d.k || ""; refrescar(); break;
         case "svc-h": S.svc = d.k; refrescar(); break;
-        case "reset-f": S.zona = ""; S.franja = ""; S.techada = false; S.svc = ""; S.dia = 0; refrescar(); break;
+        case "reset-f": S.zona = ""; S.franja = ""; S.techada = false; S.tam = ""; S.svc = ""; S.dia = 0; refrescar(); break;
         case "ficha": go("ficha", { v: d.v, dia: d.dia !== undefined ? +d.dia : null }); break;
         case "open-slot": go("ficha", { v: d.v, dia: +d.dia, t: d.t }); break;
         case "back": e.preventDefault(); if (S.nav > 0) history.back(); else go("home", { restore: true }); break;
@@ -1309,7 +1327,9 @@
   document.addEventListener("change", (e) => { if (e.target.id === "r-zona") { S.zona = e.target.value; renderResultados(); }
     if (e.target.id === "f-zona") S.zona = e.target.value;
     if (e.target.id === "f-dia") S.dia = +e.target.value;
-    if (e.target.id === "f-franja") S.franja = e.target.value; if (e.target.id === "f-svc") { S.f.svc = e.target.value; renderBook(); } });
+    if (e.target.id === "f-franja") S.franja = e.target.value; if (e.target.id === "f-svc") { S.f.svc = e.target.value; renderBook(); }
+    if (e.target.id === "f-tam") S.tam = e.target.value;
+    if (e.target.id === "b-tam") { S.tam = e.target.value; renderBook(); } });
   // El aviso de un campo se va apenas se corrige
   document.addEventListener("input", (e) => {
     const f = e.target;
@@ -1374,6 +1394,7 @@
       if (ZONAS[q.get("zona")]) S.zona = q.get("zona");
       const d = parseInt(q.get("dia"), 10); if (d >= 0 && d < 7) S.dia = d;
       if (q.get("franja") && FRANJAS[q.get("franja")]) S.franja = q.get("franja");
+      if (S.rubro === "futbol" && TAMS.includes(q.get("tam"))) S.tam = q.get("tam");
       return { page: "resultados" };
     }
     if (["sumate", "como-funciona", "funciones", "preguntas"].includes(h)) return { page: "negocios", ir: h };

@@ -140,7 +140,7 @@ Filosofía **"Franja Exacta"** en `marca/filosofia.md`. Lámina de construcción
 Pedido del dueño: "lo más importante es que el cliente pueda sacar el turno".
 
 - **Hero:** la demo de la agenda se reemplazó por un **buscador de turnos** sobre el escenario naranja.
-  - Campos: qué (pádel, fútbol 5, tenis o barbería), dónde (localidades de Mendoza agrupadas por zona), cuándo (hoy y los 6 días siguientes) y la franja horaria.
+  - Campos: qué (pádel, fútbol, tenis o barbería; con fútbol aparece el campo "Cancha": de 5 o 7, desde el 26/11), dónde (localidades de Mendoza agrupadas por zona), cuándo (hoy y los 6 días siguientes) y la franja horaria.
   - En computadora va a la altura del título. En celular va justo después del título. El botón "Buscar turnos" entra en el primer pantallazo de 1440×900, 1280×800, 1024×768 y 390×844.
 - **"Buscar turnos" lleva a `reservar.html`**, la parte de la app con los turnos libres de cada lugar sumado a Bookea.
   - Primero aparecen los lugares de la localidad elegida, después "También en (zona)" y después otras zonas.
@@ -472,7 +472,7 @@ El dueño mandó una página de referencia ("mirá lo limpia que se ve, así qui
 - **Secciones Deportes | Servicios (pedido del dueño, 19/11, eligió la opción 1 entre dos maquetas):**
   - Una pastilla gris con dos pestañas (la elegida en blanco), arriba de las fotos de rubros: en la compu al lado de "¿Qué querés reservar?", en el celular a todo el ancho (ahí el rótulo queda solo para lectores de pantalla).
   - La pestaña cambia toda la página: los rubros del buscador, las tres fotos de al lado (se funden), "Libres ahora", los lugares y los resultados (el mismo control va en "Libres ahora" y arriba de los resultados). La ficha dice "Deportes · Pádel" o "Servicios · Barbería".
-  - La fila de fotos de rubros mide siempre lo mismo que con cuatro: con tres, el primero ocupa dos lugares; con uno (Servicios hoy), es una franja a lo ancho del alto de una foto común (`.rubro--molde`, invisible, fija el alto).
+  - La fila de fotos de rubros mide siempre lo mismo que con cuatro: con tres, las tres del mismo tamaño (pedido del dueño, 26/11: la fila pasa a 12 columnas, un molde invisible del ancho de una de cuatro fija el alto y cada foto ocupa 4); con uno (Servicios hoy), es una franja a lo ancho del alto de una foto común (`.rubro--molde`, invisible, fija el alto).
   - Los rubros de cada sección están en `SECCIONES` (`sitio.js`). Cada sección recuerda el último rubro elegido.
   - **Cambio suave (pedido del dueño, 19/11: "es un poco brusco"):** el fondo blanco de la pestaña se desliza de una a otra; las tres fotos de al lado se funden una encima de la otra (1 s, una tras otra); la fila de fotos de rubros se desvanece mientras entra la nueva; los lugares y "Libres ahora" suben como siempre.
   - **"Libres ahora":** en la compu el control va a la izquierda, al lado del título. Los botones de rubro de las dos secciones ocupan el mismo lugar y se funden: no saltan, y Barbería queda donde está Pádel. Lo mismo arriba de los resultados (el control fijo adelante, los rubros siempre arrancan en el mismo lugar). Con menos de cuatro lugares, "Libres ahora" muestra dos horarios de cada uno para llenar la fila.
@@ -566,3 +566,11 @@ Segunda vuelta, el mismo día ("sigue existiendo mucho espacio"): secciones sepa
 Tercera vuelta, el mismo día ("me vas a matar, pero quedó muy corta la página"): en vez de las tarjetitas y la sección de horarios y mapa, las **tres tarjetas anchas** con fotos de arriba (ver el punto 3 de la lista). La página de ejemplo quedó en unos 2700 px de alto en la compu, sin espacios vacíos.
 
 Cuarta vuelta ("en la compu o el celular acostado, que se agrande un poco el texto y las imágenes; en el celular parado, que quede así"): de 701 px para arriba (`@media (min-width: 701px)` en `sitio.css`) los títulos van hasta 34 px, el texto de la historia y la dirección a 18, los datos de las tarjetas a 18/15, los servicios a 16 con íconos más grandes, las tarjetas y las fotos de abajo a 1200 px de ancho, la foto de una tarjeta hasta 620 px de alto y el mapa de 400. Los servicios van en dos columnas solo si entran (container query sobre el texto de la tarjeta); si no, en una. En el celular parado (hasta 700 px) no cambia nada.
+
+## Fútbol de 5 o de 7 (26/11)
+Pedido del dueño: "no debería decir fútbol 5, debería decir fútbol y darte a elegir si querés fútbol 5 o 7". El rubro se llama **Fútbol**. El tamaño de cada cancha sale de su detalle ("Cancha 3 · Fútbol 7"; en Mi negocio, el detalle de la cancha: "Fútbol 7" o "F7"); una cancha que no lo dice entra en los dos.
+- **Buscador:** con Fútbol aparece un cuarto campo, **Cancha** ("De 5 o 7", "De 5", "De 7"). En la compu los cuatro van en una fila (letra de 14 px, Dónde un poco más ancho para que "Todas las zonas" entre); en el celular, de a dos (mide lo mismo que antes).
+- **Resultados:** botones "Fútbol 5 o 7", "Fútbol 5" y "Fútbol 7" (como "Solo techadas" en pádel); solo quedan los lugares y horarios con canchas de ese tamaño. El link `index.html?rubro=futbol&tam=7` abre los de 7.
+- **Ficha:** con un tamaño elegido, los días, los horarios y la cancha que se reserva son solo de ese tamaño; si el lugar tiene de los dos, al lado de "Horarios de…" hay un "Cancha" para cambiarlo.
+- Los de ejemplo: El Potrero (dos de 5 y una de 7), La Quinta (dos de 7) y Los Cerros (dos de 5).
+- En la página de cada negocio, las fotos que sobran de las tarjetas van abajo **hasta tres, en una sola fila** (pedido del dueño, 26/11: "la cuarta ocupa mucho espacio").
