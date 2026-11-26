@@ -279,6 +279,14 @@ const medir = () => {
       await p.toca('.menu__i[data-vista="finanzas"]'); await espera(p, 700);
       ok(await p.evaluate(() => document.querySelectorAll('.fz-k').length === 4 && !!document.querySelector('.chart .prom') && !!document.querySelector('.chart .tope-t') && !!document.querySelector('.chart .eje--hoy')), `${w} finanzas: cuatro tarjetas, la línea del promedio, el monto del mejor día y hoy marcado`);
       if (w === 1440) ok(await p.evaluate(() => document.querySelector('.fz').getBoundingClientRect().bottom <= innerHeight), `${w} finanzas: todas las tarjetas entran en la pantalla sin bajar`);
+      // la planilla de cobros se descarga en Excel (.xlsx), no en CSV (pedido del dueño, 26/11: el CSV se veía en una sola columna)
+      if (w === 1440) {
+        const [dl] = await Promise.all([p.waitForEvent('download', { timeout: 5000 }), p.click('#planilla')]);
+        const buf = require('fs').readFileSync(await dl.path()), xml = buf.toString('utf8');
+        ok(/\.xlsx$/.test(dl.suggestedFilename()) && buf.slice(0, 2).toString() === 'PK' && /<t xml:space="preserve">Monto<\/t>/.test(xml)
+          && /<c r="A5" s="2"><v>\d+<\/v><\/c>/.test(xml) && /<f>SUM\(G5:G\d+\)<\/f>/.test(xml) && /pane ySplit="4"/.test(xml),
+          `${w} finanzas: la planilla se descarga en Excel, con fechas de verdad, el encabezado fijo y el total ${dl.suggestedFilename()}`);
+      }
       await p.toca('.menu__i[data-vista="negocio"]'); await espera(p, 700);
       ok(await p.evaluate(() => { const d = [...document.querySelectorAll('#g-dur option')].map((o) => +o.value), h = [...document.querySelector('#g-hor select').options].map((o) => o.value); return d[0] === 10 && d.every((x, i) => !i || x - d[i - 1] === 10) && h.length === 144 && h[1] === '00:10'; }), `${w} mi negocio: la duración y los horarios van cada 10 minutos`);
       if (w === 1440) {

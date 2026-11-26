@@ -271,7 +271,7 @@ textos que se entiendan en cada cuadro.
 - **Finanzas en tarjetas (pedido del dueño, 19/11: "que ocupen menos espacio y se vean en una sola pantalla la mayoría",
   hecho con `anti-ui-slop` y `dataviz`).** A 1440×900 entra todo sin bajar:
   - Fila 1: **Cobrado** (8 de 12 columnas) con su gráfico adentro, "Un día promedio" y "Mejor día"; a la derecha **Últimos
-    cobros** (los 5 más nuevos, "Planilla (CSV)" y "Ver los N cobros", que abre la tabla entera a todo el ancho).
+    cobros** (los 5 más nuevos, "Planilla de Excel" (un .xlsx armado en el panel, sin librerías: título, encabezado fijo con filtros, fechas, horas y montos de verdad, total con SUMA e impresión apaisada a una hoja de ancho; pedido del dueño, 26/11, porque el CSV se veía en una sola columna) y "Ver los N cobros", que abre la tabla entera a todo el ancho).
   - Fila 2: cuatro tarjetas chicas: Señas cobradas, Turnos pagados (con la barra de ocupación), No vinieron (en naranja si hubo)
     y Falta cobrar. Fila 3: **Por cancha** y **Por horario** (nombre, barra contra la mejor, monto y su parte del total).
   - **El gráfico, para que se entienda de un vistazo:** columnas verde agua; una línea punteada con el promedio de los días con

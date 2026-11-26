@@ -1333,7 +1333,7 @@
         <section class="card fz-rep" aria-labelledby="f-t"><h2 id="f-t" class="fz-t">Por horario</h2><p class="card__sub">Según la hora en que empezó cada turno</p>${reparto(porFranja, R.cobrado)}</section>
         <section class="card fz-movs" aria-labelledby="m-t">
           <div class="fz-movs__head"><div><h2 id="m-t" class="fz-t">${FIN.todos ? "Todos los cobros" : "Últimos cobros"}</h2><p class="card__sub">${plural(movs.length, "cobro", "cobros")} en el período</p></div>
-            <button type="button" class="btn btn--line btn--sm" id="csv" ${movs.length ? "" : "disabled"}>${ico("bajar")}Planilla (CSV)</button></div>
+            <button type="button" class="btn btn--line btn--sm" id="planilla" ${movs.length ? "" : "disabled"}>${ico("bajar")}Planilla de Excel</button></div>
           ${movs.length ? (FIN.todos ? tablaMovs() : `<ul class="movs">${movs.slice(0, 5).map(movFila).join("")}</ul>`) + (movs.length > 5 ? `<p class="fz-movs__pie"><button type="button" class="link" id="mas">${FIN.todos ? "Ver menos" : `Ver los ${movs.length} cobros`}</button></p>` : "")
           : `<p class="vacio-p">Todavía no entró plata en este período. Cuando te paguen una seña o un turno, aparece acá.</p>`}
         </section>
@@ -1341,7 +1341,7 @@
     $$("[data-per]").forEach((b) => b.addEventListener("click", () => { FIN.periodo = b.dataset.per; FIN.todos = false; VISTAS.finanzas(); $(`[data-per="${FIN.periodo}"]`).focus(); }));
     animarSegs();
     const mas = $("#mas"); if (mas) mas.addEventListener("click", () => { FIN.todos = !FIN.todos; VISTAS.finanzas(); $("#mas").focus(); if (FIN.todos) $(".fz-movs").scrollIntoView({ block: "start", behavior: "smooth" }); });
-    const csv = $("#csv"); if (csv) csv.addEventListener("click", () => descargarCSV(movs, desde, hasta));
+    const planilla = $("#planilla"); if (planilla) planilla.addEventListener("click", () => descargarPlanilla(movs, desde, hasta));
     const cont = $("#chart");
     graficoBarras(cont, porDia, prom);
     if ("ResizeObserver" in window) {
@@ -1419,14 +1419,92 @@
       e.preventDefault(); mostrar(Math.max(0, Math.min(datos.length - 1, (act < 0 ? (paso > 0 ? -1 : datos.length) : act) + paso)));
     });
   };
-  const descargarCSV = (movs, desde, hasta) => {
-    const q = (t) => `"${String(t).replace(/"/g, '""')}"`;
-    const filas = [["Fecha", "Hora", "Cliente", "WhatsApp", unidad(NEG), "Concepto", "Monto"].map(q).join(";")];
-    movs.forEach((r) => filas.push([r.fecha, aHora(r.hora), r.cliente, r.wa, nombreRec(r.recurso), CONCEPTO(r), ingreso(r)].map(q).join(";")));
-    const url = URL.createObjectURL(new Blob(["﻿" + filas.join("\n")], { type: "text/csv;charset=utf-8" }));
-    const a = document.createElement("a"); a.href = url; a.download = `bookea-${NEG.slug}-${desde}-a-${hasta}.csv`;
+  // ---------- La planilla de cobros, en Excel (.xlsx) ----------
+  // Pedido del dueño (26/11): el CSV se veía todo en una columna al abrirlo en Excel. Un .xlsx es un .zip con unas
+  // hojas en XML: se arma acá mismo (sin librerías), con fechas, horas y montos de verdad (se pueden ordenar y sumar),
+  // el título, el encabezado fijo con filtros y el total al final.
+  let tablaCRC = null;
+  const zipSimple = (archivos, tipo) => {
+    const enc = new TextEncoder();
+    tablaCRC = tablaCRC || Array.from({ length: 256 }, (_, n) => { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; });
+    const crc = (b) => { let c = 0xffffffff; for (let i = 0; i < b.length; i++) c = tablaCRC[(c ^ b[i]) & 255] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; };
+    const u16 = (n) => [n & 255, (n >>> 8) & 255], u32 = (n) => [n & 255, (n >>> 8) & 255, (n >>> 16) & 255, (n >>> 24) & 255];
+    const partes = [], central = []; let pos = 0;
+    for (const [nombre, texto] of archivos) {
+      const n = enc.encode(nombre), d = enc.encode(texto);
+      // nombres en UTF-8, sin comprimir, fecha 1/1/1980
+      const medio = [...u16(0x0800), ...u16(0), ...u16(0), ...u16(0x21), ...u32(crc(d)), ...u32(d.length), ...u32(d.length), ...u16(n.length), ...u16(0)];
+      const local = Uint8Array.from([...u32(0x04034b50), ...u16(20), ...medio]);
+      central.push(Uint8Array.from([...u32(0x02014b50), ...u16(20), ...u16(20), ...medio, ...u16(0), ...u16(0), ...u16(0), ...u32(0), ...u32(pos)]), n);
+      partes.push(local, n, d); pos += local.length + n.length + d.length;
+    }
+    const tamC = central.reduce((t, b) => t + b.length, 0);
+    const fin = Uint8Array.from([...u32(0x06054b50), ...u16(0), ...u16(0), ...u16(archivos.length), ...u16(archivos.length), ...u32(tamC), ...u32(pos), ...u16(0)]);
+    return new Blob([...partes, ...central, fin], { type: tipo });
+  };
+  const xmlEsc = (t) => String(t ?? "").replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const descargarPlanilla = (movs, desde, hasta) => {
+    const NS = 'xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"', NSR = 'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
+    const XML = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
+    const col = (i) => String.fromCharCode(65 + i);
+    const dmy = (f) => String(f).split("-").reverse().join("/");
+    const serie = (f) => { const [y, m, d] = String(f).split("-").map(Number); return (Date.UTC(y, m - 1, d) - Date.UTC(1899, 11, 30)) / 864e5; };
+    const txt = (r, c, v, st = 0) => `<c r="${col(c)}${r}" t="inlineStr"${st ? ` s="${st}"` : ""}><is><t xml:space="preserve">${xmlEsc(v)}</t></is></c>`;
+    const num = (r, c, v, st) => `<c r="${col(c)}${r}" s="${st}"><v>${v}</v></c>`;
+    const fila = (r, celdas, alto) => `<row r="${r}"${alto ? ` ht="${alto}" customHeight="1"` : ""}>${celdas.join("")}</row>`;
+    // estilos: 1 encabezado, 2 fecha, 3 hora, 4 plata, 5 título, 6 bajada, 7 encabezado a la derecha, 8 "Total", 9 total en plata
+    const H = 4, ult = H + movs.length, total = movs.reduce((t, r) => t + ingreso(r), 0);
+    const cab = ["Fecha", "Hora", "Cliente", "WhatsApp", unidad(NEG), "Concepto", "Monto"];
+    const filas = [
+      fila(1, [txt(1, 0, `Cobros de ${NEG.nombre}`, 5)], 24),
+      fila(2, [txt(2, 0, `Del ${dmy(desde)} al ${dmy(hasta)} · ${plural(movs.length, "cobro", "cobros")} · descargado de Bookea`, 6)]),
+      fila(H, cab.map((t, i) => txt(H, i, t, i === 6 ? 7 : 1)), 20),
+      ...movs.map((m, k) => {
+        const r = H + 1 + k, hora = ((Number(m.hora) || 0) % 1440) / 1440;
+        return fila(r, [num(r, 0, serie(m.fecha), 2), num(r, 1, +hora.toFixed(10), 3), txt(r, 2, m.cliente || ""), txt(r, 3, m.wa || ""),
+          txt(r, 4, nombreRec(m.recurso)), txt(r, 5, CONCEPTO(m)), num(r, 6, ingreso(m), 4)]);
+      }),
+      fila(ult + 1, [txt(ult + 1, 5, "Total", 8), `<c r="G${ult + 1}" s="9"><f>SUM(G${H + 1}:G${ult})</f><v>${total}</v></c>`], 20),
+    ];
+    const anchos = [12, 8, 26, 16, 16, 26, 14].map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`).join("");
+    const hoja = `${XML}<worksheet ${NS} ${NSR}><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension ref="A1:G${ult + 1}"/>`
+      + `<sheetViews><sheetView workbookViewId="0"><pane ySplit="${H}" topLeftCell="A${H + 1}" activePane="bottomLeft" state="frozen"/><selection pane="bottomLeft" activeCell="A${H + 1}" sqref="A${H + 1}"/></sheetView></sheetViews>`
+      + `<sheetFormatPr defaultRowHeight="15"/><cols>${anchos}</cols><sheetData>${filas.join("")}</sheetData>`
+      + `<autoFilter ref="A${H}:G${ult}"/><pageMargins left="0.5" right="0.5" top="0.6" bottom="0.6" header="0.3" footer="0.3"/><pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="0"/></worksheet>`;
+    const fuente = (extra = "", tam = 11, color = "") => `<font>${extra}<sz val="${tam}"/>${color ? `<color rgb="${color}"/>` : ""}<name val="Calibri"/><family val="2"/></font>`;
+    const xf = (num, font, fill, border, extra = "", alin = "") => `<xf numFmtId="${num}" fontId="${font}" fillId="${fill}" borderId="${border}" xfId="0"${extra}${alin ? ` applyAlignment="1"><alignment horizontal="${alin}"/></xf>` : "/>"}`;
+    const estilos = `${XML}<styleSheet ${NS}>`
+      + `<numFmts count="3"><numFmt numFmtId="164" formatCode="dd/mm/yyyy"/><numFmt numFmtId="165" formatCode="hh:mm"/><numFmt numFmtId="166" formatCode="&quot;$ &quot;#,##0"/></numFmts>`
+      + `<fonts count="4">${fuente()}${fuente("<b/>")}${fuente("<b/>", 14)}${fuente("", 10, "FF6F6F6F")}</fonts>`
+      + `<fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF2F2F2"/><bgColor indexed="64"/></patternFill></fill></fills>`
+      + `<borders count="3"><border><left/><right/><top/><bottom/><diagonal/></border><border><left/><right/><top/><bottom style="thin"><color rgb="FFBFBFBF"/></bottom><diagonal/></border><border><left/><right/><top style="thin"><color rgb="FF151515"/></top><bottom/><diagonal/></border></borders>`
+      + `<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="10">`
+      + xf(0, 0, 0, 0)
+      + xf(0, 1, 2, 1, ' applyFont="1" applyFill="1" applyBorder="1"')
+      + xf(164, 0, 0, 0, ' applyNumberFormat="1"', "left")
+      + xf(165, 0, 0, 0, ' applyNumberFormat="1"', "left")
+      + xf(166, 0, 0, 0, ' applyNumberFormat="1"')
+      + xf(0, 2, 0, 0, ' applyFont="1"')
+      + xf(0, 3, 0, 0, ' applyFont="1"')
+      + xf(0, 1, 2, 1, ' applyFont="1" applyFill="1" applyBorder="1"', "right")
+      + xf(0, 1, 0, 2, ' applyFont="1" applyBorder="1"', "right")
+      + xf(166, 1, 0, 2, ' applyNumberFormat="1" applyFont="1" applyBorder="1"')
+      + `</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
+    const T = "application/vnd.openxmlformats-officedocument";
+    const blob = zipSimple([
+      ["[Content_Types].xml", `${XML}<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="${T}.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>`
+        + `<Override PartName="/xl/workbook.xml" ContentType="${T}.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="${T}.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="${T}.spreadsheetml.styles+xml"/></Types>`],
+      ["_rels/.rels", `${XML}<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`],
+      ["xl/workbook.xml", `${XML}<workbook ${NS} ${NSR}><bookViews><workbookView/></bookViews><sheets><sheet name="Cobros" sheetId="1" r:id="rId1"/></sheets>`
+        + `<definedNames><definedName name="_xlnm._FilterDatabase" localSheetId="0" hidden="1">Cobros!$A$${H}:$G$${ult}</definedName><definedName name="_xlnm.Print_Titles" localSheetId="0">Cobros!$${H}:$${H}</definedName></definedNames></workbook>`],
+      ["xl/_rels/workbook.xml.rels", `${XML}<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`],
+      ["xl/worksheets/sheet1.xml", hoja],
+      ["xl/styles.xml", estilos],
+    ], `${T}.spreadsheetml.sheet`);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = `bookea-${NEG.slug}-${desde}-a-${hasta}.xlsx`;
     document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
-    aviso("Planilla descargada.");
+    aviso("Planilla de Excel descargada.");
   };
 
   // ---------- Clientes ----------
