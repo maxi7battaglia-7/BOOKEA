@@ -14,7 +14,7 @@
   <link rel="icon" href="marca/isotipo-32.png" sizes="32x32" type="image/png" />
   <link rel="apple-touch-icon" href="marca/isotipo-192.png" />
   <link rel="preload" href="assets/fuentes/inter-tight.woff2" as="font" type="font/woff2" crossorigin />
-  <link rel="stylesheet" href="sitio.css?v=33" />
+  <link rel="stylesheet" href="sitio.css?v=34" />
 </head>
 <body>
   <script>document.documentElement.classList.add("js");</script>
@@ -133,7 +133,8 @@
               <div class="frow">
                 <label class="ff" id="f-tam-l" hidden><span>Cancha</span><select id="f-tam"><option value="">De 5 o 7</option><option value="5">De 5</option><option value="7">De 7</option></select></label>
                 <label class="ff"><span>Dónde</span><select id="f-zona"></select></label>
-                <label class="ff"><span>Cuándo</span><select id="f-dia"></select></label>
+                <div class="ff-cal"><button type="button" class="ff ff__btn" id="f-dia" data-act="cal-abrir" aria-haspopup="dialog" aria-expanded="false" aria-controls="f-cal"><span>Cuándo</span><span class="ff__v"><span id="f-dia-t">Hoy</span><svg class="icon" aria-hidden="true"><use href="#i-cal"/></svg></span></button>
+                  <div class="cal" id="f-cal" role="dialog" aria-label="Elegí el día" hidden></div></div>
                 <label class="ff"><span>Hora</span><select id="f-franja"></select></label>
               </div>
               <button type="submit" class="btn btn--primary btn--lg btn--block">Buscar turnos</button>
@@ -398,9 +399,9 @@
   <dialog id="dlg"><h2 id="dlg-t"></h2><p id="dlg-p"></p><div class="row"><button class="btn btn--line" type="button" id="dlg-no">Volver</button><button class="btn btn--primary" type="button" id="dlg-si">Confirmar</button></div></dialog>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-  <script src="config.js?v=33"></script>
-  <script src="cuenta.js?v=33"></script>
-  <script src="sitio.js?v=33"></script>
-  <script src="toque.js?v=33"></script>
+  <script src="config.js?v=34"></script>
+  <script src="cuenta.js?v=34"></script>
+  <script src="sitio.js?v=34"></script>
+  <script src="toque.js?v=34"></script>
 </body>
 </html>

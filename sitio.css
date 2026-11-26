@@ -132,7 +132,29 @@ h1, h2, h3 { font-weight: 600; letter-spacing: -.03em; line-height: 1.05; text-w
 .ff[hidden] { display: none; }
 .ff { display: block; border: 1px solid var(--ink-200); border-radius: var(--r-m); padding: 9px 12px 8px; background: var(--paper); transition: border-color .18s; }
 .ff:focus-within { border-color: var(--ink-900); }
-.ff span { display: block; font: 500 11px/1.2 var(--f-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-500); margin-bottom: 3px; }
+/* "Cuándo": un botón que abre un calendario con los días que se pueden reservar (pedido del dueño, 26/11) */
+.ff-cal { position: relative; min-width: 0; }
+.ff__btn { width: 100%; height: 100%; color: inherit; font: inherit; text-align: left; cursor: pointer; outline: none; }
+.ff__v { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--ink-900); font-size: 15px; font-weight: 500; white-space: nowrap; }
+.ff__v > span { overflow: hidden; text-overflow: ellipsis; }
+.ff__v .icon { flex: none; width: 16px; height: 16px; color: var(--ink-500); }
+.frow.con-tam .ff__v { font-size: 14px; }
+.cal { position: absolute; z-index: 40; top: calc(100% + 8px); left: -1px; width: 300px; max-width: calc(100vw - 32px); padding: 12px 12px 14px; border: 1px solid var(--ink-200); border-radius: var(--r-l); background: var(--paper); box-shadow: var(--shadow-l); }
+.cal[hidden] { display: none; }
+.cal__head { padding: 2px 4px 8px; }
+.cal__head b { font-size: 15px; font-weight: 600; letter-spacing: -.01em; }
+.cal__grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
+.cal__dow { padding: 4px 0 6px; text-align: center; font: 500 11px var(--f-mono); letter-spacing: .04em; text-transform: uppercase; color: var(--ink-500); }
+.cal__d { display: grid; place-items: center; height: 40px; border: 0; border-radius: 10px; background: none; color: var(--ink-300); font: 500 14px var(--f-sans); font-variant-numeric: tabular-nums; }
+button.cal__d { color: var(--ink-900); cursor: pointer; transition: background-color .15s ease; }
+span.cal__d.is-afuera { color: var(--ink-200); }
+.cal__d.is-hoy { box-shadow: inset 0 0 0 1px var(--ink-300); }
+.cal__d.is-on { background: var(--accent); color: #fff; box-shadow: none; }
+.cal__nota { margin-top: 10px; font-size: 12.5px; line-height: 1.4; color: var(--ink-500); }
+@media (hover: hover) and (pointer: fine) {
+  button.cal__d:not(.is-on):hover { background: var(--ink-100); }
+}
+.ff > span:first-child { display: block; font: 500 11px/1.2 var(--f-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-500); margin-bottom: 3px; }
 .ff select, .ff input { width: 100%; border: 0; background: transparent; padding: 0; font-size: 15px; font-weight: 500; outline: none; appearance: none; -webkit-appearance: none; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") right center / 16px no-repeat; padding-right: 18px; text-overflow: ellipsis; }
 .finder__note { margin-top: 12px; font-size: 13px; color: var(--ink-500); text-align: center; }
 .collage { display: none; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 14px; height: min(560px, 46vw); }

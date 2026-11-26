@@ -40,6 +40,8 @@
   // ---------- Fotos (assets/) ----------
   // Rutas enteras (no armadas): así la copia sin internet (scripts/sin-internet.py) las encuentra y las mete adentro
   const IMG = { padel: "assets/r-padel.webp", futbol: "assets/r-futbol.webp", tenis: "assets/r-tenis.webp", barberia: "assets/r-barberia.webp",
+    // pádel: las fotos del dueño (sin la franja de sponsors) mezcladas con las que ya había (pedido del dueño, 26/11)
+    saque: "assets/p-saque.webp", reves: "assets/p-reves.webp", salto: "assets/p-salto.webp", espera: "assets/p-espera.webp", padel2: "assets/m-padel-juego.webp",
     canchas: "assets/m-padel-canchas.webp", paletas: "assets/m-paletas.webp", tenis2: "assets/m-tenis.webp", futbolnoche: "assets/m-futbol-noche.webp",
     barbero: "assets/m-barbero.webp", peine: "assets/m-barberia-peine.webp" };
   const img = (k, alt = "", extra = "") => `<img src="${IMG[k] || ""}" alt="${esc(alt)}" ${extra}/>`;
@@ -106,10 +108,10 @@
   const REG = { "Valle de Uco": ["tunuyan", "tupungato", "san-carlos"] };
   const AM = { vest: "Vestuarios", est: "Estacionamiento", palas: "Alquiler de paletas", buf: "Buffet", led: "Iluminación LED", cesped: "Césped sintético", luz: "Iluminación nocturna", parr: "Parrilla", polvo: "Polvo de ladrillo", raq: "Alquiler de raquetas", wifi: "Wi-Fi", mate: "Café y mate", qr: "Pago con QR", aire: "Aire acondicionado", cuen: "Mercado Pago", tv: "TV y música", duchas: "Duchas", clases: "Clases", torneos: "Torneos", cumple: "Cumpleaños", pileta: "Pileta", quincho: "Quincho" };
   const VENUES = [
-    { id: "losalamos", rubro: "padel", name: "Los Álamos", zona: "tupungato", fotos: ["canchas", "padel", "paletas"], dur: 90, bloques: [["17:00", "24:30"]], units: cs(3, [3]), p: P(28000, 34000, 36000), ocup: 34, cancel: 6, desc: "Tres canchas de cristal, una de ellas techada. Turnos de 90 minutos para jugar entre amigos o en pareja.", ame: ["vest", "est", "palas", "buf", "led"] },
-    { id: "aconcagua", rubro: "padel", name: "Aconcagua Pádel Club", zona: "tunuyan", fotos: ["padel", "paletas", "canchas"], dur: 90, bloques: [["15:00", "24:00"]], units: cs(4, [1, 2]), p: P(30000, 36000, 38000), ocup: 42, cancel: 12, desc: "Cuatro canchas con fácil acceso, dos de ellas techadas. Ideal para jugar después de la oficina.", ame: ["vest", "palas", "buf", "led", "tv"] },
-    { id: "terraza", rubro: "padel", name: "La Terraza Pádel", zona: "san-carlos", fotos: ["paletas", "canchas", "padel"], dur: 90, bloques: [["17:00", "24:30"]], units: cs(2), p: P(24000, 30000, 32000), ocup: 30, cancel: 6, desc: "Dos canchas al aire libre con buena luz de noche. Turnos de 90 minutos todos los días.", ame: ["vest", "est", "buf", "led"] },
-    { id: "valleuco", rubro: "padel", name: "Valle de Uco Pádel", zona: "tunuyan", fotos: ["canchas", "paletas", "padel"], dur: 90, bloques: [["16:00", "23:30"]], units: cs(2, [1, 2]), p: P(22000, 28000, 30000), ocup: 28, cancel: 6, desc: "Dos canchas techadas para jugar con cualquier clima, con la cordillera de fondo.", ame: ["vest", "est", "palas", "mate"] },
+    { id: "losalamos", rubro: "padel", name: "Los Álamos", zona: "tupungato", fotos: ["saque", "reves", "salto"], dur: 90, bloques: [["17:00", "24:30"]], units: cs(3, [3]), p: P(28000, 34000, 36000), ocup: 34, cancel: 6, desc: "Tres canchas de cristal, una de ellas techada. Turnos de 90 minutos para jugar entre amigos o en pareja.", ame: ["vest", "est", "palas", "buf", "led"] },
+    { id: "aconcagua", rubro: "padel", name: "Aconcagua Pádel Club", zona: "tunuyan", fotos: ["canchas", "espera", "padel2"], dur: 90, bloques: [["15:00", "24:00"]], units: cs(4, [1, 2]), p: P(30000, 36000, 38000), ocup: 42, cancel: 12, desc: "Cuatro canchas con fácil acceso, dos de ellas techadas. Ideal para jugar después de la oficina.", ame: ["vest", "palas", "buf", "led", "tv"] },
+    { id: "terraza", rubro: "padel", name: "La Terraza Pádel", zona: "san-carlos", fotos: ["paletas", "salto", "canchas"], dur: 90, bloques: [["17:00", "24:30"]], units: cs(2), p: P(24000, 30000, 32000), ocup: 30, cancel: 6, desc: "Dos canchas al aire libre con buena luz de noche. Turnos de 90 minutos todos los días.", ame: ["vest", "est", "buf", "led"] },
+    { id: "valleuco", rubro: "padel", name: "Valle de Uco Pádel", zona: "tunuyan", fotos: ["padel2", "reves", "espera"], dur: 90, bloques: [["16:00", "23:30"]], units: cs(2, [1, 2]), p: P(22000, 28000, 30000), ocup: 28, cancel: 6, desc: "Dos canchas techadas para jugar con cualquier clima, con la cordillera de fondo.", ame: ["vest", "est", "palas", "mate"] },
     { id: "potrero", rubro: "futbol", name: "El Potrero Fútbol", zona: "tunuyan", fotos: ["futbol", "futbolnoche"], dur: 60, bloques: [["18:00", "24:00"]], units: cf(5, 5, 7), p: P(38000, 48000, 52000), ocup: 40, cancel: 12, desc: "Dos canchas de fútbol 5 y una de fútbol 7, de césped sintético con luz. El precio es por cancha, para el equipo completo, en turnos de 60 minutos.", ame: ["cesped", "luz", "vest", "est", "buf"] },
     { id: "laquinta", rubro: "futbol", name: "La Quinta Fútbol", zona: "tupungato", fotos: ["futbolnoche", "futbol"], dur: 60, bloques: [["18:00", "24:00"]], units: cf(7, 7), p: P(34000, 44000, 46000), ocup: 36, cancel: 6, desc: "Dos canchas de fútbol 7 con parrilla para el tercer tiempo. El precio es por cancha.", ame: ["cesped", "luz", "parr", "vest"] },
     { id: "loscerros", rubro: "futbol", name: "Complejo Los Cerros", zona: "san-carlos", fotos: ["futbol", "futbolnoche"], dur: 60, bloques: [["18:00", "24:00"]], units: cf(5, 5), p: P(30000, 40000, 42000), ocup: 30, cancel: 6, desc: "Complejo en San Carlos con dos canchas de fútbol 5. El precio es por cancha.", ame: ["cesped", "luz", "est", "buf"] },
@@ -423,7 +425,7 @@
     if (cambia) { fr.classList.remove("rubros--entra"); void fr.offsetWidth; fr.classList.add("rubros--entra"); }
     pintarSecs();
     $("#f-zona").innerHTML = zonaOpts(S.rubro); $("#f-zona").value = S.zona;
-    $("#f-dia").innerHTML = Array.from({ length: 7 }, (_, i) => `<option value="${i}">${dayFull(i)}</option>`).join(""); $("#f-dia").value = S.dia;
+    $("#f-dia-t").textContent = dayFull(S.dia); abrirCal(false);
     $("#f-franja").innerHTML = franjaOpts(S.rubro); $("#f-franja").value = S.franja;
     const tamL = $("#f-tam-l"), conTam = S.rubro === "futbol";
     if (tamL) { tamL.hidden = !conTam; tamL.parentElement.classList.toggle("con-tam", conTam); $("#f-tam").value = S.tam; }
@@ -494,6 +496,52 @@
       <span class="now__name">${esc(v.name)}</span><span class="vcard__z">${ZONAS[v.zona]}</span>
       <span class="now__meta"><span><span class="dot"></span>${quedan(s, v)}</span><b class="mono" style="font-weight:500">${money(precioDe(sv, di, s.start))}</b></span></button>`;
   };
+
+  // ---------- Calendario de "Cuándo" (pedido del dueño, 26/11) ----------
+  // Se abre al tocar el campo y muestra el mes; se pueden elegir hoy y los 6 días siguientes (los que tienen turnos en
+  // los resultados y en la ficha), siempre a la vista; los demás se ven apagados. Con el teclado: flechas y Escape.
+  const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+  const diaUTC = (key) => { const [y, m, d] = key.split("-").map(Number); return Date.UTC(y, m - 1, d); };
+  // El mes de hoy, de lunes a domingo, y si los 7 días pasan al mes siguiente, también esa semana: siempre se ven todos
+  function pintarCal() {
+    const cal = $("#f-cal");
+    if (!cal || cal.hidden) return;
+    const DIA = 864e5, hoy = diaUTC(dayInfo(0).key), fin = hoy + 6 * DIA, h = new Date(hoy), y = h.getUTCFullYear(), m = h.getUTCMonth();
+    const primero = Date.UTC(y, m, 1), tope = Math.max(Date.UTC(y, m + 1, 0), fin);
+    const desde = primero - ((new Date(primero).getUTCDay() + 6) % 7) * DIA, hasta = tope + ((7 - new Date(tope).getUTCDay()) % 7) * DIA;
+    const celdas = [];
+    for (let t = desde; t <= hasta; t += DIA) {
+      const dt = new Date(t), i = Math.round((t - hoy) / DIA), afuera = dt.getUTCMonth() !== m ? " is-afuera" : "";
+      celdas.push(i >= 0 && i <= 6
+        ? `<button type="button" class="cal__d${afuera}${i === S.dia ? " is-on" : ""}${i === 0 ? " is-hoy" : ""}" data-act="cal-dia" data-i="${i}" aria-pressed="${i === S.dia}" aria-label="${dayFull(i)}">${dt.getUTCDate()}</button>`
+        : `<span class="cal__d${afuera}" aria-hidden="true">${dt.getUTCDate()}</span>`);
+    }
+    const f = new Date(fin), m2 = f.getUTCMonth(), y2 = f.getUTCFullYear(), ult = dayInfo(6);
+    const titulo = m2 === m ? `${cap(MESES[m])} ${y}` : y2 === y ? `${cap(MESES[m])} y ${MESES[m2]} ${y}` : `${cap(MESES[m])} ${y} y ${MESES[m2]} ${y2}`;
+    cal.innerHTML = `<p class="cal__head"><b>${titulo}</b></p>
+      <div class="cal__grid">${["lu", "ma", "mi", "ju", "vi", "sá", "do"].map((x) => `<span class="cal__dow" aria-hidden="true">${x}</span>`).join("")}${celdas.join("")}</div>
+      <p class="cal__nota">Hay turnos para reservar hasta el ${DOWL[ult.dow]} ${ult.d}/${ult.m}.</p>`;
+  }
+  function abrirCal(abrir) {
+    const cal = $("#f-cal"), b = $("#f-dia");
+    if (!cal || !b || cal.hidden === !abrir) return;
+    cal.hidden = !abrir; b.setAttribute("aria-expanded", String(abrir));
+    if (abrir) { pintarCal(); const on = $(".cal__d.is-on", cal); on && on.focus(); }
+  }
+  // se cierra al tocar afuera (antes que el resto de los clics: el calendario se vuelve a dibujar) o al salir con Tab
+  document.addEventListener("click", (e) => { const cal = $("#f-cal"); if (cal && !cal.hidden && !e.target.closest(".ff-cal")) abrirCal(false); }, true);
+  document.addEventListener("focusout", (e) => { const w = e.target.closest && e.target.closest(".ff-cal"); if (w && e.relatedTarget && !w.contains(e.relatedTarget)) abrirCal(false); });
+  document.addEventListener("keydown", (e) => {
+    const cal = $("#f-cal");
+    if (!cal || cal.hidden) return;
+    if (e.key === "Escape") { e.preventDefault(); abrirCal(false); $("#f-dia").focus(); return; }
+    const paso = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 }[e.key], b = e.target.closest && e.target.closest(".cal__d[data-i]");
+    if (!paso || !b) return;
+    e.preventDefault();
+    const i = +b.dataset.i + paso;
+    if (i < 0 || i > 6) return;
+    const x = $(`.cal__d[data-i="${i}"]`, cal); x && x.focus();
+  });
 
   // ---------- Resultados: lugares con preview de horarios ----------
   function renderResultados() { listaResultados(); revelar($("#r-list")); }
@@ -1251,6 +1299,8 @@
         case "hs": S.hs = d.k; renderDestacados(); break;
         case "sec": elegirSeccion(d.k); break;
         case "dia-h": S.dia = +d.i; refrescar(); break;
+        case "cal-abrir": abrirCal($("#f-cal").hidden); break;
+        case "cal-dia": S.dia = +d.i; $("#f-dia-t").textContent = dayFull(S.dia); abrirCal(false); $("#f-dia").focus(); break;
         case "franja-h": S.franja = d.k; refrescar(); break;
         case "zona-h": S.zona = d.k; refrescar(); break;
         case "techada-h": S.techada = !S.techada; refrescar(); break;
@@ -1326,7 +1376,6 @@
   });
   document.addEventListener("change", (e) => { if (e.target.id === "r-zona") { S.zona = e.target.value; renderResultados(); }
     if (e.target.id === "f-zona") S.zona = e.target.value;
-    if (e.target.id === "f-dia") S.dia = +e.target.value;
     if (e.target.id === "f-franja") S.franja = e.target.value; if (e.target.id === "f-svc") { S.f.svc = e.target.value; renderBook(); }
     if (e.target.id === "f-tam") S.tam = e.target.value;
     if (e.target.id === "b-tam") { S.tam = e.target.value; renderBook(); } });

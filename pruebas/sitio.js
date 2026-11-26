@@ -98,7 +98,11 @@ const medir = () => {
       await p.toca('#f-rubros .rubro[data-k="futbol"]'); await espera(p, 200);
       ok((await p.getAttribute('#f-rubros .rubro[data-k="futbol"]', 'aria-pressed')) === 'true' && (await p.getAttribute('#f-rubros .rubro[data-k="padel"]', 'aria-pressed')) === 'false'
         && (await p.textContent('#f-rubros .rubro[data-k="futbol"] .rubro__n')) === 'Fútbol' && await p.isVisible('#f-tam-l'), `${w} inicio: tocar Fútbol lo marca y aparece "Cancha" para elegir de 5 o de 7`);
-      await p.selectOption('#f-tam', '7'); await p.selectOption('#f-zona', 'tunuyan'); await p.selectOption('#f-dia', '1'); await p.selectOption('#f-franja', 'noche');
+      await p.selectOption('#f-tam', '7'); await p.selectOption('#f-zona', 'tunuyan'); await p.toca('#f-dia'); await espera(p, 150);
+      ok(await p.isVisible('#f-cal') && (await p.locator('#f-cal button.cal__d').count()) === 7 && (await p.getAttribute('#f-cal .cal__d.is-on', 'data-i')) === '0' && /Hoy/.test(await p.getAttribute('#f-cal .cal__d.is-on', 'aria-label')),
+        `${w} buscador: "Cuándo" abre un calendario con los 7 días que se pueden reservar (hoy marcado)`);
+      await p.toca('#f-cal [data-i="1"]'); await espera(p, 150);
+      ok(!(await p.isVisible('#f-cal')) && /^Mañana/.test(await p.textContent('#f-dia-t')), `${w} buscador: al tocar un día se cierra y "Cuándo" dice "Mañana"`); await p.selectOption('#f-franja', 'noche');
       await p.toca('#finder button[type=submit]'); await espera(p);
       ok((await p.pagina()) === 'resultados' && (await p.textContent('#r-t')) === 'Turnos de fútbol en Tunuyán' && /mañana/i.test(await p.textContent('#r-s')) && /noche/.test(await p.textContent('#r-s')), `${w} buscar: resultados de fútbol en Tunuyán, mañana a la noche`);
       ok(JSON.stringify(await p.$$eval('#r-list .rcard h3', (l) => l.map((h) => h.textContent))) === '["El Potrero Fútbol"]' && (await p.getAttribute('#r-rubros [data-act="tam-h"][data-k="7"]', 'aria-pressed')) === 'true',
