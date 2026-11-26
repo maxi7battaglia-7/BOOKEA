@@ -358,6 +358,8 @@
     };
   };
   const store = NUBE ? window.BookeaNube.crear(CONFIG) : almacenLocal();
+  // El motivo de un error, para mostrar: el mensaje y, si no lo conocemos, lo que dijo la base (para saber qué pasó)
+  const motivo = (r) => esc(MENSAJES[r.error] || MENSAJES.otro) + ((r.error === "otro" || r.error === "falta-base") && r.detalle ? ` <small class="err-det">(${esc(String(r.detalle).slice(0, 160))})</small>` : "");
 
   const MENSAJES = {
     credenciales: "El email o la contraseña no coinciden.",
@@ -381,6 +383,8 @@
     "email-no-autorizado": "Por ahora Bookea no puede mandar mails a esa dirección. Probá con otro email o volvé a intentar en unos días.",
     sesion: "Tu sesión venció. Volvé a ingresar.",
     otro: "Algo salió mal. Probá de nuevo en un rato.",
+    "falta-base": "Falta actualizar la base de Bookea: hay que correr de nuevo esquema.sql en Supabase.",
+    "no-existe": "Ese negocio ya no está en Bookea.",
   };
   const ocupado = (btn, si, txt) => {
     if (si) { btn.dataset.txt = btn.textContent; btn.textContent = txt; btn.disabled = true; btn.setAttribute("aria-busy", "true"); }
@@ -1816,7 +1820,7 @@
       n.pagina = nueva;
       estadoMsg("", "Guardando…");
       const r = otro ? await store.guardarPaginaDe(n.id, nueva) : await sincronizar();
-      if (!r.ok) { n.pagina = antes; estadoMsg("err", "No se pudo guardar. " + esc(MENSAJES[r.error] || MENSAJES.otro)); return false; }
+      if (!r.ok) { n.pagina = antes; estadoMsg("err", "No se pudo guardar. " + motivo(r)); return false; }
       // modo de prueba: si una foto no entró en el navegador, se avisa
       const ultima = [nueva.portada, nueva.logo, ...nueva.galeria].filter(Boolean).pop();
       if (store.modo === "local" && ultima && local.get(CLAVE) && !local.get(CLAVE).includes(ultima.slice(-40))) aviso("No entró la foto en este navegador. Probá con una más chica.");
@@ -1838,7 +1842,7 @@
       let blob;
       try { blob = await achicarImagen(archivo, MAX[tipo], tipo === "logo"); } catch { err.textContent = "No pudimos abrir esa imagen. Probá con otra."; err.hidden = false; return ""; }
       const r = await store.subirFoto(blob, tipo, otro ? n.id : undefined);
-      if (!r.ok) { err.textContent = "No se pudo subir la foto. " + (MENSAJES[r.error] || MENSAJES.otro); err.hidden = false; return ""; }
+      if (!r.ok) { err.innerHTML = "No se pudo subir la foto. " + motivo(r); err.hidden = false; return ""; }
       return r.url;
     };
     const cambiarFoto = (tipo) => async (e) => {

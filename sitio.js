@@ -651,12 +651,20 @@
   // del lugar a toda la pantalla, que baja más despacio al bajar; abajo, tarjetas sutiles con lo que tiene el lugar
   // (cuántas canchas, turnos, horarios, dónde queda y cada servicio: pileta, vestuarios…), sin decir "Características";
   // su historia, la galería, los horarios con el día de hoy marcado, el mapa y al final el botón para reservar.
+  // Compacta (26/11): menos aire, horarios y mapa en una sola sección, y el cierre como una franja chica.
   function renderLocal(st) {
     const v = venue(st.v), R = RUBROS[v.rubro], pg = paginaDe(v);
     const logo = pg.logo || (v.real ? IMG[v.id] || "" : "");
     const maps = v.real ? comoLlegar(v) : "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(`${ZONAS[v.zona]}, Mendoza`);
     const mapa = mapaDe(v), ciudad = v.real && v.ciudad ? v.ciudad : ZONAS[v.zona];
     const semana = semanaDe(v), hoy = semana.find((x) => x.hoy) || semana[0];
+    // los días seguidos que abren igual van en una fila ("Lunes a viernes", "Sábado y domingo", "Todos los días");
+    // hoy se marca solo si hay más de una fila
+    const tramos = [];
+    semana.forEach((x) => { const u = tramos[tramos.length - 1]; if (u && u.t === x.t) u.dias.push(x); else tramos.push({ t: x.t, dias: [x] }); });
+    const nomTramo = (ds) => (ds.length === 7 ? "Todos los días" : ds.length === 1 ? ds[0].d : `${ds[0].d} ${ds.length === 2 ? "y" : "a"} ${ds[ds.length - 1].d.toLowerCase()}`);
+    const filaHor = ({ t, dias }) => { const h = tramos.length > 1 && dias.some((x) => x.hoy);
+      return `<tr${h ? ' class="is-hoy"' : ""}><th scope="row">${nomTramo(dias)}${h ? `<span class="loc__hoy">Hoy</span>` : ""}</th><td>${esc(t)}</td></tr>`; };
     const icono = (n) => `<svg class="icon" aria-hidden="true"><use href="#i-${n}"/></svg>`;
     const redes = [
       pg.whatsapp && waDe(pg.whatsapp) ? ["wa", pg.whatsapp, waDe(pg.whatsapp), "WhatsApp"] : null,
@@ -709,26 +717,28 @@
           ${gal.length ? `<section class="loc__sec" aria-labelledby="loc-fotos"><h2 id="loc-fotos">Galería</h2>
             <div class="loc__gal n${gal.length}">${gal.map((u, i) => `<figure><img src="${esc(u)}" alt="Foto ${i + 1} de ${esc(v.name)}" loading="lazy" /></figure>`).join("")}</div>
           </section>` : ""}
-          <section class="loc__sec" aria-labelledby="loc-hor">
-            <h2 id="loc-hor">Horarios</h2>
-            <table class="loc__hor"><caption class="sr-only">Horarios de ${esc(v.name)}</caption><tbody>${semana.map((x) => `<tr${x.hoy ? ' class="is-hoy"' : ""}><th scope="row">${x.d}</th><td>${esc(x.t)}</td><td>${x.hoy ? `<span class="loc__hoy">Hoy</span>` : ""}</td></tr>`).join("")}</tbody></table>
+          <section class="loc__sec" aria-labelledby="loc-ubi">
+            <h2 id="loc-ubi">Horarios y ubicación</h2>
+            <div class="loc__visita${mapa ? "" : " sin-mapa"}">
+              <div class="loc__info">
+                <div><h3>Horarios</h3>
+                  <table class="loc__hor"><caption class="sr-only">Horarios de ${esc(v.name)}</caption><tbody>${tramos.map(filaHor).join("")}</tbody></table></div>
+                <div><h3>Dónde estamos</h3>
+                  <p class="loc__dir">${esc(dir)}${v.real ? "" : ". Ubicación aproximada: es un negocio de ejemplo."}</p>
+                  ${maps || redes.length ? `<ul class="loc__acc" aria-label="Cómo llegar, redes y contacto">${maps ? `<li><a href="${esc(maps)}" target="_blank" rel="noopener">${icono("pin")}<span>Cómo llegar</span></a></li>` : ""}${redes.map(([i, t, h]) => `<li><a href="${esc(h)}" target="_blank" rel="noopener">${icono(i)}<span>${esc(t)}</span></a></li>`).join("")}</ul>` : ""}</div>
+              </div>
+              ${mapa ? `<div class="loc__mapa"><iframe title="Mapa: dónde queda ${esc(v.name)}" src="${esc(mapa)}" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe></div>` : ""}
+            </div>
           </section>
-          <section class="loc__sec loc__ubi" aria-labelledby="loc-ubi">
-            <h2 id="loc-ubi">Dónde estamos</h2>
-            <p class="loc__bajada">${esc(dir)}${v.real ? "" : ". Ubicación aproximada: es un negocio de ejemplo."}</p>
-            ${mapa ? `<div class="loc__mapa"><iframe title="Mapa: dónde queda ${esc(v.name)}" src="${esc(mapa)}" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe></div>` : ""}
-            ${maps ? `<p class="loc__ubi-acc"><a class="loc__btn loc__btn--linea" href="${esc(maps)}" target="_blank" rel="noopener">Cómo llegar</a></p>` : ""}
-            ${redes.length ? `<ul class="loc__redes" aria-label="Redes y contacto">${redes.map(([i, t, h]) => `<li><a href="${esc(h)}" target="_blank" rel="noopener">${icono(i)}<span>${esc(t)}</span></a></li>`).join("")}</ul>` : ""}
+          <section class="loc__fin${fotoFin ? " has-foto" : ""}" aria-labelledby="loc-fin">
+            ${fotoFin ? `<img class="loc__bg" src="${esc(fotoFin)}" alt="" loading="lazy" />` : ""}
+            <div class="loc__fin-in">
+              <div><h2 id="loc-fin">Reservá tu turno en ${esc(v.name)}</h2>
+                <p>Elegís el día y el horario, y te llega la confirmación por mail.</p></div>
+              <button type="button" class="loc__btn loc__btn--claro" data-act="ficha" data-v="${v.id}">Reservar turno</button>
+            </div>
           </section>
         </div>
-        <section class="loc__fin${fotoFin ? " has-foto" : ""}" aria-labelledby="loc-fin">
-          ${fotoFin ? `<img class="loc__bg" src="${esc(fotoFin)}" alt="" loading="lazy" />` : ""}
-          <div class="wrap loc__fin-in">
-            <h2 id="loc-fin">Reservá tu turno en ${esc(v.name)}</h2>
-            <p>Elegís el día y el horario, y te llega la confirmación por mail.</p>
-            <button type="button" class="loc__btn loc__btn--claro loc__btn--grande" data-act="ficha" data-v="${v.id}">Reservar turno</button>
-          </div>
-        </section>
         <footer class="loc__pie"><div class="wrap"><a href="#" data-go="home">Reservas online con ${B}<b>Bookea</b></a></div></footer>
       </div>`;
     const desc = document.querySelector('meta[name="description"]');

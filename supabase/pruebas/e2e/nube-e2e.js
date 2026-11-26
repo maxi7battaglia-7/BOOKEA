@@ -538,6 +538,19 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
     await f4.waitForFunction(() => document.querySelector('.page:not([hidden])').dataset.page === 'local', null, { timeout: 8000 }).catch(() => {});
     const loc2 = await f4.textContent('#local-root');
     ok(/Cargada por Bookea/.test(loc2) && /Pileta/.test(loc2) && (await f4.locator('.loc__gal img').count()) === 1, 'la página del negocio muestra lo que cargó el equipo de Bookea');
+    // horarios: los días seguidos que abren igual van en una sola fila, y se marca la de hoy (pedido del dueño, 26/11)
+    await sql(`with x as (update negocios set ajustes = jsonb_set(ajustes, '{horario}', (select jsonb_agg(case
+        when d = 0 then jsonb_build_object('abre', '08:00', 'cierra', '23:00', 'cerrado', true)
+        when d = 6 then jsonb_build_object('abre', '09:00', 'cierra', '20:00', 'cerrado', false)
+        else jsonb_build_object('abre', '08:00', 'cierra', '23:00', 'cerrado', false) end order by d) from generate_series(0, 6) d))
+      where slug = 'losalamospadel' returning 1) select count(*) from x`);
+    const dowHoy = await sql("select to_json(extract(dow from (now() at time zone 'America/Argentina/Mendoza'))::int)");
+    await f4.goto('http://localhost:8787/losalamospadel'); await frenteListo(f4);
+    await f4.waitForFunction(() => document.querySelector('.page:not([hidden])').dataset.page === 'local', null, { timeout: 8000 }).catch(() => {});
+    const hor = await f4.evaluate(() => [...document.querySelectorAll('.loc__hor tr')].map((tr) => [tr.querySelector('th').firstChild.textContent, tr.querySelector('td').textContent, tr.classList.contains('is-hoy')]));
+    const filaHoy = dowHoy === 0 ? 2 : dowHoy === 6 ? 1 : 0;
+    ok(JSON.stringify(hor.map(([d, t]) => [d, t])) === JSON.stringify([['Lunes a viernes', '08:00 a 23:00'], ['Sábado', '09:00 a 20:00'], ['Domingo', 'Cerrado']])
+      && hor.filter((x) => x[2]).length === 1 && hor[filaHoy][2], 'la página del negocio: horarios juntos ("Lunes a viernes", "Sábado", "Domingo") con la fila de hoy marcada ' + JSON.stringify(hor));
     for (const [n, p] of [['f1', f1], ['f2', f2], ['f3', f3], ['f4', f4], ['an', an]]) ok(!p.errs.filter((x) => !/Failed to load resource/.test(x)).length, `frente: sin errores en la consola (${n}) ${p.errs.join(' | ')}`);
   } catch (e) {
     console.log('FALLA (excepción)', e.message); process.exitCode = 1;

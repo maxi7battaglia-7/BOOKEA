@@ -321,11 +321,15 @@ const medir = () => {
         botones: document.querySelectorAll('#local-root [data-act="ficha"]').length, alFinal: !!document.querySelector('.loc__fin [data-act="ficha"]'),
         texto: document.querySelector('#local-root').textContent, mapa: (document.querySelector('.loc__mapa iframe') || {}).src || '',
         tarjetas: document.querySelectorAll('.loc__cards .loc__card').length, hoy: document.querySelectorAll('.loc__hor tr.is-hoy').length,
+        horarios: [...document.querySelectorAll('.loc__hor tr')].map((tr) => tr.textContent), fin: Math.round(document.querySelector('.loc__fin').getBoundingClientRect().height),
       }));
       ok(loc.pagina === 'local' && !loc.splash && loc.sinBookea && loc.marca, `${w} página del negocio: sin la barra, la de abajo, el pie ni la pantalla de carga de Bookea; solo el logo de Bookea sobre la foto`);
       ok(loc.turnos === 0 && loc.botones === 1 && loc.alFinal && loc.tarjetas >= 8 && !/Características/.test(loc.texto) && /3 canchas de pádel/.test(loc.texto) && /Vestuarios/.test(loc.texto)
-        && /Galería/.test(loc.texto) && loc.hoy === 1 && /Dónde estamos/.test(loc.texto) && /maps\.google\.com/.test(loc.mapa),
-        `${w} página del negocio: tarjetas con lo que tiene el lugar (canchas, horarios, servicios), galería, horarios con hoy marcado, mapa y un solo botón para reservar, al final (sin turnos ni precios) ${loc.tarjetas}`);
+        && /Galería/.test(loc.texto) && /Horarios y ubicación/.test(loc.texto) && /maps\.google\.com/.test(loc.mapa),
+        `${w} página del negocio: tarjetas con lo que tiene el lugar (canchas, horarios, servicios), galería, horarios con el mapa al lado y un solo botón para reservar, al final (sin turnos ni precios) ${loc.tarjetas}`);
+      // compacta (pedido del dueño, 26/11): los días que abren igual van en una sola fila y el cierre es una franja chica
+      ok(loc.horarios.length === 1 && /^Todos los días17:00 a 00:30$/.test(loc.horarios[0]) && loc.hoy === 0 && loc.fin > 0 && loc.fin <= 240,
+        `${w} página del negocio: horarios en una fila ("Todos los días") y "Reservá tu turno" chico ${JSON.stringify(loc.horarios)} ${loc.fin}px`);
       await p.limpio('página del negocio');
       await p.toca('.loc__fin [data-act="ficha"]'); await espera(p);
       ok((await p.pagina()) === 'ficha' && await p.evaluate(() => getComputedStyle(document.querySelector('.top')).display !== 'none'), `${w} página del negocio: "Reservar turno" lleva a sus turnos (y ahí vuelve la barra de Bookea)`);

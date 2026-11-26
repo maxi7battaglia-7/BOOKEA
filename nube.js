@@ -72,8 +72,13 @@
     if (cod === "23514") return "invalido";
     // sin permiso (las reglas de la base): no es que venció la sesión
     if (cod === "42501" || /row-level security/i.test(msj)) return "permiso";
-    if (cod === "PGRST301" || st === 401 || /jwt/i.test(msj)) return "sesion";
-    if (/fetch|network|failed to/i.test(msj) || st === 0) return "red";
+    if (cod === "PGRST301" || cod === "PGRST303" || st === 401 || /jwt/i.test(msj)) return "sesion";
+    // a la base le falta algo (una función nueva): hay que correr de nuevo esquema.sql
+    if (cod === "PGRST202" || cod === "PGRST203" || cod === "42883" || cod === "42703") return "falta-base";
+    if (cod === "P0002") return "no-existe";
+    // sin conexión: solo cuando el pedido no llegó. Un error de la base que no conocemos no es "sin internet"
+    // (antes cualquier error sin código HTTP se mostraba como "No hay conexión" y escondía el motivo real)
+    if (/failed to fetch|fetch failed|networkerror|network request failed|load failed/i.test(msj) || (!cod && !st && /fetch|network/i.test(msj))) return "red";
     return "otro";
   };
   const fallo = (e) => ({ ok: false, error: tipoDeError(e), detalle: e && e.message });
