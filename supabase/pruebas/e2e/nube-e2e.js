@@ -523,7 +523,9 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
       'equipo de Bookea: "Editar su página" (en Solicitudes) abre la página de ese negocio, con lo que ya tiene');
     await adm.fill('#p-frase', 'Cargada por Bookea');
     await adm.click('#f-pag .servp__i:has(input[value="pileta"])');
-    await adm.setInputFiles('#p-fotos', RAIZ + '/assets/r-futbol.webp');
+    // como una persona: tocando "Agregar fotos" se abre el selector de archivos
+    const [selector] = await Promise.all([adm.waitForEvent('filechooser', { timeout: 5000 }), adm.click('#p-gal .galp__mas')]);
+    await selector.setFiles(RAIZ + '/assets/r-futbol.webp');
     await adm.waitForFunction(() => document.querySelectorAll('#p-gal .galp__f').length === 1, null, { timeout: 15000 }).catch(() => {});
     await adm.waitForTimeout(1800);
     await adm.waitForFunction(() => /Guardado/.test(document.querySelector('#p-msg').textContent), null, { timeout: 10000 }).catch(() => {});
