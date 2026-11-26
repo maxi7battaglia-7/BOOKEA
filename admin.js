@@ -1790,6 +1790,8 @@
   // Cada cambio se guarda solo.
   // Las fotos van a Supabase Storage (modo nube) o, en el modo de prueba, achicadas dentro de este navegador.
   const FOTOS_MAX = 6;
+  // las tres tarjetas anchas de la página (26/11): cada una con una o dos fotos (pagina.tarjetas)
+  const TARJETAS_PG = [["lugar", "El lugar", "Las canchas, el lugar"], ["serv", "Servicios", "Vestuarios, buffet, quincho…"], ["ubi", "Dónde estamos", "La entrada, el frente"]];
   // Los servicios que se pueden marcar (los mismos nombres que AM en sitio.js, que es quien los muestra)
   const SERVICIOS = [["est", "Estacionamiento"], ["vest", "Vestuarios"], ["duchas", "Duchas"], ["pileta", "Pileta"], ["quincho", "Quincho"], ["buf", "Buffet"], ["parr", "Parrilla"],
     ["wifi", "Wi-Fi"], ["mate", "Café y mate"], ["qr", "Pago con QR"], ["tv", "TV y música"], ["aire", "Aire acondicionado"],
@@ -1824,6 +1826,8 @@
     const pg = Object.assign({ frase: "", historia: "", logo: "", portada: "", galeria: [], instagram: "", tiktok: "", facebook: "", mostrar_whatsapp: false, servicios: [] }, n.pagina || {});
     if (!Array.isArray(pg.galeria)) pg.galeria = [];
     if (!Array.isArray(pg.servicios)) pg.servicios = [];
+    const tj0 = pg.tarjetas && typeof pg.tarjetas === "object" ? pg.tarjetas : {};
+    pg.tarjetas = Object.fromEntries(TARJETAS_PG.map(([k]) => [k, (Array.isArray(tj0[k]) ? tj0[k] : []).slice(0, 2)]));
     const MAX = store.modo === "nube" ? { portada: 1920, galeria: 1600, logo: 512 } : { portada: 960, galeria: 640, logo: 256 };
     const tarjeta = (id, icono, t, d, cuerpo, cls = "") => `<section class="card ng-card${cls ? " " + cls : ""}" aria-labelledby="${id}"><header class="ng-card__h">${ico(icono)}<div><h2 id="${id}">${t}</h2><p>${d}</p></div></header>${cuerpo}</section>`;
     const red = (id, rot, pre, val) => `<div class="field campo"><label for="${id}">${rot}</label><div class="slug"><span>${pre}</span><input id="${id}" value="${esc(val)}" autocapitalize="none" autocomplete="off" spellcheck="false" translate="no" /></div></div>`;
@@ -1856,9 +1860,12 @@
           ${red("p-tt", "TikTok", "tiktok.com/@", pg.tiktok)}
           ${red("p-fb", "Facebook", "facebook.com/", pg.facebook)}
           <label class="check-pg"><input type="checkbox" id="p-wa" ${pg.mostrar_whatsapp ? "checked" : ""} ${n.whatsapp ? "" : "disabled"} /><span>${n.whatsapp ? `Mostrar mi WhatsApp (${esc(n.whatsapp)})` : "Mostrar mi WhatsApp (cargalo primero en Mi negocio)"}</span></label>`)}
-        ${tarjeta("pg-6", "check", "Servicios del lugar", "Marcá lo que tiene tu lugar: cada uno se ve como una tarjeta en tu página.", `
+        ${tarjeta("pg-6", "check", "Servicios del lugar", "Marcá lo que tiene el lugar: se ven en la tarjeta Servicios de la página.", `
           <div class="servp" role="group" aria-label="Servicios del lugar">${SERVICIOS.map(([k, t]) => `<label class="servp__i"><input type="checkbox" value="${k}" ${pg.servicios.includes(k) ? "checked" : ""} /><span>${t}</span></label>`).join("")}</div>`, "pg-card--serv")}
-        ${tarjeta("pg-5", "camara", "Fotos del lugar", `Hasta ${FOTOS_MAX}. Se ven en tu página, en "Conocé el lugar": las canchas, el lugar, la gente.`, `
+        ${tarjeta("pg-7", "camara", "Fotos de las tarjetas", "La página tiene tres tarjetas anchas: el lugar, los servicios y dónde está. Cada una lleva una o dos fotos al costado; si no tiene, usa una de las fotos del lugar.", `
+          <div class="tjp">${TARJETAS_PG.map(([k, t, d]) => `<div class="tjp__g"><p class="tjp__t"><b>${t}</b><span>${d}</span></p><div class="galp galp--tj" id="p-tj-${k}"></div><input class="sr-only" type="file" id="p-tjf-${k}" accept="image/*" multiple /></div>`).join("")}</div>
+          <p class="field__err" id="p-tj-err" hidden></p>`, "pg-card--gal")}
+        ${tarjeta("pg-5", "camara", "Fotos del lugar", `Hasta ${FOTOS_MAX}. Si una tarjeta no tiene fotos propias, usa una de estas; las demás se ven abajo de todo, de a tres.`, `
           <div class="galp" id="p-gal"></div>
           <input class="sr-only" type="file" id="p-fotos" accept="image/*" multiple />
           <p class="field__err" id="p-gal-err" hidden></p>`, "pg-card--gal")}
@@ -1879,14 +1886,20 @@
       $("#p-gal").innerHTML = pg.galeria.map((u, i) => `<figure class="galp__f"><img src="${esc(u)}" alt="Foto ${i + 1} del lugar" loading="lazy" /><button type="button" class="quitar" data-foto="${i}" aria-label="Quitar la foto ${i + 1}">${ico("x")}</button></figure>`).join("")
         + (pg.galeria.length < FOTOS_MAX ? `<label class="galp__mas" for="p-fotos">${ico("mas")}<span>Agregar fotos</span></label>` : "");
     };
+    const pintarTj = (k) => {
+      const l = pg.tarjetas[k];
+      $(`#p-tj-${k}`).innerHTML = l.map((u, i) => `<figure class="galp__f"><img src="${esc(u)}" alt="Foto ${i + 1} de la tarjeta" loading="lazy" /><button type="button" class="quitar" data-quitar-tj="${i}" aria-label="Quitar la foto ${i + 1}">${ico("x")}</button></figure>`).join("")
+        + (l.length < 2 ? `<label class="galp__mas" for="p-tjf-${k}">${ico("mas")}<span>${l.length ? "Otra foto" : "Agregar foto"}</span></label>` : "");
+    };
     const cuenta = () => { $("#p-historia-cuenta").textContent = `${$("#p-historia").value.length} de 3000 letras`; };
-    pintarPort(); pintarGal(); cuenta();
+    pintarPort(); pintarGal(); TARJETAS_PG.forEach(([k]) => pintarTj(k)); cuenta();
     const leer = () => ({
       frase: $("#p-frase").value.trim().slice(0, 160), historia: $("#p-historia").value.trim().slice(0, 3000),
       logo: pg.logo, portada: pg.portada, galeria: pg.galeria.slice(0, FOTOS_MAX),
       instagram: usuarioRed($("#p-ig").value), tiktok: usuarioRed($("#p-tt").value), facebook: usuarioRed($("#p-fb").value),
       mostrar_whatsapp: !!n.whatsapp && $("#p-wa").checked,
       servicios: $$("#f-pag .servp input:checked").map((i) => i.value),
+      tarjetas: Object.fromEntries(TARJETAS_PG.map(([k]) => [k, pg.tarjetas[k].slice(0, 2)])),
     });
     const estado = () => JSON.stringify(leer());
     let inicial = estado(), espera = null;
@@ -1949,6 +1962,22 @@
       const [vieja] = pg.galeria.splice(+b.dataset.foto, 1); pintarGal();
       const sig = $("[data-foto], .galp__mas", $("#p-gal")); sig && sig.focus();
       if (await guardar() && vieja) store.borrarFoto(vieja, otro ? n.id : undefined);
+    });
+    // las fotos de cada tarjeta: hasta dos; se suben y se guarda enseguida; la que se quita, se borra
+    TARJETAS_PG.forEach(([k]) => {
+      $(`#p-tjf-${k}`).addEventListener("change", async (e) => {
+        const lista = [...(e.target.files || [])].slice(0, 2 - pg.tarjetas[k].length); e.target.value = "";
+        if (!lista.length) return;
+        estadoMsg("", lista.length > 1 ? `Subiendo ${lista.length} fotos…` : "Subiendo la foto…");
+        for (const a of lista) { const url = await subir(a, "galeria", $("#p-tj-err")); if (url) { pg.tarjetas[k].push(url); pintarTj(k); } }
+        await guardar();
+      });
+      $(`#p-tj-${k}`).addEventListener("click", async (e) => {
+        const b = e.target.closest("[data-quitar-tj]"); if (!b) return;
+        const [vieja] = pg.tarjetas[k].splice(+b.dataset.quitarTj, 1); pintarTj(k);
+        const sig = $("[data-quitar-tj], .galp__mas", $(`#p-tj-${k}`)); sig && sig.focus();
+        if (await guardar() && vieja) store.borrarFoto(vieja, otro ? n.id : undefined);
+      });
     });
     $$("[data-copiar]", f).forEach((b) => b.addEventListener("click", async () => {
       const link = b.dataset.copiar;

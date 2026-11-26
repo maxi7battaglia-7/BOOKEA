@@ -534,12 +534,24 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
     ok(pgE.frase === 'Cargada por Bookea' && JSON.stringify(pgE.servicios) === '["vest","pileta","clases"]' && pgE.galeria.length === 1 && pgE.galeria[0].includes(`/negocios/${idLA}/`)
       && pgE.instagram === 'losalamospadel' && pgE.portada === pgA2.portada,
       'equipo de Bookea: guarda la página del negocio y sube la foto a su carpeta (sin tocar lo demás)');
+    // las fotos de las tarjetas (pedido del dueño, 26/11): una foto propia para "Servicios", tocando "Agregar foto"
+    const [selTj] = await Promise.all([adm.waitForEvent('filechooser', { timeout: 5000 }), adm.click('label[for="p-tjf-serv"]')]);
+    await selTj.setFiles(RAIZ + '/assets/r-tenis.webp');
+    await adm.waitForFunction(() => document.querySelectorAll('#p-tj-serv .galp__f').length === 1, null, { timeout: 15000 }).catch(() => {});
+    await adm.waitForTimeout(1800);
+    await adm.waitForFunction(() => /Guardado/.test(document.querySelector('#p-msg').textContent), null, { timeout: 10000 }).catch(() => {});
+    const pgT = await sql("select to_json(pagina) from negocios where slug = 'losalamospadel'");
+    ok(pgT.tarjetas && pgT.tarjetas.serv.length === 1 && pgT.tarjetas.serv[0].includes(`/negocios/${idLA}/`) && pgT.tarjetas.lugar.length === 0 && pgT.galeria.length === 1,
+      'equipo de Bookea: sube una foto a la tarjeta "Servicios" (a la carpeta del negocio) ' + JSON.stringify(pgT.tarjetas));
     await adm.click('#p-volver'); await adm.waitForSelector('.sol');
     ok(true, 'equipo de Bookea: "Volver a Solicitudes"');
     await f4.goto('http://localhost:8787/losalamospadel'); await frenteListo(f4);
     await f4.waitForFunction(() => document.querySelector('.page:not([hidden])').dataset.page === 'local', null, { timeout: 8000 }).catch(() => {});
     const loc2 = await f4.textContent('#local-root');
-    ok(/Cargada por Bookea/.test(loc2) && /Pileta/.test(loc2) && (await f4.locator('.loc__gal img').count()) === 1, 'la página del negocio muestra lo que cargó el equipo de Bookea');
+    ok(/Cargada por Bookea/.test(loc2) && /Pileta/.test(loc2) && (await f4.locator('.loc__bloque').count()) === 3, 'la página del negocio muestra lo que cargó el equipo de Bookea, en sus tres tarjetas');
+    ok((await f4.locator(`[aria-labelledby="loc-serv"] .loc__fotos img[src="${pgT.tarjetas.serv[0]}"]`).count()) === 1
+      && (await f4.locator(`[aria-labelledby="loc-lugar"] .loc__fotos img[src="${pgT.galeria[0]}"]`).count()) === 1 && (await f4.locator('.loc__gal').count()) === 0,
+      'la página del negocio: la foto de "Servicios" va en su tarjeta, y "Las canchas" (sin foto propia) usa la del lugar');
     // horarios: los días seguidos que abren igual van en una sola fila, y se marca la de hoy (pedido del dueño, 26/11)
     await sql(`with x as (update negocios set ajustes = jsonb_set(ajustes, '{horario}', (select jsonb_agg(case
         when d = 0 then jsonb_build_object('abre', '08:00', 'cierra', '23:00', 'cerrado', true)

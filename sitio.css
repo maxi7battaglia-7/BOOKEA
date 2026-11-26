@@ -923,8 +923,8 @@ dialog .row { margin-top: 6px; }
    - Sin la barra de arriba, la de abajo ni el pie de Bookea (sitio.js pone .en-local en <html>) y sin la pantalla de carga.
    - Blanco, negro y grises: el color lo ponen sus fotos. Nada de naranja, verde agua ni crema.
    - Portada a toda la pantalla (la foto baja más despacio al bajar), con el logo de Bookea chico y transparente arriba a
-     la izquierda y sus redes a la derecha; tarjetas sutiles con lo que tiene el lugar; historia con sus fotos enteras, horarios
-     con el mapa al lado y al final una franja chica para reservar. Títulos centrados, de peso medio, como la referencia.
+     la izquierda y sus redes a la derecha; tarjetas sutiles con lo que tiene el lugar; tres tarjetas anchas (el lugar, servicios, dónde
+     estamos) con sus fotos al costado y al final una franja chica para reservar. Títulos centrados, de peso medio, como la referencia.
    - Compacta (pedido del dueño, 26/11): poco aire entre secciones, títulos chicos, todo en un ancho de 1000px.
    ========================================================= */
 .sin-splash .splash { display: none; }
@@ -959,36 +959,46 @@ dialog .row { margin-top: 6px; }
 .loc__rubro { margin-top: 4px; font: 500 12px var(--f-mono); letter-spacing: .16em; text-transform: uppercase; opacity: .88; }
 .loc__hero h1 { color: inherit; font-size: clamp(40px, 6vw, 84px); font-weight: 600; line-height: 1; letter-spacing: -.045em; max-width: 14ch; text-wrap: balance; }
 
-/* lo que tiene el lugar: cuatro tarjetas sutiles (canchas, turnos, horarios, dónde queda) y debajo, más chicos,
-   los servicios con su ícono al lado del nombre */
-.loc__cards { list-style: none; padding: 0; max-width: 1000px; margin: clamp(16px, 1.8vw, 22px) auto 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
-.loc__card { flex: 0 1 238px; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; align-content: center; column-gap: 12px; row-gap: 1px; padding: 13px 16px; border: 1px solid var(--l-line); border-radius: 14px; background: #fff; text-align: left; }
-.loc__card .icon { grid-row: 1 / span 2; width: 22px; height: 22px; stroke-width: 1.5; color: var(--l-ink); }
-.loc__card b { grid-column: 2; font-size: 15px; font-weight: 500; line-height: 1.3; letter-spacing: -.01em; }
-.loc__card span { grid-column: 2; font-size: 13px; line-height: 1.35; color: var(--l-mute); font-variant-numeric: tabular-nums; }
-.loc__cards--serv { margin-top: 10px; gap: 8px; }
-.loc__cards--serv .loc__card { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; padding: 9px 14px 9px 12px; border-radius: 12px; background: var(--l-suave); border-color: transparent; }
-.loc__cards--serv .loc__card .icon { width: 18px; height: 18px; margin: 0; }
-.loc__cards--serv .loc__card b { font-size: 14px; }
+/* lo del lugar en tres tarjetas anchas (pedido del dueño, 26/11: "características, servicios y ubicación, cada una con
+   una o dos fotos, ocupando todo el ancho"): el texto de un lado y sus fotos del otro, alternados; las fotos enteras
+   (las acomoda armarFotos en sitio.js) */
+.loc__bloques { display: grid; gap: 14px; max-width: 1160px; margin: clamp(22px, 2.6vw, 34px) auto 0; }
+.loc__bloque { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); border: 1px solid var(--l-line); border-radius: 20px; background: #fff; overflow: hidden; }
+.loc__bloque:nth-child(even) > .loc__fotos { order: -1; }
+.loc__bloque.sin-fotos { grid-template-columns: minmax(0, 1fr); }
+.loc__bloque-t { align-self: center; padding: clamp(24px, 3vw, 40px); }
+.loc__bloque h2 { text-align: left; }
+.loc__bloque h3 { margin: 18px 0 2px; font-size: 13px; font-weight: 600; letter-spacing: 0; color: var(--l-mute); }
+.loc__datos { list-style: none; padding: 0; margin-top: 16px; }
+.loc__datos li { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; column-gap: 14px; row-gap: 1px; padding-block: 13px; border-top: 1px solid var(--l-line); }
+.loc__datos li:first-child { border-top: 0; padding-top: 4px; }
+.loc__datos li:last-child { padding-bottom: 0; }
+.loc__datos .icon { grid-row: 1 / span 2; width: 22px; height: 22px; stroke-width: 1.5; color: var(--l-ink); }
+.loc__datos b { grid-column: 2; font-size: 16px; font-weight: 500; line-height: 1.3; letter-spacing: -.01em; }
+.loc__datos span { grid-column: 2; font-size: 14px; line-height: 1.4; color: var(--l-mute); font-variant-numeric: tabular-nums; }
+.loc__servs { list-style: none; padding: 0; margin-top: 18px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.loc__servs li { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 11px 12px; border-radius: 12px; background: var(--l-suave); font-size: 15px; font-weight: 500; line-height: 1.25; }
+.loc__servs .icon { flex: none; width: 19px; height: 19px; stroke-width: 1.5; color: var(--l-ink); }
+.loc__fotos { display: flex; flex-wrap: wrap; justify-content: center; align-content: center; gap: 8px; padding: 14px; background: var(--l-suave); }
+.loc__fotos figure { flex: 1 1 0; min-width: 0; aspect-ratio: 4 / 3; overflow: hidden; border-radius: 14px; background: var(--l-suave); }
+.loc__fotos figure[style] { flex: none; aspect-ratio: auto; }
+.loc__fotos img { width: 100%; height: 100%; object-fit: cover; }
+.loc__fotos--mapa { display: grid; grid-template-columns: minmax(0, 1fr); padding: 0; background: none; }
+.loc__fotos--mapa .loc__mapa { min-height: 340px; border: 0; border-radius: 0; }
 
 /* su historia: centrada, en una columna angosta */
 .loc__texto { max-width: 640px; margin: 10px auto 0; }
 .loc__texto p { font-size: 16px; line-height: 1.6; color: var(--l-txt); text-align: center; }
 .loc__texto p + p { margin-top: 10px; }
 
-/* sus fotos, enteras: cada una con su forma, en filas parejas que ocupan el ancho (las arma armarGaleria en sitio.js);
+/* sus fotos, enteras: cada una con su forma, en filas parejas que ocupan el ancho (las arma armarFotos en sitio.js);
    sin JavaScript, tres por fila (dos en el celular) en 4:3 */
 .loc__gal { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; max-width: 1160px; margin: clamp(18px, 2vw, 24px) auto 0; }
 .loc__gal figure { flex: none; width: calc((100% - 16px) / 3); aspect-ratio: 4 / 3; overflow: hidden; border-radius: 14px; background: var(--l-suave); }
 .loc__gal figure[style] { aspect-ratio: auto; }
 .loc__gal img { width: 100%; height: 100%; object-fit: cover; }
 
-/* horarios y ubicación, juntos: a la izquierda una tarjeta con los horarios (los días seguidos que abren igual van
-   en una sola fila) y la dirección; a la derecha el mapa, de la misma altura */
-.loc__visita { display: grid; grid-template-columns: minmax(0, 360px) minmax(0, 1fr); gap: 10px; max-width: 1000px; margin: clamp(16px, 1.8vw, 22px) auto 0; }
-.loc__visita.sin-mapa { grid-template-columns: minmax(0, 440px); justify-content: center; }
-.loc__info { display: grid; align-content: start; gap: 20px; padding: 20px 22px 22px; border: 1px solid var(--l-line); border-radius: 16px; }
-.loc__info h3 { font-size: 13px; font-weight: 600; letter-spacing: 0; color: var(--l-mute); margin-bottom: 6px; }
+/* dónde estamos: la dirección, los horarios (los días seguidos que abren igual van en una sola fila) y "Cómo llegar" */
 .loc__hor { width: 100%; border-collapse: collapse; }
 .loc__hor th, .loc__hor td { padding: 8px 0; border-bottom: 1px solid var(--l-line); font-size: 15px; line-height: 1.35; vertical-align: baseline; }
 .loc__hor tr:last-child > * { border-bottom: 0; padding-bottom: 0; }
@@ -997,13 +1007,15 @@ dialog .row { margin-top: 6px; }
 .loc__hor tr.is-hoy th, .loc__hor tr.is-hoy td { color: var(--l-ink); font-weight: 600; }
 .loc__hoy { display: inline-flex; align-items: center; gap: 5px; margin-left: 8px; font-size: 12px; font-weight: 600; color: var(--l-ink); }
 .loc__hoy::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--l-ink); }
-.loc__dir { font-size: 15px; line-height: 1.5; color: var(--l-txt); }
-.loc__acc { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.loc__dir { margin-top: 12px; font-size: 16px; line-height: 1.5; color: var(--l-txt); }
+.loc__acc { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
 .loc__acc a { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 16px; border: 1px solid var(--l-line); border-radius: 999px; color: var(--l-ink); text-decoration: none; font-size: 14px; font-weight: 500; transition: border-color .2s ease; }
 .loc__acc a:hover { border-color: var(--l-ink); }
 .loc__acc .icon { width: 17px; height: 17px; color: var(--l-ink); }
 .loc__mapa { min-height: 220px; overflow: hidden; border: 1px solid var(--l-line); border-radius: 16px; background: var(--l-suave); }
 .loc__mapa iframe { display: block; width: 100%; height: 100%; min-height: 220px; border: 0; }
+.loc__mapa--chico { margin-top: 16px; height: 190px; min-height: 0; }
+.loc__mapa--chico iframe { min-height: 0; }
 
 /* los botones de la página: negro o blanco sobre foto (sin el barrido verde de Bookea) */
 .loc__btn { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 46px; padding: 0 22px; border: 1px solid var(--l-ink); border-radius: 999px; background: var(--l-ink); color: #fff; font: 600 15px var(--f-sans); text-decoration: none; cursor: pointer; transition: transform .2s var(--ease), background-color .2s ease, color .2s ease, border-color .2s ease; }
@@ -1016,7 +1028,7 @@ dialog .row { margin-top: 6px; }
 
 /* al final: una franja chica "Reservá tu turno" sobre una de sus fotos (o un fondo oscuro liso) con el botón al
    costado, y una línea chica de Bookea */
-.loc__fin { position: relative; overflow: hidden; max-width: 1000px; margin: clamp(34px, 3.6vw, 52px) auto 0; border-radius: 16px; background: #1b1b1b; color: #fff; }
+.loc__fin { position: relative; overflow: hidden; max-width: 1160px; margin: clamp(34px, 3.6vw, 52px) auto 0; border-radius: 16px; background: #1b1b1b; color: #fff; }
 .loc__fin.has-foto::before { content: ""; position: absolute; inset: 0; z-index: 1; background: rgba(0, 0, 0, .6); }
 .loc__fin-in { position: relative; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 16px 28px; padding: 26px 28px; }
 .loc__fin h2 { color: inherit; font-size: clamp(20px, 1.7vw, 24px); text-align: left; }
@@ -1032,19 +1044,18 @@ dialog .row { margin-top: 6px; }
 @media (max-width: 700px) {
   .loc__in { padding-block: 84px 64px; }
   .loc__logo { width: 76px; height: 76px; border-radius: 19px; font-size: 26px; }
-  .loc__card { flex-basis: calc(50% - 5px); column-gap: 10px; padding: 11px 12px; border-radius: 12px; }
-  .loc__card .icon { width: 20px; height: 20px; }
-  .loc__card b { font-size: 14px; }
-  .loc__cards--serv .loc__card { flex-basis: auto; padding: 8px 12px 8px 10px; }
-  .loc__cards--serv .loc__card b { font-size: 13px; }
+  .loc__bloque, .loc__bloque.sin-fotos { grid-template-columns: minmax(0, 1fr); border-radius: 16px; }
+  .loc__bloque > .loc__fotos, .loc__bloque:nth-child(even) > .loc__fotos { order: -1; padding: 8px; }
+  .loc__bloque > .loc__fotos--mapa { padding: 0; }
+  .loc__fotos--mapa .loc__mapa { min-height: 220px; }
+  .loc__bloque-t { padding: 18px 18px 20px; }
+  .loc__servs li { padding: 9px 10px; font-size: 14px; }
   .loc__gal { gap: 6px; }
   .loc__gal figure { width: calc((100% - 6px) / 2); border-radius: 12px; }
-  .loc__visita, .loc__visita.sin-mapa { grid-template-columns: minmax(0, 1fr); }
-  .loc__info { padding: 16px 18px 18px; }
-  .loc__mapa, .loc__mapa iframe { min-height: 240px; }
   .loc__fin-in { flex-direction: column; align-items: stretch; gap: 14px; padding: 22px 20px 20px; }
   .loc__fin .loc__btn { width: 100%; }
 }
+@media (max-width: 400px) { .loc__servs { grid-template-columns: minmax(0, 1fr); } }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }

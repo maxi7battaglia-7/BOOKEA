@@ -816,6 +816,14 @@ create or replace function public.foto_publica(n uuid, u text) returns text
 language sql immutable set search_path = '' as $$
   select case when coalesce(u, '') ~* ('^https?://[^/]+/storage/v1/object/public/negocios/' || n::text || '/[a-z0-9._-]+$') then u end
 $$;
+-- Una lista de fotos de la página (las de una tarjeta): solo las de su carpeta, y hasta "tope"
+create or replace function public.fotos_publicas(n uuid, lista jsonb, tope integer) returns jsonb
+language sql immutable set search_path = '' as $$
+  select coalesce(jsonb_agg(u order by i), '[]'::jsonb) from (
+    select public.foto_publica(n, g) as u, i
+      from jsonb_array_elements_text(case when jsonb_typeof(lista) = 'array' then lista else '[]'::jsonb end) with ordinality as e(g, i)) s
+   where u is not null and i <= tope
+$$;
 -- Un usuario de Instagram, TikTok o Facebook: aunque peguen el link entero, queda solo el usuario ("losalamospadel")
 create or replace function public.red_social(t text) returns text
 language sql immutable set search_path = '' as $$
@@ -863,6 +871,11 @@ language sql stable set search_path = '' as $$
                       from jsonb_array_elements_text(case when jsonb_typeof(x.pagina -> 'servicios') = 'array' then x.pagina -> 'servicios' else '[]'::jsonb end)
                            with ordinality as e(s, i)
                      where s ~ '^[a-z]{2,10}$' and i <= 30),
+      -- las fotos de sus tres tarjetas (el lugar, servicios, dónde estamos): hasta dos en cada una (26/11)
+      'tarjetas', jsonb_build_object(
+        'lugar', public.fotos_publicas(x.id, x.pagina #> '{tarjetas,lugar}', 2),
+        'serv', public.fotos_publicas(x.id, x.pagina #> '{tarjetas,serv}', 2),
+        'ubi', public.fotos_publicas(x.id, x.pagina #> '{tarjetas,ubi}', 2)),
       'whatsapp', case when x.pagina ->> 'mostrar_whatsapp' = 'true' then x.whatsapp else '' end),
     'publicado', public.tiene_mercado_pago(x.id),
     'ocupados', public.ocupados_de(x.id))
@@ -962,6 +975,7 @@ end $$;
 
 revoke all on function public.tiene_mercado_pago(uuid) from public, anon, authenticated;
 revoke all on function public.foto_publica(uuid, text) from public, anon, authenticated;
+revoke all on function public.fotos_publicas(uuid, jsonb, integer) from public, anon, authenticated;
 revoke all on function public.red_social(text) from public, anon, authenticated;
 revoke all on function public.lugar_listo(jsonb) from public, anon, authenticated;
 revoke all on function public.ocupados_de(uuid) from public, anon, authenticated;

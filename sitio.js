@@ -161,6 +161,8 @@
       galeria: (Array.isArray(pg.galeria) ? pg.galeria : []).map(fotoOk).filter(Boolean).slice(0, 8),
       instagram: usuario(pg.instagram), tiktok: usuario(pg.tiktok), facebook: usuario(pg.facebook), whatsapp: String(pg.whatsapp || "").trim(),
       servicios: (Array.isArray(pg.servicios) ? pg.servicios : []).filter((k, i, a) => AM[k] && k !== "cuen" && a.indexOf(k) === i).slice(0, 20),
+      // las fotos de sus tres tarjetas (el lugar, servicios, dónde estamos): hasta dos en cada una
+      tarjetas: Object.fromEntries(["lugar", "serv", "ubi"].map((k) => [k, (Array.isArray(pg.tarjetas && pg.tarjetas[k]) ? pg.tarjetas[k] : []).map(fotoOk).filter(Boolean).slice(0, 2)])),
     };
   };
   const lugarDeFila = (f) => {
@@ -626,7 +628,7 @@
   // tienen, con sus fotos de muestra y el cartel de ejemplo.
   const paginaDe = (v) => (v.real ? v.pagina : {
     frase: "", historia: v.desc, logo: "", portada: IMG[v.fotos[0]] || "", galeria: v.fotos.slice(1).map((k) => IMG[k]).filter(Boolean),
-    instagram: "", tiktok: "", facebook: "", whatsapp: "", servicios: v.ame || [],
+    instagram: "", tiktok: "", facebook: "", whatsapp: "", servicios: v.ame || [], tarjetas: { lugar: [], serv: [], ubi: [] },
   });
   const parrafos = (t) => String(t || "").split(/\n\s*\n|\n/).map((x) => x.trim()).filter(Boolean).map((x) => `<p>${esc(x)}</p>`).join("");
   const waDe = (n) => { const d = String(n || "").replace(/\D/g, "").replace(/^0/, ""); return d ? "https://wa.me/" + (d.startsWith("54") ? d : "549" + d) : ""; };
@@ -674,23 +676,35 @@
     ].filter(Boolean);
     const gal = pg.galeria.slice(0, 6), fotoFin = gal[gal.length - 1] || pg.portada || "";
     const servs = (pg.servicios || []).filter((k) => AM[k]);
-    // las tarjetas: primero lo del lugar (canchas, turnos, horarios, dónde queda) y después cada servicio
     const esDep = secDe(v.rubro) === "deportes", nU = v.units.length;
     // el detalle de las canchas: si todas lo tienen, solo el detalle ("Techada"); si no, cuáles ("Cancha 3: techada")
     const grupos = {};
     v.units.forEach((u) => { const [nom, det] = u.split(" · "); if (det && det.trim()) (grupos[det.trim().toLowerCase()] ||= []).push(nom); });
     const dets = Object.entries(grupos).map(([det, noms]) => (noms.length === nU ? cap(det) : `${noms.join(", ")}: ${det}`));
-    const tarjetas = [
+    // Tres tarjetas anchas (pedido del dueño, 26/11: "características, servicios y ubicación, cada una con una o dos
+    // fotos, ocupando todo el ancho"): el lugar (canchas, turnos, horarios), sus servicios y dónde está, con sus fotos al
+    // costado. Si una no tiene fotos propias, usa una de las fotos del lugar; las que sobran van abajo de todo, de a tres.
+    const datos = [
       [v.rubro === "barberia" ? "tijera" : esDep ? "cancha" : "shop",
         `${nU} ${nU === 1 ? R.un.toLowerCase() : R.uns}${esDep ? ` de ${R.n.toLowerCase()}` : ""}`,
         dets.length ? dets.join(" · ") : esDep ? "" : v.units.map((u) => u.split(" · ")[0]).join(", ")],
       ["clock", `Turnos de ${v.dur} min`, "Se reservan online"],
       ["cal", "Horarios", hoy.t === "Cerrado" ? "Hoy está cerrado" : `Hoy de ${hoy.t}`],
-      ciudad ? ["pin", ciudad, v.real ? v.direccion || "" : "Mendoza"] : v.real && v.direccion ? ["pin", v.direccion, ""] : null,
-    ].filter(Boolean);
-    const extras = servs.map((k) => [AMIC[k] || "check", AM[k], ""]);
-    const tarjeta = ([i, t, c]) => `<li class="loc__card">${icono(i)}<b>${esc(t)}</b>${c ? `<span>${esc(c)}</span>` : ""}</li>`;
+    ];
+    const dato = ([i, t, c]) => `<li>${icono(i)}<b>${esc(t)}</b>${c ? `<span>${esc(c)}</span>` : ""}</li>`;
+    const tj = pg.tarjetas || {}, sueltas = gal.slice();
+    const fotosDe = (k, prestar) => { const l = (tj[k] || []).slice(0, 2); if (!l.length && prestar && sueltas.length) l.push(sueltas.shift()); return l; };
+    const fLugar = fotosDe("lugar", true), fServ = servs.length ? fotosDe("serv", true) : [], fUbi = fotosDe("ubi", false);
+    const figuras = (l, que) => `<div class="loc__fotos">${l.map((u, i) => `<figure><img src="${esc(u)}" alt="${esc(`${v.name}: ${que}${l.length > 1 ? ` (${i + 1})` : ""}`)}" loading="lazy" /></figure>`).join("")}</div>`;
+    const bloque = (id, titulo, cuerpo, media) => `<article class="loc__bloque${media ? "" : " sin-fotos"}" aria-labelledby="${id}"><div class="loc__bloque-t"><h2 id="${id}">${esc(titulo)}</h2>${cuerpo}</div>${media}</article>`;
     const dir = v.real ? [v.direccion, v.ciudad].filter(Boolean).join(", ") : `${ciudad}, Mendoza`;
+    // dónde estamos: la dirección, los horarios y "Cómo llegar"; al costado sus fotos (y el mapa abajo del texto) o el mapa
+    const iframeMapa = mapa ? `<iframe title="Mapa: dónde queda ${esc(v.name)}" src="${esc(mapa)}" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>` : "";
+    const ubiCuerpo = `${dir ? `<p class="loc__dir">${esc(dir)}${v.real ? "" : ". Ubicación aproximada: es un negocio de ejemplo."}</p>` : ""}
+      <h3>Horarios</h3><table class="loc__hor"><caption class="sr-only">Horarios de ${esc(v.name)}</caption><tbody>${tramos.map(filaHor).join("")}</tbody></table>
+      ${maps || redes.length ? `<ul class="loc__acc" aria-label="Cómo llegar, redes y contacto">${maps ? `<li><a href="${esc(maps)}" target="_blank" rel="noopener">${icono("pin")}<span>Cómo llegar</span></a></li>` : ""}${redes.map(([i, t, h]) => `<li><a href="${esc(h)}" target="_blank" rel="noopener">${icono(i)}<span>${esc(t)}</span></a></li>`).join("")}</ul>` : ""}
+      ${fUbi.length && iframeMapa ? `<div class="loc__mapa loc__mapa--chico">${iframeMapa}</div>` : ""}`;
+    const ubiMedia = fUbi.length ? figuras(fUbi, "dónde está") : iframeMapa ? `<div class="loc__fotos loc__fotos--mapa"><div class="loc__mapa">${iframeMapa}</div></div>` : "";
     const B = `<svg class="loc__bk" aria-hidden="true"><use href="#bk-b"/></svg>`;
     $("#local-root").innerHTML = `
       <div class="loc">
@@ -710,26 +724,13 @@
           <section class="loc__sec loc__intro" aria-labelledby="loc-intro">
             <h2 id="loc-intro">${esc(pg.frase || `Conocé ${v.name}`)}</h2>
             ${v.real ? "" : `<p class="loc__demo"><span class="demo">Negocio de ejemplo · demo</span></p>`}
-            <ul class="loc__cards">${tarjetas.map(tarjeta).join("")}</ul>
-            ${extras.length ? `<ul class="loc__cards loc__cards--serv" aria-label="Lo que ofrece ${esc(v.name)}">${extras.map(tarjeta).join("")}</ul>` : ""}
-          </section>
-          ${pg.historia || gal.length ? `<section class="loc__sec loc__hist" aria-labelledby="loc-hist">
-            <h2 id="loc-hist">${pg.historia ? (v.real ? "Nuestra historia" : "Sobre el lugar") : "El lugar"}</h2>
             ${pg.historia ? `<div class="loc__texto">${parrafos(pg.historia)}</div>` : ""}
-            ${gal.length ? `<div class="loc__gal">${gal.map((u, i) => `<figure><img src="${esc(u)}" alt="Foto ${i + 1} de ${esc(v.name)}" loading="lazy" /></figure>`).join("")}</div>` : ""}
-          </section>` : ""}
-          <section class="loc__sec" aria-labelledby="loc-ubi">
-            <h2 id="loc-ubi">Horarios y ubicación</h2>
-            <div class="loc__visita${mapa ? "" : " sin-mapa"}">
-              <div class="loc__info">
-                <div><h3>Horarios</h3>
-                  <table class="loc__hor"><caption class="sr-only">Horarios de ${esc(v.name)}</caption><tbody>${tramos.map(filaHor).join("")}</tbody></table></div>
-                <div><h3>Dónde estamos</h3>
-                  ${dir ? `<p class="loc__dir">${esc(dir)}${v.real ? "" : ". Ubicación aproximada: es un negocio de ejemplo."}</p>` : ""}
-                  ${maps || redes.length ? `<ul class="loc__acc" aria-label="Cómo llegar, redes y contacto">${maps ? `<li><a href="${esc(maps)}" target="_blank" rel="noopener">${icono("pin")}<span>Cómo llegar</span></a></li>` : ""}${redes.map(([i, t, h]) => `<li><a href="${esc(h)}" target="_blank" rel="noopener">${icono(i)}<span>${esc(t)}</span></a></li>`).join("")}</ul>` : ""}</div>
-              </div>
-              ${mapa ? `<div class="loc__mapa"><iframe title="Mapa: dónde queda ${esc(v.name)}" src="${esc(mapa)}" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe></div>` : ""}
+            <div class="loc__bloques">
+              ${bloque("loc-lugar", esDep ? (nU === 1 ? `La ${R.un.toLowerCase()}` : `Las ${R.uns}`) : "El lugar", `<ul class="loc__datos">${datos.map(dato).join("")}</ul>`, fLugar.length ? figuras(fLugar, "el lugar") : "")}
+              ${servs.length ? bloque("loc-serv", "Servicios", `<ul class="loc__servs">${servs.map((k) => `<li>${icono(AMIC[k] || "check")}<span>${esc(AM[k])}</span></li>`).join("")}</ul>`, fServ.length ? figuras(fServ, "servicios") : "") : ""}
+              ${bloque("loc-ubi", "Dónde estamos", ubiCuerpo, ubiMedia)}
             </div>
+            ${sueltas.length ? `<div class="loc__gal" role="group" aria-label="Más fotos de ${esc(v.name)}">${sueltas.map((u, i) => `<figure><img src="${esc(u)}" alt="Foto ${i + 1} de ${esc(v.name)}" loading="lazy" /></figure>`).join("")}</div>` : ""}
           </section>
           <section class="loc__fin${fotoFin ? " has-foto" : ""}" aria-labelledby="loc-fin">
             ${fotoFin ? `<img class="loc__bg" src="${esc(fotoFin)}" alt="" loading="lazy" />` : ""}
@@ -744,15 +745,13 @@
       </div>`;
     const desc = document.querySelector('meta[name="description"]');
     if (desc && v.real) desc.setAttribute("content", (pg.frase || pg.historia || `${v.name}: reservá tu turno en Bookea.`).slice(0, 160));
-    // las fotos, enteras: apenas se sabe la forma de cada una, se arman las filas (ver armarGaleria)
-    galAncho = 0;
-    $$(".loc__gal img").forEach((im) => {
-      const lista = () => { if (!im.naturalWidth) return; im.parentElement.dataset.r = Math.min(2.4, Math.max(0.5, im.naturalWidth / im.naturalHeight)).toFixed(4); armarGaleria(true); };
+    // las fotos, enteras: apenas se sabe la forma de cada una, se acomodan (ver armarFotos)
+    $$(".loc__gal img, .loc__fotos img").forEach((im) => {
+      const lista = () => { if (!im.naturalWidth) return; im.parentElement.dataset.r = Math.min(2.4, Math.max(0.5, im.naturalWidth / im.naturalHeight)).toFixed(4); armarFotos(im.closest(".loc__gal, .loc__fotos"), true); };
       if (im.complete) lista(); else im.addEventListener("load", lista, { once: true });
     });
     if (galRO) galRO.disconnect();
-    const galEl = $(".loc__gal");
-    if (galEl && "ResizeObserver" in window) { galRO = new ResizeObserver(() => armarGaleria()); galRO.observe(galEl); }
+    if ("ResizeObserver" in window) { galRO = new ResizeObserver((es) => es.forEach((e) => armarFotos(e.target))); $$(".loc__gal, .loc__fotos").forEach((g) => galRO.observe(g)); }
   }
   // Las fotos del negocio, enteras (pedido del dueño, 26/11: "que entren en los recuadros completas"): cada una con su
   // forma, en filas que ocupan todo el ancho y tienen la misma altura dentro de la fila (como un álbum de fotos). Como
@@ -760,20 +759,26 @@
   // cerca de la buscada. Una fila que quedaría muy alta (una o dos fotos solas) no se estira: va centrada.
   // Grandes (pedido del dueño, 26/11: "no me disgustaba 3 y 3, que se sigan viendo un poco más grandes"): en la compu,
   // hasta tres por fila (seis fotos: 3 y 3) y más anchas que el resto de la página; en el celular, hasta dos.
+  // En una tarjeta (.loc__fotos), sus una o dos fotos van en una sola fila, a todo el ancho de su lado (hasta 560 px
+  // de alto), sobre un fondo gris claro que hace de marco.
   // Sin JavaScript: tres por fila (dos en el celular), en 4:3.
-  let galAncho = 0, galRO = null;
-  function armarGaleria(forzar) {
-    const g = $(".loc__gal");
-    if (!g) return;
-    const W = Math.floor(g.getBoundingClientRect().width) - 1;
-    if (W <= 0 || (!forzar && W === galAncho)) return;
-    galAncho = W;
-    const gap = parseFloat(getComputedStyle(g).columnGap) || 8, alto = W < 560 ? 160 : W < 900 ? 220 : 300, tope = alto * 1.35;
-    const porFila = W < 700 ? 2 : 3;
-    const figs = [...g.children], rs = figs.map((f) => +f.dataset.r || 4 / 3), n = rs.length;
+  const galAnchos = new WeakMap();
+  let galRO = null;
+  function armarFotos(g, forzar) {
+    if (!g || !g.isConnected) return;
+    const cs = getComputedStyle(g);
+    const W = Math.floor(g.getBoundingClientRect().width - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0)) - 1;
+    if (W <= 0 || (!forzar && galAnchos.get(g) === W)) return;
+    galAnchos.set(g, W);
+    const figs = [...g.children].filter((f) => f.tagName === "FIGURE"), n = figs.length;
+    if (!n) return;
+    const enTarjeta = g.classList.contains("loc__fotos");
+    const gap = parseFloat(cs.columnGap) || 8, alto = W < 560 ? 160 : W < 900 ? 220 : 300;
+    const tope = enTarjeta ? (W < 560 ? 360 : 560) : alto * 1.35, porFila = enTarjeta ? n : W < 700 ? 2 : 3;
+    const rs = figs.map((f) => +f.dataset.r || 4 / 3);
     const altoDe = (a, b) => { let t = 0; for (let i = a; i < b; i++) t += rs[i]; return (W - gap * (b - a - 1)) / t; };
-    let mejor = null, puntos = Infinity;
-    for (let m = 0; m < 1 << Math.max(0, n - 1); m++) { // cada bit: si hay corte de fila después de esa foto
+    let mejor = [0, n], puntos = Infinity;
+    if (!enTarjeta) for (let m = 0; m < 1 << Math.max(0, n - 1); m++) { // cada bit: si hay corte de fila después de esa foto
       const cortes = [0];
       for (let i = 0; i < n - 1; i++) if (m & (1 << i)) cortes.push(i + 1);
       cortes.push(n);

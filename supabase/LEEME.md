@@ -184,6 +184,9 @@ turnos para reservar. La arma solo el equipo de Bookea, como un servicio: en el 
   negocio para cargarle fotos, frase, historia y servicios. Guarda con `guardar_pagina` (solo la página, nada más del
   negocio). El negocio no la puede cambiar: `pagina` no está entre las columnas que puede tocar. Hace falta correr de nuevo
   `esquema.sql`.
+- **Las fotos de sus tres tarjetas (26/11):** en el mismo editor, "Fotos de las tarjetas" (el lugar, servicios, dónde estamos;
+  hasta dos cada una) se guardan en `pagina.tarjetas`, y `lugar_publico` las devuelve solo si son de la carpeta del negocio
+  (`fotos_publicas`). Hasta correr de nuevo `esquema.sql`, la página las reemplaza por las fotos del lugar.
 - **Para que funcione en bookea.ar:** correr de nuevo `esquema.sql` y después `avisos-por-mail.sql` (en ese orden).
 
 ### Pasar el sitio a Cloudflare Pages (para que las direcciones queden limpias y Google las encuentre)

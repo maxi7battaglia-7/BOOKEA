@@ -862,7 +862,13 @@ begin
     'galeria', jsonb_build_array('https://x.supabase.co/storage/v1/object/public/negocios/' || n || '/g1.webp',
                                  'https://x.supabase.co/storage/v1/object/public/negocios/00000000-0000-0000-0000-000000000000/ajena.webp'),
     'instagram', 'https://www.instagram.com/canchaeva/?hl=es', 'tiktok', '@canchaeva', 'facebook', 'Cancha Eva', 'mostrar_whatsapp', false,
-    'servicios', jsonb_build_array('vest', 'est', '<script>', 5, 'Parrilla con espacios')));
+    'servicios', jsonb_build_array('vest', 'est', '<script>', 5, 'Parrilla con espacios'),
+    'tarjetas', jsonb_build_object(
+      'lugar', jsonb_build_array('https://x.supabase.co/storage/v1/object/public/negocios/' || n || '/t1.webp',
+                                 'https://x.supabase.co/storage/v1/object/public/negocios/' || n || '/t2.webp',
+                                 'https://x.supabase.co/storage/v1/object/public/negocios/' || n || '/t3.webp'),
+      'serv', jsonb_build_array('https://otro-sitio.com/foto.jpg'),
+      'ubi', 'no es una lista')));
   -- las fotos: a la carpeta de un negocio sí; sueltas, no
   insert into storage.objects (bucket_id, name) values ('negocios', n || '/logo-1.webp');
   begin
@@ -882,12 +888,15 @@ begin
      and jsonb_array_length(pg -> 'galeria') = 1, 'fotos de la página (solo las de su carpeta): ' || pg::text;
   assert pg ->> 'instagram' = 'canchaeva' and pg ->> 'tiktok' = 'canchaeva' and pg ->> 'facebook' = 'CanchaEva' and pg ->> 'whatsapp' = '', 'redes: ' || pg::text;
   assert pg -> 'servicios' = '["vest", "est"]'::jsonb, 'servicios (solo claves cortas): ' || coalesce(pg -> 'servicios', 'null'::jsonb)::text;
+  assert jsonb_array_length(pg #> '{tarjetas,lugar}') = 2 and pg #>> '{tarjetas,lugar,1}' like '%/t2.webp'
+     and pg #> '{tarjetas,serv}' = '[]'::jsonb and pg #> '{tarjetas,ubi}' = '[]'::jsonb,
+     'fotos de las tarjetas (hasta dos, solo de su carpeta): ' || coalesce(pg -> 'tarjetas', 'null'::jsonb)::text;
   begin
     insert into storage.objects (bucket_id, name) values ('negocios', current_setting('prueba.neg_eva') || '/sin-cuenta.webp');
     raise exception 'FALLA: sin cuenta se subió una foto';
   exception when insufficient_privilege then null;
   end;
-  raise notice 'OK  la página del negocio: su frase, su historia, solo sus propias fotos, sus servicios y sus redes (sin su WhatsApp si no lo eligió)';
+  raise notice 'OK  la página del negocio: su frase, su historia, solo sus propias fotos (también las de sus tarjetas, hasta dos), sus servicios y sus redes (sin su WhatsApp si no lo eligió)';
 end $$;
 reset role;
 update public.negocios set pagina = pagina || '{"mostrar_whatsapp": true}' where id = current_setting('prueba.neg_eva')::uuid;

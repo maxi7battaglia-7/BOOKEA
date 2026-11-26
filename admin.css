@@ -893,6 +893,13 @@ html:has(#panel:not([hidden])) { scrollbar-gutter: stable; }
 .galp__mas .ico { width: 22px; height: 22px; color: var(--v); }
 #p-fotos:focus-visible + .field__err, .galp__mas:focus-within { outline: 3px solid var(--v); outline-offset: 2px; }
 @media (hover: hover) and (pointer: fine) { .galp__mas:hover { border-color: var(--v); color: var(--v-tinta); background: var(--v50); } }
+/* las fotos de las tres tarjetas de la página: un grupo por tarjeta, hasta dos fotos cada uno */
+.tjp { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+.tjp__t { display: grid; gap: 2px; margin-bottom: 10px; }
+.tjp__t b { font-size: 15px; }
+.tjp__t span { font-size: 13px; color: var(--tx-2); }
+.galp.galp--tj { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 899px) { .tjp { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 1199px) { .galp { grid-template-columns: repeat(3, minmax(0, 1fr)); } .pg .ng-card--desc { grid-column: 1 / -1; } }
 @media (max-width: 760px) {
   .pg-card--port { grid-column: auto; }

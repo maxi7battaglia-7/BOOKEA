@@ -328,13 +328,13 @@ const medir = () => {
         marca: !!document.querySelector('.loc__hero .loc__bookea'), turnos: document.querySelectorAll('#local-root .slot, #local-root .now, #local-root .ptable').length,
         botones: document.querySelectorAll('#local-root [data-act="ficha"]').length, alFinal: !!document.querySelector('.loc__fin [data-act="ficha"]'),
         texto: document.querySelector('#local-root').textContent, mapa: (document.querySelector('.loc__mapa iframe') || {}).src || '',
-        tarjetas: document.querySelectorAll('.loc__cards .loc__card').length, hoy: document.querySelectorAll('.loc__hor tr.is-hoy').length,
-        fotosEnHistoria: document.querySelectorAll('.loc__hist .loc__gal img').length > 0,
+        tarjetas: document.querySelectorAll('.loc__bloque').length, hoy: document.querySelectorAll('.loc__hor tr.is-hoy').length,
+        fotosEnTarjetas: document.querySelectorAll('.loc__bloque .loc__fotos img').length,
         horarios: [...document.querySelectorAll('.loc__hor tr')].map((tr) => tr.textContent), fin: Math.round(document.querySelector('.loc__fin').getBoundingClientRect().height),
       }));
       ok(loc.pagina === 'local' && !loc.splash && loc.sinBookea && loc.marca, `${w} página del negocio: sin la barra, la de abajo, el pie ni la pantalla de carga de Bookea; solo el logo de Bookea sobre la foto`);
-      ok(loc.turnos === 0 && loc.botones === 1 && loc.alFinal && loc.tarjetas >= 8 && !/Características/.test(loc.texto) && /3 canchas de pádel/.test(loc.texto) && /Vestuarios/.test(loc.texto)
-        && !/Galería/.test(loc.texto) && loc.fotosEnHistoria && /Horarios y ubicación/.test(loc.texto) && /maps\.google\.com/.test(loc.mapa),
+      ok(loc.turnos === 0 && loc.botones === 1 && loc.alFinal && loc.tarjetas === 3 && !/Características/.test(loc.texto) && /3 canchas de pádel/.test(loc.texto) && /Vestuarios/.test(loc.texto)
+        && !/Galería/.test(loc.texto) && loc.fotosEnTarjetas >= 2 && /Dónde estamos/.test(loc.texto) && /Servicios/.test(loc.texto) && /maps\.google\.com/.test(loc.mapa),
         `${w} página del negocio: tarjetas con lo que tiene el lugar (canchas, horarios, servicios), galería, horarios con el mapa al lado y un solo botón para reservar, al final (sin turnos ni precios) ${loc.tarjetas}`);
       // compacta (pedido del dueño, 26/11): los días que abren igual van en una sola fila y el cierre es una franja chica
       ok(loc.horarios.length === 1 && /^Todos los días17:00 a 00:30$/.test(loc.horarios[0]) && loc.hoy === 0 && loc.fin > 0 && loc.fin <= 240,
