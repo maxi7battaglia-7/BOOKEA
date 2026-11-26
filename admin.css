@@ -629,6 +629,33 @@ html:has(#panel:not([hidden])) { scrollbar-gutter: stable; }
 .ng-card--desc { grid-column: span 2; display: flex; flex-direction: column; }
 .ng-desc { flex: 1; display: flex; flex-direction: column; gap: 6px; }
 .pa .ng .ng-desc textarea { flex: 1; min-height: 120px; resize: none; }
+/* Mercado Pago (26/11): a lo ancho, entre "Seña y cancelaciones" y "Cómo es el lugar"; el estado, qué pasa y la acción */
+.ng-card--mp { grid-column: 1 / -1; }
+@media (min-width: 1100px) { /* en la compu, en una sola franja: el título a la izquierda y el estado con la acción a la derecha */
+  .ng-card--mp { grid-template-columns: minmax(0, 4fr) minmax(0, 11fr); column-gap: 32px; align-items: center; padding-block: 14px; }
+}
+.mpc { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px 24px; align-items: center; }
+.mpc__info { display: grid; gap: 6px; justify-items: start; min-width: 0; }
+.mpc__t { font-size: 14px; line-height: 1.45; max-width: 86ch; text-wrap: pretty; }
+.mpc__t--cargando { color: var(--tx-2); }
+.mpc__d { font-size: 13px; color: var(--tx-2); font-variant-numeric: tabular-nums; }
+.mpc__alerta { font-size: 13px; line-height: 1.4; color: var(--n-tinta); background: var(--n50); border-radius: var(--r-ctl); padding: 8px 12px; max-width: 86ch; }
+.mpc__acc { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; align-items: center; max-width: 440px; }
+.mpc__conf { flex-basis: 100%; font-size: 13px; color: var(--tx-2); text-align: right; }
+@container (max-width: 680px) {
+  .mpc { grid-template-columns: minmax(0, 1fr); }
+  .mpc__acc { justify-content: flex-start; max-width: none; }
+  .mpc__conf { text-align: left; }
+}
+/* La pestaña que vuelve de Mercado Pago: lo dice y se cierra */
+.mpv { min-height: 100dvh; display: grid; place-items: center; padding: 24px 16px; background: var(--fondo); }
+.mpv__caja { background: var(--caja); border: 1px solid var(--borde); border-radius: var(--r-caja); padding: 32px 28px; max-width: 460px; display: grid; gap: 12px; justify-items: start; }
+.mpv__caja h1 { font-size: 22px; letter-spacing: -0.01em; }
+.mpv__caja p { font-size: 15px; line-height: 1.5; color: var(--tx-2); text-wrap: pretty; }
+.mpv__caja .mpv__sub { font-size: 14px; }
+.mpv__ic { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: var(--v100); color: var(--v-tinta); }
+.mpv__ic--no { background: var(--n50); color: var(--n-tinta); }
+.mpv__ic svg { width: 22px; height: 22px; }
 .ng-card--ubi { display: flex; flex-direction: column; }
 .ng-card--ubi .mapa { margin-top: auto; }
 /* "Así te ven", en noche: la ficha blanca, como la ven tus clientes, arriba de la tarjeta oscura */

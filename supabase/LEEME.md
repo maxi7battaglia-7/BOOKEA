@@ -132,8 +132,9 @@ Para que funcione en bookea.ar, una vez:
 5. **Probar:** en una ventana de incógnito, en bookea.ar reservá un turno, creá una cuenta con un email tuyo,
    confirmala desde el mail y pagá (es simulado). Te tiene que llegar "Tu turno está confirmado" y verse en Mis turnos.
 
-Mientras la seña no se cobre, los mails, la página y la agenda del negocio aclaran que no se cobró. Cuando se cobre
-con Mercado Pago, cambiá `bookea_en_prueba()` (en `esquema.sql`) a `false` y volvé a correr los dos archivos.
+En los negocios que todavía no conectaron Mercado Pago la seña no se cobra, y los mails, la página y la agenda del
+negocio lo aclaran ("Bookea está en prueba"). En los que lo conectaron se cobra de verdad: ver "Cobrar la seña con
+Mercado Pago", abajo.
 
 **Datos personales (Ley 25.326):** antes de abrir el registro a clientes reales, inscribí la base en el Registro
 Nacional de Bases de Datos (AAIP, por Trámites a Distancia, con tu clave fiscal) y completá en `../privacidad.html`
@@ -148,11 +149,12 @@ nombres, emails ni teléfonos.
 
 - **Dónde aparece:** con su link, `bookea.ar/su-link` (el que ve en Mi negocio; `../404.html` lo lleva a
   `bookea.ar/?lugar=su-link`). En la lista de la página (inicio y resultados) aparece recién cuando pueda cobrar la
-  seña con Mercado Pago: hasta entonces `tiene_mercado_pago()` dice que no para todos.
+  seña con Mercado Pago con una cuenta de verdad (`en_la_lista()`; ver "Cobrar la seña con Mercado Pago").
 - **Al reservar:** la base arma el turno con los datos del negocio (no con lo que manda la página): controla que la
   cancha exista, que el horario sea uno de los suyos y que esté libre, y calcula el precio y la seña. El turno entra
-  en su agenda como "por el link", con el nombre y el celular del cliente. Mientras Bookea esté en prueba, en la
-  agenda va sin seña (no se cobró) y con una nota que lo dice.
+  en su agenda como "por el link", con el nombre y el celular del cliente. Si el negocio no cobra con Mercado Pago,
+  en la agenda va sin seña (no se cobró) y con una nota que lo dice; si cobra, dice "Esperando la seña" hasta que se
+  acredita el pago.
 - **Si el cliente cancela,** el horario se libera en la agenda. **Si el negocio lo cancela desde el panel** (o borra
   la fila), se cancela también el del cliente y le llega el mail.
 - **Mails nuevos** (`avisos-por-mail.sql`): al negocio, "Tenés un turno nuevo" (con el cliente y su WhatsApp) y "Se
@@ -208,6 +210,67 @@ ya está en Cloudflare, así que es gratis y son unos clics:
 Nada cambia en Supabase: los links de los mails (`bookea.ar/admin.html`, `bookea.ar/?cuenta=…`) siguen andando.
 Cloudflare abre `admin.html` también como `bookea.ar/admin`.
 
+## Cobrar la seña con Mercado Pago (26/11)
+
+Cada negocio conecta **su** cuenta de Mercado Pago desde el panel (Mi negocio → "Cobrar la seña con Mercado Pago") y la
+seña de cada turno que le reservan en bookea.ar entra directo en esa cuenta. Mercado Pago le descuenta su costo y la
+comisión de Bookea, que llega a la cuenta de Bookea (la de la aplicación BOOKEA). La comisión no se ve en la página.
+
+Cómo anda:
+
+1. **Conectar:** el dueño toca "Conectar Mercado Pago"; se abre Mercado Pago en otra pestaña, da el permiso y vuelve.
+   La función `mp` (`functions/mp/index.ts`) guarda las llaves de su cuenta en **Vault**, cifradas (tabla
+   `mp_cuentas`, que solo guarda dónde están). Con PKCE y un "estado" que sirve una vez: nadie puede colarle otra cuenta.
+2. **Cobrar:** el cliente reserva y toca "Pagar seña": el turno queda **esperando el pago 20 minutos** (en su agenda
+   dice "Esperando la seña") y la función arma el cobro en Mercado Pago (Checkout Pro, API de Orders) con la cuenta del
+   negocio y la comisión de Bookea. El cliente paga en Mercado Pago y vuelve a bookea.ar.
+3. **Confirmar:** Mercado Pago avisa (aviso firmado); la función le pregunta a Mercado Pago cómo salió (nunca le cree
+   al navegador) y el turno queda **confirmado**: llegan los dos mails y la seña aparece en la agenda. Si nadie paga a
+   tiempo, el horario se libera solo.
+4. **Devolver:** si un turno pagado se cancela con tiempo (o lo cancela el negocio sin quedarse con la seña), la seña
+   se devuelve sola por Mercado Pago, desde la cuenta del negocio. Si Mercado Pago no deja (por ejemplo, sin saldo), se
+   vuelve a intentar; después de 48 intentos el panel le avisa al negocio que la devuelva él.
+5. **Renovar:** las llaves duran 180 días; la función las renueva sola un mes antes. Si el dueño le quita el permiso a
+   Bookea desde Mercado Pago, el panel le pide que la conecte de nuevo (mientras tanto, la seña no se cobra).
+
+### Ponerlo en marcha (una vez, en este orden)
+
+1. **Mercado Pago → Tus integraciones → BOOKEA:**
+   - **Configuración avanzada → URL de redireccionamiento:** cambiala por
+     `https://vpxzuutavdjwglglbvdt.supabase.co/functions/v1/mp/oauth` (PKCE: Sí). Tiene que ser exactamente esa.
+   - **Webhooks → Configurar notificaciones:** en la URL (la de prueba y la de producción) poné
+     `https://vpxzuutavdjwglglbvdt.supabase.co/functions/v1/mp/avisos` y marcá el evento **Order (Mercado Pago)**.
+     Al guardar aparece la **clave secreta** de los avisos: la vas a pegar en Supabase en el paso 4.
+   - **Credenciales de producción:** ahí están el **Client ID** (el número de la aplicación) y el **Client Secret**.
+2. **Supabase → Database → Extensions:** activá **pg_cron** (pg_net ya está, por los mails). Con pg_cron, cada minuto
+   se liberan los turnos que nadie pagó, cada 15 minutos se reintentan las devoluciones y una vez por día se renuevan
+   las llaves.
+3. **Supabase → SQL Editor:** pegá todo `esquema.sql` → **Run**; después todo `avisos-por-mail.sql` → **Run**.
+4. **Supabase → Edge Functions → Secrets:** agregá tres secretos (los valores se pegan ahí, nunca en un chat ni en el
+   repo): `MP_CLIENT_ID` (el Client ID), `MP_CLIENT_SECRET` (el Client Secret) y `MP_WEBHOOK_SECRET` (la clave secreta
+   de los avisos). Si en Supabase apagaste las claves viejas (legacy), sumá `BOOKEA_SECRET_KEY` con tu Secret key.
+5. **Supabase → Edge Functions → Deploy a new function → Via Editor:** nombre **`mp`**, borrá el ejemplo, pegá todo
+   `functions/mp/index.ts` y tocá **Deploy**. Después, en la función → **Details** (o Settings): apagá **Verify JWT**
+   ("Enforce JWT verification"): cada ruta controla quién la llama (la página, el panel, Mercado Pago o la base).
+6. **La comisión de Bookea:** en `esquema.sql`, `bookea_comision_pct()` (hoy `0`). Cambiá el número (por ejemplo `8`
+   para el 8 % de cada seña) y corré de nuevo `esquema.sql`. Vale para los cobros que se armen desde ese momento.
+
+### Probarlo sin plata de verdad
+
+En Mercado Pago → Tus integraciones → BOOKEA → **Cuentas de prueba**, creá dos: un **vendedor** y un **comprador**.
+
+1. En una ventana de incógnito, entrá a mercadopago.com.ar con el **vendedor de prueba**. En otra pestaña de esa
+   misma ventana, entrá al panel (bookea.ar/admin.html) con un negocio aprobado y tocá **Conectar Mercado Pago**: el
+   permiso lo da el vendedor de prueba. Con una cuenta de prueba, el negocio no aparece en la lista (sí con su link).
+2. En otra ventana de incógnito, en bookea.ar/su-link/reservar reservá con una cuenta de cliente y tocá **Pagar seña**.
+   En Mercado Pago pagá con el **comprador de prueba** y una tarjeta de prueba (las de la documentación de Mercado
+   Pago; el nombre del titular decide el resultado: `APRO` aprobada, `OTHE` rechazada).
+3. Tiene que volver a bookea.ar con el turno **confirmado**, llegar los dos mails y verse la seña en la agenda del
+   negocio. Cancelalo desde Mis turnos con tiempo: la seña tiene que volver a la cuenta del comprador de prueba.
+
+Si algo falla: **Edge Functions → mp → Logs** dice qué contestó Mercado Pago (nunca muestra llaves). En la base,
+`select * from mp_cobros order by creado desc` muestra cada cobro, su estado y si se devolvió.
+
 ## Que Supabase no pause el proyecto (25/11)
 
 En el plan gratis, Supabase pausa un proyecto que pasa 7 días casi sin uso (avisa por mail antes). Pausado, bookea.ar
@@ -226,9 +289,8 @@ clave publishable de `config.js`).
 
 ## Qué falta para la siguiente etapa
 
-- **Mercado Pago:** que cada negocio conecte su cuenta desde el panel, que la seña se cobre de verdad (y vaya a la
-  cuenta del negocio), que el turno quede guardado 10 minutos en la base mientras se paga y que las devoluciones salgan
-  solas. Con eso, `tiene_mercado_pago()` dice que sí y el negocio aparece en la lista.
+- **Mercado Pago en producción:** probarlo de punta a punta con las cuentas de prueba (arriba) y completar el
+  formulario de homologación de la aplicación en Mercado Pago antes de cobrar a clientes reales.
 - **Pasar los mails de Supabase (confirmar cuenta, contraseña nueva) al castellano** en Authentication → Emails → Templates.
 - **Fotos**: hoy la foto de perfil se guarda chica dentro del negocio; más adelante conviene Supabase Storage.
 
@@ -238,3 +300,6 @@ clave publishable de `config.js`).
   esquema, la aprobación, las reglas de permisos con dos negocios y los avisos por mail (con Vault y pg_net
   simulados).
 - `node supabase/pruebas/e2e/nube-e2e.js`: prueba el panel real y la cuenta de los clientes en el frente contra ese Postgres (ver `pruebas/e2e/LEEME.md`).
+- `node supabase/pruebas/e2e/mp-e2e.js`: el cobro de la seña con Mercado Pago de punta a punta: la función `mp` tal
+  cual se publica, contra ese Postgres y un Mercado Pago de juguete (conectar con PKCE, cobrar con la comisión, el
+  aviso firmado, pagos rechazados y tardíos, devoluciones, renovar las llaves), y en el navegador el panel y la página.

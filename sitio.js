@@ -51,6 +51,7 @@
   const store = {
     get(k, d) { try { const v = localStorage.getItem("bookea:" + k); return v ? JSON.parse(v) : (mem[k] ?? d); } catch { return mem[k] ?? d; } },
     set(k, v) { mem[k] = v; try { localStorage.setItem("bookea:" + k, JSON.stringify(v)); } catch {} },
+    del(k) { delete mem[k]; try { localStorage.removeItem("bookea:" + k); } catch {} },
   };
 
   // ---------- Fechas (Mendoza, UTC-3 fijo) ----------
@@ -182,7 +183,7 @@
     if (foto) IMG[id] = foto;
     const p = {}; (franjas.length ? franjas : [{ precio: 0 }]).forEach((x, i) => (p[i] = x.precio));
     return {
-      id, real: true, nid: f.id, slug: f.slug, publicado: !!f.publicado, rubro, name: String(f.nombre || ""), zona: zonaDe(f.ciudad),
+      id, real: true, nid: f.id, slug: f.slug, publicado: !!f.publicado, cobra: !!f.cobra, rubro, name: String(f.nombre || ""), zona: zonaDe(f.ciudad),
       fotos: foto ? [id] : [], dur, units, recIds, horario: Array.isArray(f.horario) ? f.horario : [], bloques: [],
       senaPct: Math.max(0, Math.min(100, +f.senaPct || 0)), cancel: Math.max(0, Math.round(+f.cancelarHoras) || 0), devuelve: f.devolverSena !== false,
       desc: String(f.descripcion || "").trim(), ame: [], direccion: String(f.direccion || "").trim(), ciudad: String(f.ciudad || "").trim(),
@@ -875,6 +876,8 @@
   if (!reduce) window.addEventListener("scroll", () => { if (S.page === "local" && !portadaRaf) portadaRaf = requestAnimationFrame(moverPortada); }, { passive: true });
 
   // ---------- Pagar la seña: un solo turno, guardado 10 minutos ----------
+  // "21:40": hasta cuándo se guarda un turno que espera el pago (hora de Mendoza)
+  const horaDe = (ms) => { const d = new Date((+ms || 0) - 3 * 3600e3); return String(d.getUTCHours()).padStart(2, "0") + ":" + String(d.getUTCMinutes()).padStart(2, "0"); };
   const mmss = (ms) => { const s = Math.max(0, Math.ceil(ms / 1000)); return String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0"); };
   let tic = null;
   // Un solo reloj para todo: la pantalla de pago, su barra de abajo y el aviso "Pagar" de arriba
@@ -941,7 +944,7 @@
           <div class="big"><span>Seña ahora (${pctDe(v)} %)</span><b>${money(r.sena)}</b></div></div>
           <button type="button" class="btn btn--primary btn--lg btn--block" data-act="pay" style="margin-top:18px"><span class="mp">Pagar seña con Mercado Pago</span></button>
           <p class="note note--ok"><svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg><span>${r.devuelve === false ? "Si cancelás, el horario se libera, pero en este lugar la seña no se devuelve." : r.cancel ? `Podés cancelar hasta ${r.cancel} h antes y la seña se devuelve.` : "Podés cancelar hasta que empiece y la seña se devuelve."}</span></p>
-          <p class="note">${v.real ? "Bookea está en prueba: todavía no se cobra la seña. El turno queda reservado igual en la agenda del lugar." : "Demo: los negocios son de ejemplo y no se cobra nada. En la versión real, acá se abre el pago de Mercado Pago."}</p></div>
+          <p class="note">${v.real && v.cobra ? "Pagás la seña en Mercado Pago, con tarjeta o con el dinero de tu cuenta. El turno queda confirmado apenas se acredita." : v.real ? "Bookea está en prueba: todavía no se cobra la seña. El turno queda reservado igual en la agenda del lugar." : "Demo: los negocios son de ejemplo y no se cobra nada. En la versión real, acá se abre el pago de Mercado Pago."}</p></div>
           <div class="panel chk__mapa"><h2>Dónde queda</h2>${v.real ? dondeReal(v) : `<div class="mapbox">${mapSVG(v.id)}<div class="mapbox__t"><b>${ZONAS[v.zona]}</b>Valle de Uco, Mendoza</div></div>`}<p class="mapnote">Los datos del turno te llegan por mail al confirmar.</p></div></aside>
         <div class="pasos"><h2>Cómo sigue</h2><ol>
           <li><span class="pasos__n">1</span><b>Pagás la seña</b><span>${money(r.sena)} con Mercado Pago. El turno queda confirmado en el momento.</span></li>
@@ -995,6 +998,9 @@
     sesion: "Se cerró tu sesión. Entrá de nuevo con tu email y tu contraseña.",
     libreria: "No pudimos conectarnos. Revisá tu conexión y probá de nuevo.",
     red: "No pudimos conectarnos. Revisá tu conexión y probá de nuevo.",
+    vencido: "Se terminó el tiempo para pagar la seña y el horario se liberó. Elegí otro.",
+    "no-cobra": "Este lugar no está cobrando la seña ahora. Probá de nuevo en un rato o escribiles.",
+    mp: "No pudimos abrir Mercado Pago. Probá de nuevo en un rato.",
     otro: "Algo salió mal. Probá de nuevo en un rato.",
   };
   const msj = (e) => MSJ[e] || MSJ.otro;
@@ -1160,12 +1166,62 @@
       if (res.error === "sesion" || res.error === "sin-datos") { S.yo = null; await aplicar(await CU.iniciar()); }
       return avisoCu(msj(res.error));
     }
+    if (res.turno.estado === "pendiente") return irAMercadoPago(res.turno, ov, v, r); // el negocio cobra la seña de verdad
     ov.innerHTML = `<div class="mpov__in"><div class="okc"><svg class="icon"><use href="#i-check"/></svg></div><h2>¡Turno confirmado!</h2><p>${v.real ? "Bookea está en prueba: no se cobró la seña." : "Es una demo: no se cobró nada."}</p></div>`;
     if (v.real) v.ocup.add(`${r.rec}|${r.fa}|${r.min}`); // ya está en su agenda
     await espera(reduce ? 300 : 1200);
     S.turnos = S.turnos.concat(res.turno); S.res = null; S.vencida = null; guardar(); reloj();
     ov.remove(); pagando = false;
     go("turnos", { nuevos: [res.turno.id] }); toast(v.real ? "Turno confirmado. Bookea está en prueba: no se cobró la seña." : "Turno confirmado (demo, sin cobro).");
+  }
+
+  // ---------- Pagar la seña en Mercado Pago (negocios que cobran: pedido del dueño, 26/11) ----------
+  // El turno ya está guardado en la base esperando el pago (20 minutos, también en la agenda del negocio). La función
+  // "mp" arma el cobro con la cuenta del negocio y se va a Mercado Pago; al volver, se pregunta cómo salió (volverDePago).
+  // Si no se pudo abrir, el turno sigue esperando en Mis turnos, con "Pagar seña".
+  async function irAMercadoPago(t, ov, v, r) {
+    if (v.real) v.ocup.add(`${r.rec}|${r.fa}|${r.min}`); // ya está en su agenda
+    S.turnos = S.turnos.filter((x) => x.id !== t.id).concat(t); S.res = null; S.vencida = null; guardar(); reloj();
+    const c = await CU.cobrar(t.id);
+    if (c.ok && c.url) { store.set("pagando", { id: t.id, desde: Date.now() }); location.assign(c.url); return; }
+    ov.remove(); pagando = false;
+    if (c.ok && c.estado === "confirmado") { await recargarTurnos(); go("turnos", { nuevos: [t.id] }); return; }
+    await recargarTurnos();
+    go("turnos", { espera: t.id, pago: "error" }); toast(msj(c.ok ? "mp" : c.error));
+  }
+  async function recargarTurnos() {
+    const l = await CU.turnos();
+    if (l.ok) { S.turnos = l.lista.filter((x) => venue(x.vid) || x.lugar); badges(); }
+  }
+  // Desde Mis turnos: "Pagar seña" de uno que espera el pago
+  async function pagarPendiente(id, b) {
+    if (b) b.disabled = true;
+    const c = await CU.cobrar(id);
+    if (c.ok && c.url) { store.set("pagando", { id, desde: Date.now() }); location.assign(c.url); return; }
+    if (b) b.disabled = false;
+    await recargarTurnos();
+    if (c.ok && c.estado === "confirmado") { renderTurnos({ nuevos: [id] }); toast("Tu seña ya estaba pagada: el turno está confirmado."); return; }
+    renderTurnos();
+    toast(c.ok && c.estado === "cancelado" ? msj("vencido") : msj(c.ok ? "mp" : c.error));
+  }
+  // Vuelve de Mercado Pago (?pago=ok|error|pendiente&turno=…): se le pregunta a la función (que le pregunta a Mercado
+  // Pago) cómo salió, unas veces, porque el aviso de Mercado Pago puede tardar unos segundos
+  async function volverDePago(p) {
+    store.del("pagando");
+    const ov = document.createElement("div"); ov.className = "mpov"; ov.setAttribute("role", "alertdialog"); ov.setAttribute("aria-live", "polite");
+    ov.innerHTML = `<div class="mpov__in"><div class="spin"></div><h2>${p.estado === "error" ? "Volviste de Mercado Pago" : "Confirmando tu pago"}</h2><p>Le estamos preguntando a Mercado Pago cómo salió el pago de tu seña.</p></div>`;
+    document.body.appendChild(ov);
+    let c = null;
+    for (let i = 0; i < (p.estado === "error" ? 1 : 8); i++) {
+      c = await CU.cobrar(p.turno, true);
+      if (!c.ok || c.estado !== "pendiente") break;
+      await espera(reduce ? 400 : 2000);
+    }
+    await recargarTurnos();
+    ov.remove();
+    if (c && c.ok && c.estado === "confirmado") { go("turnos", { nuevos: [p.turno] }, true); toast("¡Listo! Pagaste la seña y tu turno está confirmado."); return; }
+    if (c && c.ok && c.estado === "cancelado") { go("turnos", {}, true); toast("Se terminó el tiempo para pagar y el horario se liberó. Si llegaste a pagar, la seña se te devuelve sola."); return; }
+    go("turnos", { espera: p.turno, pago: p.estado }, true);
   }
 
   // ---------- Mis turnos ----------
@@ -1186,10 +1242,16 @@
     }
     const cuenta = miCuentaHTML();
     if (!lista.length) { root.innerHTML = `<h1>Mis turnos</h1><p class="sub">Acá vas a ver tus turnos confirmados.</p><div class="mt"><div class="mt__lista"><div class="empty"><h3>Todavía no tenés turnos</h3><p>Reservá el primero en segundos.</p><button type="button" class="btn btn--primary" data-go="home" data-focus="pick">Buscar turnos</button></div></div>${cuenta}</div>${mas}`; return; }
-    const ahora = Date.now();
+    const ahora = Date.now(), esperan = lista.filter((x) => x.estado === "pendiente");
+    const enEspera = st.espera && lista.find((x) => x.id === st.espera && x.estado === "pendiente");
+    const aviso = enEspera ? `<div class="okban okban--espera"><span class="okban__ic"><svg class="icon" aria-hidden="true"><use href="#i-clock"/></svg></span><div><b>${st.pago === "error" ? "La seña todavía no se pagó" : "Tu pago se está procesando"}</b><span>${st.pago === "error" ? `Probá de nuevo antes de las ${horaDe(enEspera.vence)}: hasta entonces te guardamos el turno.` : "Cuando Mercado Pago lo acredite, el turno queda confirmado y te llega el mail. Si no se acredita, probá de nuevo desde acá."}</span></div><button type="button" class="btn btn--primary btn--s" data-act="mp-pagar" data-id="${enEspera.id}">Pagar seña</button></div>` : "";
     const listo = st.nuevos ? `<div class="okban"><span class="okban__ic"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg></span><div><b>¡Listo, tu turno está confirmado!</b><span>Te mandamos los datos por mail a ${esc(S.yo.email)}. El resto lo pagás en el lugar.</span></div><button type="button" class="btn btn--ink btn--s" data-go="home" data-focus="pick">Reservar otro turno</button></div>` : "";
-    root.innerHTML = `<h1>Mis turnos</h1><p class="sub">Tus turnos confirmados, con la seña ya paga.</p>${listo}<div class="mt"><div class="mt__lista">` + lista.map((it) => {
+    root.innerHTML = `<h1>Mis turnos</h1><p class="sub">${esperan.length ? "Tus turnos: los confirmados y los que esperan el pago de la seña." : "Tus turnos confirmados, con la seña ya paga."}</p>${aviso}${listo}<div class="mt"><div class="mt__lista">` + lista.map((it) => {
       const v = lugarDeTurno(it), R = RUBROS[v.rubro], svc = v.svcs.find((s) => s.id === it.svc) || v.svcs[0], pasado = cuando(it).getTime() + 3600e3 < ahora;
+      if (it.estado === "pendiente") return `<article class="tcard tcard--espera"><div class="tcard__h"><span class="code">${it.code}</span><span class="status status--espera">Esperando el pago</span></div>
+        <div class="tcard__b"><div><h3>${esc(v.name)}</h3><div class="tcard__when">${keyLabel(it.key)} · ${it.t}–${it.end}</div><p>${R.n} · ${esc(it.unit)} · te lo guardamos hasta las ${horaDe(it.vence)}</p></div>
+        <div class="tcard__act"><button type="button" class="btn btn--primary btn--s" data-act="mp-pagar" data-id="${it.id}">Pagar seña</button><button type="button" class="btn btn--line btn--s" data-act="cancel" data-id="${it.id}">Cancelar</button></div></div>
+        <div class="tcard__money"><span>Seña a pagar <b>${money(it.sena)}</b></span><span>En el lugar <b>${money(it.precio - it.sena)}</b></span></div></article>`;
       const txt = encodeURIComponent(`Turno en ${v.name}: ${keyLabel(it.key)} ${it.t} hs (${it.unit}). Código ${it.code}.`);
       return `<article class="tcard${st.nuevos && st.nuevos.includes(it.id) ? " is-new" : ""}"><div class="tcard__h"><span class="code">${it.code}</span><span class="status"${pasado ? ' style="color:var(--ink-500);background:var(--ink-100)"' : ""}>${pasado ? "Finalizado" : "Confirmado"}</span></div>
         <div class="tcard__b"><div><h3>${esc(v.name)}</h3><div class="tcard__when">${keyLabel(it.key)} · ${it.t}–${it.end}</div><p>${R.n}${v.rubro === "barberia" ? " · " + svc.n : ""} · ${esc(it.unit)} · ${ZONAS[v.zona]}</p></div>
@@ -1213,7 +1275,7 @@
     const horas = (cuando(it) - Date.now()) / 3600e3, devuelve = it.devuelve !== false && horas > it.cancel;
     const dlg = $("#dlg");
     $("#dlg-t").textContent = "¿Cancelar este turno?";
-    $("#dlg-p").textContent = it.devuelve === false ? `En este lugar la seña no se devuelve: la seña de ${money(it.sena)} queda para el negocio y el turno se libera.` : devuelve ? `Cancelás con más de ${it.cancel} h de anticipación: la seña de ${money(it.sena)} se devuelve y el turno se libera.` : `Faltan menos de ${it.cancel} h: la seña de ${money(it.sena)} queda para el negocio y el turno se libera.`;
+    $("#dlg-p").textContent = it.estado === "pendiente" ? "Todavía no pagaste la seña: si lo cancelás, el horario se libera." : it.devuelve === false ? `En este lugar la seña no se devuelve: la seña de ${money(it.sena)} queda para el negocio y el turno se libera.` : devuelve ? `Cancelás con más de ${it.cancel} h de anticipación: la seña de ${money(it.sena)} se devuelve y el turno se libera.` : `Faltan menos de ${it.cancel} h: la seña de ${money(it.sena)} queda para el negocio y el turno se libera.`;
     $("#dlg-si").textContent = "Cancelar turno";
     $("#dlg-si").onclick = async () => {
       const b = $("#dlg-si"); b.disabled = true;
@@ -1332,6 +1394,7 @@
         case "cambiar": { const x = vigente(); if (x) go("ficha", { v: x.vid, dia: diaDe(x.key), t: x.t }); break; }
         case "otra-vez": otraVez(); break;
         case "cancel": cancelar(d.id); break;
+        case "mp-pagar": pagarPendiente(d.id, t); break;
         // la cuenta del cliente
         case "cu-modo": {
           const correo = $("#cu-email") ? $("#cu-email").value : "";
@@ -1435,9 +1498,15 @@
   badges(); reloj(); // si quedó un turno guardado de antes, sigue corriendo su tiempo
   // En pantallas táctiles, que :active (el apretado de botones y tarjetas) funcione también en iPhone
   document.addEventListener("touchstart", () => {}, { passive: true });
+  // Vuelve de pagar la seña en Mercado Pago: ?pago=ok|error|pendiente&turno=… (la dirección la arma la función "mp")
+  const PAGO = (() => {
+    const q = new URLSearchParams(location.search), p = q.get("pago") || "", t = q.get("turno") || "";
+    return /^(ok|error|pendiente)$/.test(p) && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(t) ? { estado: p, turno: t } : null;
+  })();
   // Links que llegan con datos: resultados de un rubro, o una sección de la parte para negocios
   const inicial = (() => {
     const q = new URLSearchParams(location.search), h = location.hash.slice(1);
+    if (PAGO) return { page: "turnos" };
     if (RUBROS[q.get("rubro")]) {
       S.rubro = S.hs = q.get("rubro"); S.sec = secDe(S.rubro); S.ult[S.sec] = S.rubro;
       if (ZONAS[q.get("zona")]) S.zona = q.get("zona");
@@ -1478,6 +1547,11 @@
   CU.alRecuperar(pedirClaveNueva);
   CU.iniciar().then(async (r) => {
     await aplicar(r);
+    if (PAGO) {
+      if (S.yo) return volverDePago(PAGO);
+      S.modoCu = "entrar"; go("turnos", {}, true); toast("Entrá con tu cuenta para ver cómo quedó el pago de tu seña.");
+      return;
+    }
     if (CU.vuelta === "confirmada") {
       if (S.yo) { toast("Tu email quedó confirmado."); if (vigente()) go("pago", {}, true); else if (S.page !== "turnos") go("turnos", {}, true); }
       else { toast(r.linkVencido ? "Ese link ya se usó o venció. Entrá con tu email y tu contraseña." : "Tu email quedó confirmado. Entrá con tu email y tu contraseña."); S.modoCu = "entrar"; go(vigente() ? "pago" : "turnos", {}, true); }

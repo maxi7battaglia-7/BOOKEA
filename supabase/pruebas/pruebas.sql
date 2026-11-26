@@ -950,4 +950,363 @@ begin
 end $$;
 reset role;
 
+-- =============== Mercado Pago: el negocio cobra la seña con su cuenta (26/11) ===============
+-- (las llaves de estas pruebas son inventadas: PRUEBA_LLAVE_… y PRUEBA_RENOVAR_…)
+-- Lo de Mercado Pago lo usa solo la función (service_role): desde la página o el panel no se toca
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000e1', false) \g /dev/null
+set role authenticated;
+do $$
+declare f text;
+begin
+  foreach f in array array['mp_empezar_conexion(''' || current_setting('prueba.neg_eva') || '''::uuid, auth.uid())',
+      'mp_tomar_estado(''x'')', 'mp_llaves(''' || current_setting('prueba.neg_eva') || '''::uuid)', 'mp_por_devolver()',
+      'mp_resultado(''ORD1'', ''processed'', ''accredited'', 1)', 'mp_guardar_cuenta(''' || current_setting('prueba.neg_eva') || '''::uuid, null, ''{}''::jsonb)'] loop
+    begin
+      execute 'select public.' || f;
+      raise exception 'FALLA: un cliente usó public.%', f;
+    exception when insufficient_privilege then null;
+    end;
+  end loop;
+  begin
+    perform 1 from public.mp_cuentas;
+    raise exception 'FALLA: un cliente leyó las cuentas de Mercado Pago';
+  exception when insufficient_privilege then null;
+  end;
+  begin
+    perform public.mi_mercado_pago(current_setting('prueba.neg_eva')::uuid);
+    raise exception 'FALLA: un cliente vio la conexión de Mercado Pago de un negocio';
+  exception when insufficient_privilege then null;
+  end;
+  raise notice 'OK  Mercado Pago: las llaves, los cobros y la conexión no se tocan desde la página ni con la cuenta de un cliente';
+end $$;
+reset role;
+
+-- Conectar: solo el dueño; el pedido sirve una vez, por 15 minutos, y el desafío PKCE sale del verificador
+set role service_role;
+do $$
+declare r jsonb; x public.mp_estados%rowtype; t jsonb;
+begin
+  begin
+    perform public.mp_empezar_conexion(current_setting('prueba.neg_eva')::uuid, '00000000-0000-0000-0000-0000000000e1');
+    raise exception 'FALLA: alguien que no es el dueño empezó a conectar Mercado Pago';
+  exception when insufficient_privilege then null;
+  end;
+  r := public.mp_empezar_conexion(current_setting('prueba.neg_eva')::uuid, current_setting('prueba.eva')::uuid);
+  assert r ->> 'estado' ~ '^[0-9a-f]{64}$' and r ->> 'desafio' ~ '^[A-Za-z0-9_-]{43}$', 'pedido de conexión: ' || r::text;
+  reset role;
+  select * into x from public.mp_estados where estado = r ->> 'estado';
+  assert translate(rtrim(encode(sha256(convert_to(x.verificador, 'UTF8')), 'base64'), '='), '+/', '-_') = r ->> 'desafio'
+     and x.verificador <> x.estado, 'el desafío no sale del verificador';
+  set role service_role;
+  t := public.mp_tomar_estado(r ->> 'estado');
+  assert t ->> 'negocio' = current_setting('prueba.neg_eva') and t ->> 'quien' = current_setting('prueba.eva') and t ->> 'verificador' = x.verificador, 'tomar: ' || coalesce(t::text, 'nada');
+  assert public.mp_tomar_estado(r ->> 'estado') is null, 'el pedido de conexión sirvió dos veces';
+  -- uno de hace más de 15 minutos ya no sirve
+  r := public.mp_empezar_conexion(current_setting('prueba.neg_eva')::uuid, current_setting('prueba.eva')::uuid);
+  reset role;
+  update public.mp_estados set creado = now() - interval '16 minutes' where estado = r ->> 'estado';
+  set role service_role;
+  assert public.mp_tomar_estado(r ->> 'estado') is null, 'sirvió un pedido de conexión vencido';
+  raise notice 'OK  conectar Mercado Pago: solo el dueño, el pedido sirve una vez y por 15 minutos, y el desafío PKCE sale del verificador';
+end $$;
+reset role;
+
+-- Las llaves quedan en Vault (no en la tabla); al renovarlas se pisan las mismas
+set role service_role;
+do $$
+declare r jsonb; ll jsonb;
+begin
+  begin
+    perform public.mp_guardar_cuenta(current_setting('prueba.neg_eva')::uuid, current_setting('prueba.eva')::uuid, '{"access_token": "x"}');
+    raise exception 'FALLA: se guardó una cuenta sin llaves';
+  exception when invalid_parameter_value then null;
+  end;
+  r := public.mp_guardar_cuenta(current_setting('prueba.neg_eva')::uuid, current_setting('prueba.eva')::uuid,
+    '{"access_token": "PRUEBA_LLAVE_uno_0123456789", "refresh_token": "PRUEBA_RENOVAR_uno",
+      "user_id": 555, "expires_in": 15552000, "live_mode": true}');
+  assert (r ->> 'conectado')::boolean and r ->> 'cuenta' = '555', 'guardar: ' || r::text;
+  ll := public.mp_llaves(current_setting('prueba.neg_eva')::uuid);
+  assert ll ->> 'llave' = 'PRUEBA_LLAVE_uno_0123456789' and ll ->> 'renovar' = 'PRUEBA_RENOVAR_uno' and ll ->> 'usuario' = '555'
+     and (ll ->> 'vence')::timestamptz > now() + interval '179 days', 'llaves: ' || ll::text;
+end $$;
+reset role;
+do $$
+declare n int;
+begin
+  assert (select to_jsonb(c)::text from public.mp_cuentas c where negocio_id = current_setting('prueba.neg_eva')::uuid) not like '%PRUEBA_%',
+    'las llaves quedaron en la tabla y no en Vault';
+  select count(*) into n from vault.secrets;
+  perform set_config('prueba.secretos', n::text, false);
+  assert public.tiene_mercado_pago(current_setting('prueba.neg_eva')::uuid) and public.en_la_lista(current_setting('prueba.neg_eva')::uuid), 'no quedó conectado';
+end $$;
+set role service_role;
+select public.mp_guardar_cuenta(current_setting('prueba.neg_eva')::uuid, null,
+  '{"access_token": "PRUEBA_LLAVE_dos_0123456789", "refresh_token": "PRUEBA_RENOVAR_dos", "user_id": "555", "expires_in": 100}') \g /dev/null
+reset role;
+do $$ begin
+  assert (select count(*) from vault.secrets) = current_setting('prueba.secretos')::int, 'al renovar se crearon llaves nuevas en Vault';
+  assert (select decrypted_secret from vault.decrypted_secrets d join public.mp_cuentas c on c.llave_id = d.id
+           where c.negocio_id = current_setting('prueba.neg_eva')::uuid) = 'PRUEBA_LLAVE_dos_0123456789', 'no se renovó la llave';
+  assert (select quien from public.mp_cuentas where negocio_id = current_setting('prueba.neg_eva')::uuid) = current_setting('prueba.eva')::uuid,
+    'al renovar se perdió quién la conectó';
+  raise notice 'OK  las llaves de Mercado Pago quedan en Vault, cifradas, y al renovarlas se pisan las mismas';
+end $$;
+
+-- Conectado: aparece en la lista y la página sabe que la seña se cobra. Con una cuenta de prueba de Mercado Pago, solo por su link.
+update public.negocios set ajustes = ajustes || '{"devolverSena": true}' where id = current_setting('prueba.neg_eva')::uuid;
+set role anon;
+do $$
+declare l jsonb := public.lugares_publicos();
+begin
+  assert jsonb_array_length(l) = 1 and l -> 0 ->> 'slug' = 'canchaeva' and (l -> 0 ->> 'publicado')::boolean and (l -> 0 ->> 'cobra')::boolean, 'lista: ' || l::text;
+  assert l::text not like '%PRUEBA_%', 'la página ve las llaves';
+end $$;
+reset role;
+update public.mp_cuentas set real = false where negocio_id = current_setting('prueba.neg_eva')::uuid;
+set role anon;
+do $$ begin
+  assert public.lugares_publicos() = '[]'::jsonb and (public.lugares_publicos('canchaeva') -> 0 ->> 'cobra')::boolean, 'cuenta de prueba de Mercado Pago';
+  raise notice 'OK  con Mercado Pago conectado aparece en la lista y cobra la seña (con una cuenta de prueba de Mercado Pago, solo por su link)';
+end $$;
+reset role;
+update public.mp_cuentas set real = true where negocio_id = current_setting('prueba.neg_eva')::uuid;
+
+-- La comisión de Bookea sale de la seña (acá, con 10 %)
+create or replace function public.bookea_comision_pct() returns numeric language sql immutable as $$ select 10::numeric $$;
+do $$ begin
+  assert public.comision_de(12500) = 1250 and public.comision_de(0) = 0 and public.comision_de(1) = 0, 'comisión';
+end $$;
+
+-- Juli reserva: el turno queda esperando el pago 20 minutos, también en la agenda, con la seña en 0
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000e1', false) \g /dev/null
+set role authenticated;
+do $$
+declare t jsonb;
+begin
+  t := public.reservar_turno(jsonb_build_object('negocio_id', current_setting('prueba.neg_eva'), 'recurso', 'r2',
+    'fecha_agenda', current_setting('prueba.dia_eva'), 'minuto', 1320));
+  assert t ->> 'estado' = 'pendiente' and t ->> 'pago' = 'pendiente' and (t ->> 'sena')::int = 12500 and (t ->> 'comision')::int = 1250
+     and (t ->> 'vence')::timestamptz between now() + interval '19 minutes' and now() + interval '21 minutes', 'pendiente: ' || t::text;
+  perform set_config('prueba.mp_turno', t ->> 'id', false);
+  -- nadie le gana el horario mientras paga
+  assert public.horarios_ocupados('canchaeva') @> jsonb_build_array(jsonb_build_array('r2', current_setting('prueba.dia_eva'), 1320)), 'el que espera el pago no ocupa el horario';
+end $$;
+reset role;
+do $$
+declare r public.reservas%rowtype;
+begin
+  select * into r from public.reservas where id = (select reserva_id from public.turnos where id = current_setting('prueba.mp_turno')::uuid);
+  assert r.sena = 0 and r.estado = 'confirmada' and r.nota like '%Esperando que pague la seña de $ 12500 con Mercado Pago%', 'agenda: ' || to_jsonb(r)::text;
+  raise notice 'OK  con Mercado Pago, el turno queda esperando el pago 20 minutos: ocupa el horario y está en la agenda con la seña en 0';
+end $$;
+
+-- La función pide los datos del cobro (solo el cliente del turno) y anota el cobro que armó
+set role service_role;
+do $$
+declare d jsonb;
+begin
+  begin
+    perform public.mp_datos_cobro(current_setting('prueba.mp_turno')::uuid, '00000000-0000-0000-0000-00000000000c');
+    raise exception 'FALLA: otra cuenta pidió cobrar el turno de Juli';
+  exception when no_data_found then null;
+  end;
+  d := public.mp_datos_cobro(current_setting('prueba.mp_turno')::uuid, '00000000-0000-0000-0000-0000000000e1');
+  assert d ->> 'estado' = 'pendiente' and (d ->> 'monto')::int = 12500 and (d ->> 'comision')::int = 1250 and d ->> 'email' = 'juli@prueba.com'
+     and (d ->> 'cobra')::boolean and (d ->> 'minutos')::int between 18 and 20 and d -> 'abiertos' = '[]'::jsonb
+     and d ->> 'titulo' like 'Seña · Cancha Eva · %22:00 · Cancha 2 · techada', 'datos del cobro: ' || d::text;
+  perform public.mp_cobro_creado(current_setting('prueba.mp_turno')::uuid, 'ORDTST01', 'https://www.mercadopago.com.ar/checkout/v1/redirect?order_id=ORDTST01', 12500, 1250);
+  d := public.mp_datos_cobro(current_setting('prueba.mp_turno')::uuid, '00000000-0000-0000-0000-0000000000e1');
+  assert d -> 'abiertos' -> 0 ->> 'orden' = 'ORDTST01' and (d ->> 'intento')::int = 1, 'cobro abierto: ' || d::text;
+  assert public.mp_cobro('ORDTST01') ->> 'negocio' = current_setting('prueba.neg_eva'), 'cobro: ' || public.mp_cobro('ORDTST01')::text;
+  -- mientras no se acredite, nada cambia; si dice que se pagó menos que la seña, no se confirma
+  assert public.mp_resultado('ORDTST01', 'action_required', 'waiting_payment', 0) ->> 'accion' = 'nada', 'en curso';
+  begin
+    perform public.mp_resultado('ORDTST01', 'processed', 'accredited', 100);
+    raise exception 'FALLA: se confirmó un pago menor que la seña';
+  exception when invalid_parameter_value then null;
+  end;
+  assert public.mp_resultado('ORDTST99', 'processed', 'accredited', 12500) ->> 'accion' = 'desconocido', 'una orden que no es de Bookea';
+  raise notice 'OK  la función cobra solo el turno del cliente, con la seña y la comisión de la base, y anota el cobro';
+end $$;
+reset role;
+
+-- Se acredita: el turno queda confirmado y la seña aparece en la agenda. Si avisa dos veces, no pasa nada más.
+set role service_role;
+do $$
+declare r jsonb;
+begin
+  r := public.mp_resultado('ORDTST01', 'processed', 'accredited', 12500);
+  assert r ->> 'accion' = 'confirmado' and r ->> 'turno' = current_setting('prueba.mp_turno'), 'resultado: ' || r::text;
+  assert public.mp_resultado('ORDTST01', 'processed', 'accredited', 12500) ->> 'accion' = 'nada', 'el mismo pago se procesó dos veces';
+end $$;
+reset role;
+do $$
+declare t public.turnos%rowtype; r public.reservas%rowtype;
+begin
+  select * into t from public.turnos where id = current_setting('prueba.mp_turno')::uuid;
+  select * into r from public.reservas where id = t.reserva_id;
+  assert t.estado = 'confirmado' and t.pago = 'aprobado' and t.pagado is not null and t.vence is null, 'turno pagado: ' || to_jsonb(t)::text;
+  assert r.sena = 12500 and r.nota like '%Seña de $ 12500 pagada con Mercado Pago%', 'agenda pagada: ' || to_jsonb(r)::text;
+  assert (select estado from public.mp_cobros where orden = 'ORDTST01') = 'aprobado', 'el cobro no quedó aprobado';
+  raise notice 'OK  al acreditarse la seña el turno queda confirmado y la seña aparece en la agenda (una sola vez)';
+end $$;
+
+-- Si alguien paga dos veces el mismo turno, el segundo pago se devuelve
+set role service_role;
+select public.mp_cobro_creado(current_setting('prueba.mp_turno')::uuid, 'ORDTST02', 'https://x', 12500, 1250) \g /dev/null
+do $$ begin
+  assert public.mp_resultado('ORDTST02', 'processed', 'accredited', 12500) ->> 'accion' = 'devolver', 'doble pago';
+  assert public.mp_por_devolver() @> '[{"orden": "ORDTST02"}]'::jsonb, 'el doble pago no quedó para devolver: ' || public.mp_por_devolver()::text;
+  raise notice 'OK  si se paga dos veces el mismo turno, el segundo pago queda para devolver';
+end $$;
+reset role;
+
+-- Juli cancela con tiempo: la seña queda para devolver; la función la devuelve (o reintenta si Mercado Pago no deja)
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000e1', false) \g /dev/null
+set role authenticated;
+do $$ begin
+  assert (public.cancelar_turno(current_setting('prueba.mp_turno')::uuid) ->> 'devuelve')::boolean, 'cancelar con tiempo';
+end $$;
+reset role;
+set role service_role;
+do $$
+declare p jsonb := public.mp_por_devolver();
+begin
+  assert p @> '[{"orden": "ORDTST01"}, {"orden": "ORDTST02"}]'::jsonb and p -> 0 ->> 'negocio' = current_setting('prueba.neg_eva'), 'cola: ' || p::text;
+  perform public.mp_devolucion('ORDTST01', true, 'refunded');
+  perform public.mp_devolucion('ORDTST02', false, 'sin saldo');
+  p := public.mp_por_devolver();
+  assert not p @> '[{"orden": "ORDTST01"}]'::jsonb and p @> '[{"orden": "ORDTST02", "intentos": 1}]'::jsonb, 'cola después: ' || p::text;
+end $$;
+reset role;
+do $$ begin
+  assert (select pago from public.turnos where id = current_setting('prueba.mp_turno')::uuid) = 'devuelto', 'el turno no dice que se devolvió';
+  assert (select estado || devolucion from public.mp_cobros where orden = 'ORDTST01') = 'devueltohecha', 'el cobro no dice que se devolvió';
+  update public.mp_cobros set intentos = 47 where orden = 'ORDTST02';
+end $$;
+set role service_role;
+select public.mp_devolucion('ORDTST02', false, 'sin saldo') \g /dev/null
+reset role;
+do $$ begin
+  assert (select devolucion from public.mp_cobros where orden = 'ORDTST02') = 'fallo', 'después de 48 intentos sigue en la cola';
+  update public.mp_cobros set devolucion = 'hecha' where orden = 'ORDTST02';
+  raise notice 'OK  al cancelar con tiempo la seña queda para devolver; la función la devuelve o reintenta (48 veces y queda para el negocio)';
+end $$;
+
+-- Si nadie paga a tiempo, el horario se libera solo y sale de la agenda; si el pago llega igual, se devuelve
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000e1', false) \g /dev/null
+set role authenticated;
+select set_config('prueba.mp_vence', (public.reservar_turno(jsonb_build_object('negocio_id', current_setting('prueba.neg_eva'), 'recurso', 'r2',
+  'fecha_agenda', current_setting('prueba.dia_eva'), 'minuto', 1380)) ->> 'id'), false) \g /dev/null
+reset role;
+set role service_role;
+select public.mp_cobro_creado(current_setting('prueba.mp_vence')::uuid, 'ORDTST03', 'https://x', 12500, 1250) \g /dev/null
+reset role;
+update public.turnos set vence = now() - interval '1 minute' where id = current_setting('prueba.mp_vence')::uuid;
+select set_config('prueba.mp_vence_r', (select reserva_id::text from public.turnos where id = current_setting('prueba.mp_vence')::uuid), false) \g /dev/null
+set role anon;
+do $$ begin
+  assert not public.horarios_ocupados('canchaeva') @> jsonb_build_array(jsonb_build_array('r2', current_setting('prueba.dia_eva'), 1380)),
+    'un turno vencido sin pagar sigue ocupando el horario en la página';
+end $$;
+reset role;
+select set_config('request.jwt.claim.sub', current_setting('prueba.eva'), false) \g /dev/null
+set role authenticated;
+do $$ begin
+  assert public.vencer_pendientes() = 1, 'el panel no liberó el turno vencido';
+end $$;
+reset role;
+do $$
+declare t public.turnos%rowtype;
+begin
+  select * into t from public.turnos where id = current_setting('prueba.mp_vence')::uuid;
+  assert t.estado = 'cancelado' and t.cancelado_por = 'sin_pago' and not exists (select 1 from public.reservas where id = current_setting('prueba.mp_vence_r')::uuid),
+    'vencido: ' || to_jsonb(t)::text;
+end $$;
+set role service_role;
+do $$ begin
+  assert public.mp_resultado('ORDTST03', 'processed', 'accredited', 12500) ->> 'accion' = 'devolver', 'pago tardío';
+  raise notice 'OK  si nadie paga a tiempo, el horario se libera solo (y sale de la agenda); si el pago llega igual, se devuelve';
+end $$;
+reset role;
+update public.mp_cobros set devolucion = 'hecha' where orden = 'ORDTST03';
+
+-- Cancelar uno que espera el pago: sale de la agenda y no hay nada que devolver. El negocio también puede sacarlo.
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000e1', false) \g /dev/null
+set role authenticated;
+do $$
+declare t jsonb; r jsonb;
+begin
+  t := public.reservar_turno(jsonb_build_object('negocio_id', current_setting('prueba.neg_eva'), 'recurso', 'r2',
+    'fecha_agenda', current_setting('prueba.dia_eva'), 'minuto', 1380));
+  r := public.cancelar_turno((t ->> 'id')::uuid);
+  assert r ->> 'estado' = 'cancelado' and not (r ->> 'devuelve')::boolean, 'cancelar pendiente: ' || r::text;
+  perform set_config('prueba.mp_r1', t ->> 'reserva_id', false);
+  t := public.reservar_turno(jsonb_build_object('negocio_id', current_setting('prueba.neg_eva'), 'recurso', 'r2',
+    'fecha_agenda', current_setting('prueba.dia_eva'), 'minuto', 1380));
+  perform set_config('prueba.mp_t2', t ->> 'id', false);
+end $$;
+reset role;
+do $$ begin
+  assert not exists (select 1 from public.reservas where id = current_setting('prueba.mp_r1')::uuid), 'el pendiente cancelado sigue en la agenda';
+  delete from public.reservas where id = (select reserva_id from public.turnos where id = current_setting('prueba.mp_t2')::uuid);
+  assert (select estado || cancelado_por || devuelta::text from public.turnos where id = current_setting('prueba.mp_t2')::uuid) = 'canceladonegociofalse',
+    'el negocio sacó de la agenda uno que esperaba el pago';
+  raise notice 'OK  cancelar uno que espera el pago lo saca de la agenda (también si lo saca el negocio), sin nada que devolver';
+end $$;
+
+-- El panel ve cómo está la conexión; solo el dueño la desconecta, y no mientras alguien está pagando
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000e1', false) \g /dev/null
+set role authenticated;
+select set_config('prueba.mp_t3', (public.reservar_turno(jsonb_build_object('negocio_id', current_setting('prueba.neg_eva'), 'recurso', 'r1',
+  'fecha_agenda', current_setting('prueba.dia_eva'), 'minuto', 1320)) ->> 'id'), false) \g /dev/null
+do $$ begin
+  begin
+    perform public.mp_desconectar(current_setting('prueba.neg_eva')::uuid);
+    raise exception 'FALLA: un cliente desconectó el Mercado Pago de un negocio';
+  exception when insufficient_privilege then null;
+  end;
+end $$;
+reset role;
+select set_config('request.jwt.claim.sub', current_setting('prueba.eva'), false) \g /dev/null
+set role authenticated;
+do $$
+declare m jsonb := public.mi_mercado_pago(current_setting('prueba.neg_eva')::uuid);
+begin
+  assert (m ->> 'conectado')::boolean and m ->> 'cuenta' = '555' and (m ->> 'dueno')::boolean and (m ->> 'real')::boolean
+     and (m ->> 'sin_devolver')::int = 0 and m::text not like '%PRUEBA_%', 'mi_mercado_pago: ' || m::text;
+  begin
+    perform public.mp_desconectar(current_setting('prueba.neg_eva')::uuid);
+    raise exception 'FALLA: se desconectó con un cliente pagando';
+  exception when object_in_use then null;
+  end;
+end $$;
+reset role;
+update public.turnos set vence = now() - interval '1 minute' where id = current_setting('prueba.mp_t3')::uuid;
+set role authenticated;
+do $$ begin
+  assert public.mp_desconectar(current_setting('prueba.neg_eva')::uuid), 'no se pudo desconectar';
+  assert not (public.mi_mercado_pago(current_setting('prueba.neg_eva')::uuid) ->> 'conectado')::boolean, 'sigue conectado';
+end $$;
+reset role;
+do $$ begin
+  assert (select count(*) from vault.secrets where name like 'mercadopago_%') = 0, 'al desconectar quedaron las llaves en Vault';
+  assert not public.tiene_mercado_pago(current_setting('prueba.neg_eva')::uuid) and public.lugares_publicos() = '[]'::jsonb, 'desconectado sigue cobrando';
+  raise notice 'OK  el panel ve la conexión sin las llaves; solo el dueño la desconecta (no con alguien pagando) y se borran las llaves';
+end $$;
+
+-- Sin Mercado Pago, el turno se confirma enseguida y no se cobra (como antes)
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000e1', false) \g /dev/null
+set role authenticated;
+do $$
+declare t jsonb;
+begin
+  t := public.reservar_turno(jsonb_build_object('negocio_id', current_setting('prueba.neg_eva'), 'recurso', 'r1',
+    'fecha_agenda', current_setting('prueba.dia_eva'), 'minuto', 1380));
+  assert t ->> 'estado' = 'confirmado' and t ->> 'pago' = '' and t ->> 'vence' is null and (t ->> 'comision')::int = 0, 'sin Mercado Pago: ' || t::text;
+  raise notice 'OK  sin Mercado Pago el turno se confirma enseguida y la seña no se cobra';
+end $$;
+reset role;
+create or replace function public.bookea_comision_pct() returns numeric language sql immutable as $$ select 0::numeric $$;
+
 \echo 'Todas las pruebas del esquema pasaron.'

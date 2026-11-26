@@ -541,9 +541,27 @@ alter table public.turnos
   add column if not exists cancelado_por text not null default '' check (cancelado_por in ('', 'cliente', 'negocio')),
   add column if not exists devuelta      boolean;
 create index if not exists turnos_por_reserva on public.turnos (reserva_id) where reserva_id is not null;
+-- Con Mercado Pago (26/11): en un negocio que cobra la seña, el turno queda "pendiente" hasta que el pago se acredita.
+--   · vence    → hasta cuándo se le guarda el horario para pagar (si nadie paga, se libera solo: vencer_pendientes).
+--   · pago     → cómo va el cobro de la seña: '' (no se cobra: lugar de ejemplo o negocio sin Mercado Pago),
+--                'pendiente', 'aprobado' (se acreditó) o 'devuelto' (se devolvió por Mercado Pago).
+--   · pagado   → cuándo se acreditó.   · comision → la parte de Bookea (sale de la seña; no se muestra en la página).
+-- "sin_pago" en cancelado_por: el horario se liberó porque nadie pagó la seña a tiempo.
+alter table public.turnos
+  add column if not exists pago     text not null default '' check (pago in ('', 'pendiente', 'aprobado', 'devuelto')),
+  add column if not exists pagado   timestamptz,
+  add column if not exists vence    timestamptz,
+  add column if not exists comision integer not null default 0 check (comision >= 0);
+alter table public.turnos drop constraint if exists turnos_estado_check;
+alter table public.turnos add constraint turnos_estado_check check (estado in ('pendiente', 'confirmado', 'cancelado'));
+alter table public.turnos drop constraint if exists turnos_cancelado_por_check;
+alter table public.turnos add constraint turnos_cancelado_por_check check (cancelado_por in ('', 'cliente', 'negocio', 'sin_pago'));
+create index if not exists turnos_pendientes on public.turnos (vence) where estado = 'pendiente';
 -- Un horario de una cancha no se reserva dos veces: si dos personas pagan el mismo turno a la vez, la base acepta una.
-create unique index if not exists turnos_un_cliente_por_horario
-  on public.turnos (lugar_id, cancha, fecha, hora) where estado = 'confirmado';
+-- El que está esperando el pago también lo ocupa (hasta que vence).
+create unique index if not exists turnos_un_horario_activo
+  on public.turnos (lugar_id, cancha, fecha, hora) where estado in ('pendiente', 'confirmado');
+drop index if exists public.turnos_un_cliente_por_horario;  -- el de antes (solo los confirmados)
 
 -- La hora de Mendoza (los turnos se guardan en la hora del lugar)
 create or replace function public.ahora_mendoza() returns timestamp
@@ -572,8 +590,8 @@ begin
   return to_jsonb(fila);
 end $$;
 
--- Mientras Bookea esté en prueba (la seña todavía no se cobra), la página, la agenda del negocio y los mails lo dicen.
--- Cuando se cobre de verdad (Mercado Pago), cambiá el true por false y volvé a correr este archivo.
+-- En los negocios que todavía no conectaron Mercado Pago, la seña no se cobra: la página, la agenda del negocio y los
+-- mails lo dicen ("Bookea está en prueba"). Los que lo conectaron cobran la seña de verdad (ver "Mercado Pago", abajo).
 create or replace function public.bookea_en_prueba() returns boolean language sql immutable as $$
   select true
 $$;
@@ -613,6 +631,8 @@ end $$;
 -- un turno de las 00:30 que sigue a la noche del sábado es del sábado, minuto 1470). Todo lo demás (la cancha, el
 -- horario, el precio, la seña y la regla para cancelar) sale de lo que el negocio cargó en Mi negocio, no de la página.
 -- El turno entra también en su agenda, con el nombre y el celular del cliente.
+-- Si el negocio cobra la seña con Mercado Pago (tiene_mercado_pago), el turno queda "pendiente" y guardado 20 minutos
+-- mientras el cliente paga (la función "mp" arma el cobro); al acreditarse el pago queda confirmado (mp_resultado).
 create or replace function public.reservar_turno(t jsonb) returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare
@@ -638,11 +658,14 @@ declare
   cierra   integer;
   pct      numeric;
   rid      uuid;
+  cobra    boolean := false;
+  limite   timestamptz := now() + interval '20 minutes';
   fila     public.turnos%rowtype;
 begin
   if auth.uid() is null then raise exception 'Hace falta iniciar sesión' using errcode = '42501'; end if;
   select * into yo from public.clientes c where c.id = auth.uid();
   if not found then raise exception 'Faltan tus datos' using errcode = '42501'; end if;
+  perform public.vencer_pendientes();  -- los turnos que nadie pagó a tiempo liberan su horario
   -- Turno en un negocio de verdad: tiene que estar aprobado, y el turno sale de su Mi negocio
   if nullif(t ->> 'negocio_id', '') is not null then
     select * into neg from public.negocios x where x.id = (t ->> 'negocio_id')::uuid and x.estado = 'aprobado';
@@ -673,30 +696,35 @@ begin
     cancha   := left(btrim(coalesce(rec ->> 'nombre', '')), 40)
                 || case when btrim(coalesce(rec ->> 'detalle', '')) <> '' then ' · ' || lower(left(btrim(rec ->> 'detalle'), 17)) else '' end;
     servicio := 'Turno de ' || dur || ' min';
+    cobra    := sena > 0 and public.tiene_mercado_pago(neg.id);
   end if;
   if f + h < public.ahora_mendoza() then raise exception 'Ese horario ya pasó' using errcode = '23514'; end if;
   if f > current_date + 60 then raise exception 'Ese día está muy lejos' using errcode = '23514'; end if;
-  -- Para que nadie se quede con todos los horarios: hasta 10 turnos por delante por cuenta
-  if (select count(*) from public.turnos x where x.cliente_id = auth.uid() and x.estado = 'confirmado'
+  -- Para que nadie se quede con todos los horarios: hasta 10 turnos por delante por cuenta (también los que esperan el pago)
+  if (select count(*) from public.turnos x where x.cliente_id = auth.uid() and x.estado in ('pendiente', 'confirmado')
         and x.fecha + x.hora >= public.ahora_mendoza()) >= 10 then
     raise exception 'Ya tenés 10 turnos por delante' using errcode = '23514';
   end if;
   -- En la agenda del negocio, como un turno "por el link". Si ese horario ya está ocupado (otro turno, uno cargado
-  -- a mano o un bloqueo), la base no deja reservarlo. Mientras Bookea esté en prueba, la seña no se cobró: va en 0.
+  -- a mano o un bloqueo), la base no deja reservarlo. La seña va en 0 hasta que se acredita el pago (mp_resultado la
+  -- pone); en un negocio sin Mercado Pago, no se cobra (Bookea está en prueba).
   if neg.id is not null then
     insert into public.reservas (negocio_id, recurso, fecha, hora, cliente, wa, precio, sena, estado, origen, nota)
-      values (neg.id, rec ->> 'id', fa, m, left(yo.nombre, 80), left(yo.celular, 40), precio,
-              case when public.bookea_en_prueba() then 0 else sena end, 'confirmada', 'link',
+      values (neg.id, rec ->> 'id', fa, m, left(yo.nombre, 80), left(yo.celular, 40), precio, 0, 'confirmada', 'link',
               'Reservó en bookea.ar · código ' || cod
-              || case when public.bookea_en_prueba() then ' · Bookea está en prueba: la seña no se cobró.' else '' end)
+              || case when cobra then ' · Esperando que pague la seña de $ ' || sena || ' con Mercado Pago (hasta las '
+                                      || to_char(limite at time zone 'America/Argentina/Mendoza', 'HH24:MI') || '; si no paga, el horario se libera solo).'
+                      when public.bookea_en_prueba() then ' · Bookea está en prueba: la seña no se cobró.' else '' end)
       returning id into rid;
   end if;
   insert into public.turnos (cliente_id, negocio_id, reserva_id, codigo, lugar_id, lugar, zona, rubro, servicio_id, servicio, cancha,
-                             fecha, hora, fin, precio, sena, cancelar_horas, devuelve_sena)
+                             fecha, hora, fin, precio, sena, cancelar_horas, devuelve_sena, estado, pago, vence, comision)
     values (auth.uid(), neg.id, rid, cod, coalesce(neg.slug, t ->> 'lugar_id'), coalesce(neg.nombre, btrim(t ->> 'lugar')),
             coalesce(nullif(neg.ciudad, ''), t ->> 'zona', ''), left(coalesce(case when neg.id is not null then neg.rubro end, t ->> 'rubro', ''), 40),
             case when neg.id is not null then 'turno' else coalesce(t ->> 'servicio_id', '') end, servicio, cancha, f, h, fin,
-            precio, sena, horas, devuelve)
+            precio, sena, horas, devuelve,
+            case when cobra then 'pendiente' else 'confirmado' end, case when cobra then 'pendiente' else '' end,
+            case when cobra then limite end, case when cobra then public.comision_de(sena) else 0 end)
     returning * into fila;
   return to_jsonb(fila);
 end $$;
@@ -721,6 +749,13 @@ begin
       where x.id = turno returning * into fila;
     update public.reservas r set estado = 'cancelada', retenida = not devuelve and r.sena > 0
       where r.id = fila.reserva_id and r.estado <> 'cancelada';
+  elsif fila.estado = 'pendiente' then
+    -- Todavía no pagó la seña: el horario se libera y sale de la agenda del negocio (no había nada que devolver).
+    -- Si el pago se acredita igual después, la seña se devuelve sola (mp_resultado).
+    update public.turnos x set estado = 'cancelado', cancelado = now(), cancelado_por = 'cliente', devuelta = false
+      where x.id = turno returning * into fila;
+    delete from public.reservas r where r.id = fila.reserva_id;
+    return to_jsonb(fila) || jsonb_build_object('devuelve', false);
   end if;
   return to_jsonb(fila) || jsonb_build_object('devuelve', coalesce(fila.devuelta, devuelve));
 end $$;
@@ -737,7 +772,7 @@ begin
      or exists (select 1 from public.admins_bookea a where a.user_id = auth.uid()) then
     raise exception 'Esta cuenta maneja un negocio' using errcode = '42501';
   end if;
-  for x in select t.id from public.turnos t where t.cliente_id = auth.uid() and t.estado = 'confirmado'
+  for x in select t.id from public.turnos t where t.cliente_id = auth.uid() and t.estado in ('pendiente', 'confirmado')
              and t.fecha + t.hora >= public.ahora_mendoza() loop
     perform public.cancelar_turno(x);
   end loop;
@@ -770,6 +805,419 @@ revoke all on function public.borrar_mi_cuenta() from public, anon;
 grant execute on function public.borrar_mi_cuenta() to authenticated;
 
 -- =====================================================================================
+-- Mercado Pago: cada negocio cobra la seña con su propia cuenta (pedido del dueño, 26/11)
+--
+--   1. El dueño conecta su cuenta desde el panel (Mi negocio → Mercado Pago). Mercado Pago le pide permiso y vuelve a
+--      la función "mp" (supabase/functions/mp), que guarda las llaves de su cuenta en Vault, cifradas: ni la página ni
+--      el panel las ven nunca. (OAuth con PKCE: mp_empezar_conexion, mp_tomar_estado, mp_guardar_cuenta.)
+--   2. Un cliente reserva en un negocio conectado: el turno queda "pendiente" 20 minutos (también en la agenda del
+--      negocio) y la función arma el cobro de la seña con la cuenta del negocio y la comisión de Bookea (mp_cobros).
+--   3. Mercado Pago avisa que hubo un pago (aviso firmado). La función se lo pregunta a Mercado Pago (nunca le cree al
+--      navegador) y, si se acreditó, el turno queda confirmado (mp_resultado): llegan los mails y la seña aparece en la
+--      agenda. Si nadie paga a tiempo, el horario se libera solo (vencer_pendientes).
+--   4. Si se cancela un turno pagado y la seña se devuelve, queda en la cola (mp_cobros.devolucion) y la función la
+--      devuelve por Mercado Pago (también si alguien pagó un turno que ya no estaba esperando el pago).
+-- La plata va directo a la cuenta del negocio: Mercado Pago le descuenta su costo y la comisión de Bookea, que llega a
+-- la cuenta de Bookea. Todo esto lo usa solo la función, con la clave secreta (service_role); el panel usa solo
+-- mi_mercado_pago, mp_desconectar y vencer_pendientes. La guía para ponerlo en marcha está en supabase/LEEME.md.
+-- =====================================================================================
+
+-- La comisión de Bookea: qué parte de cada seña cobrada se queda Bookea (en %). Para cambiarla, cambiá el número y
+-- volvé a correr este archivo (vale para los cobros que se armen desde ese momento). No se muestra en la página.
+create or replace function public.bookea_comision_pct() returns numeric language sql immutable as $$
+  select 0::numeric
+$$;
+-- La comisión de una seña, en pesos: redondeada, hasta la mitad de la seña y nunca la seña entera
+create or replace function public.comision_de(sena integer) returns integer
+language sql immutable set search_path = '' as $$
+  select greatest(0, least(coalesce(sena, 0) - 1,
+           round(coalesce(sena, 0) * least(greatest(public.bookea_comision_pct(), 0), 50) / 100)::integer))
+$$;
+-- Adónde la base le avisa a la función que hay señas para devolver (la dirección del proyecto de Supabase es pública)
+create or replace function public.bookea_url_funciones() returns text language sql immutable as $$
+  select 'https://vpxzuutavdjwglglbvdt.supabase.co/functions/v1'
+$$;
+
+-- La cuenta de Mercado Pago de cada negocio. Las llaves (access token y refresh token) están en Vault, cifradas: acá
+-- van solo sus ids. El access token dura 180 días; la función lo renueva antes de que venza.
+create table if not exists public.mp_cuentas (
+  negocio_id  uuid primary key references public.negocios (id) on delete cascade,
+  mp_usuario  text not null check (mp_usuario ~ '^[0-9]{1,20}$'),       -- el número de cuenta de Mercado Pago
+  llave_id    uuid,                                                     -- Vault: access token
+  renovar_id  uuid,                                                     -- Vault: refresh token
+  vence       timestamptz not null,                                     -- cuándo vence el access token
+  real        boolean not null default true,                            -- false: una cuenta de prueba de Mercado Pago
+  reconectar  boolean not null default false,                           -- no se pudo renovar: hay que conectarla de nuevo
+  quien       uuid references auth.users (id) on delete set null,       -- quién la conectó
+  conectado   timestamptz not null default now(),
+  actualizado timestamptz not null default now()
+);
+-- Los pedidos de conexión en curso: cada uno sirve una sola vez y por 15 minutos. "estado" viaja a Mercado Pago y vuelve
+-- (así nadie puede colarle otra cuenta al negocio); "verificador" es el de PKCE y no sale nunca de la base y la función.
+create table if not exists public.mp_estados (
+  estado      text primary key check (estado ~ '^[0-9a-f]{64}$'),
+  negocio_id  uuid not null references public.negocios (id) on delete cascade,
+  quien       uuid not null references auth.users (id) on delete cascade,
+  verificador text not null check (verificador ~ '^[0-9a-f]{64}$'),
+  creado      timestamptz not null default now()
+);
+-- Cada cobro de una seña (una "orden" de Mercado Pago). Un turno puede tener más de uno (si volvió a intentar).
+-- Queda aunque se borre el turno o el negocio: es el registro de la plata.
+create table if not exists public.mp_cobros (
+  orden       text primary key check (orden ~ '^[A-Za-z0-9_-]{1,64}$'),
+  turno_id    uuid references public.turnos (id) on delete set null,
+  negocio_id  uuid references public.negocios (id) on delete set null,
+  monto       integer not null check (monto > 0),
+  comision    integer not null default 0 check (comision >= 0),
+  url         text not null default '' check (char_length(url) <= 500),   -- adónde va el cliente a pagar
+  estado      text not null default 'creado' check (estado in ('creado', 'aprobado', 'rechazado', 'devuelto')),
+  devolucion  text not null default '' check (devolucion in ('', 'pendiente', 'hecha', 'fallo')),
+  intentos    smallint not null default 0,                                -- veces que se intentó devolver
+  detalle     text not null default '' check (char_length(detalle) <= 200),
+  creado      timestamptz not null default now(),
+  actualizado timestamptz not null default now()
+);
+create index if not exists mp_cobros_por_turno on public.mp_cobros (turno_id);
+create index if not exists mp_cobros_por_negocio on public.mp_cobros (negocio_id);
+create index if not exists mp_cobros_a_devolver on public.mp_cobros (actualizado) where devolucion = 'pendiente';
+alter table public.mp_cuentas enable row level security;
+alter table public.mp_estados enable row level security;
+alter table public.mp_cobros enable row level security;
+-- Sin políticas: desde la página y el panel no se leen ni se tocan (solo con las funciones de abajo)
+revoke all on public.mp_cuentas, public.mp_estados, public.mp_cobros from anon, authenticated;
+
+-- ¿Ya cobra la seña con Mercado Pago? Conectó su cuenta y la conexión sigue andando.
+create or replace function public.tiene_mercado_pago(n uuid) returns boolean
+language sql stable set search_path = '' as $$
+  select exists (select 1 from public.mp_cuentas c where c.negocio_id = n and not c.reconectar)
+$$;
+-- ¿Aparece en la lista de la página? Cobra con una cuenta de verdad (con una de prueba de Mercado Pago, solo por su link)
+create or replace function public.en_la_lista(n uuid) returns boolean
+language sql stable set search_path = '' as $$
+  select exists (select 1 from public.mp_cuentas c where c.negocio_id = n and not c.reconectar and c.real)
+$$;
+
+-- Los turnos que nadie pagó a tiempo: se cancelan y salen de la agenda del negocio (el horario queda libre).
+-- Corre al reservar, cada minuto si está pg_cron (abajo) y cuando el panel abre la agenda.
+create or replace function public.vencer_pendientes() returns integer
+language plpgsql security definer set search_path = '' as $$
+declare
+  x record;
+  n integer := 0;
+begin
+  for x in select t.id, t.reserva_id from public.turnos t where t.estado = 'pendiente' and t.vence < now()
+             for update skip locked loop
+    update public.turnos t set estado = 'cancelado', cancelado = now(), cancelado_por = 'sin_pago', devuelta = false where t.id = x.id;
+    delete from public.reservas r where r.id = x.reserva_id;
+    n := n + 1;
+  end loop;
+  return n;
+end $$;
+
+-- ---------- Conectar la cuenta (OAuth con PKCE) ----------
+-- 1. El dueño toca "Conectar Mercado Pago": la función (que ya comprobó quién es) pide un pedido de conexión.
+create or replace function public.mp_empezar_conexion(n uuid, quien uuid) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+  e text := encode(sha256(convert_to(gen_random_uuid()::text || gen_random_uuid()::text, 'UTF8')), 'hex');
+  v text := encode(sha256(convert_to(gen_random_uuid()::text || gen_random_uuid()::text, 'UTF8')), 'hex');
+begin
+  if not exists (select 1 from public.miembros m join public.negocios x on x.id = m.negocio_id
+                  where m.negocio_id = n and m.user_id = quien and m.rol = 'dueno' and x.estado = 'aprobado') then
+    raise exception 'Solo el dueño puede conectar Mercado Pago' using errcode = '42501';
+  end if;
+  delete from public.mp_estados x where x.creado < now() - interval '1 day' or x.negocio_id = n;
+  insert into public.mp_estados (estado, negocio_id, quien, verificador) values (e, n, quien, v);
+  -- el desafío PKCE (S256): base64url del sha256 del verificador
+  return jsonb_build_object('estado', e, 'desafio', translate(rtrim(encode(sha256(convert_to(v, 'UTF8')), 'base64'), '='), '+/', '-_'));
+end $$;
+-- 2. Mercado Pago vuelve con el código y el estado: la función toma el pedido (una sola vez, dentro de los 15 minutos)
+create or replace function public.mp_tomar_estado(e text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare x public.mp_estados%rowtype;
+begin
+  delete from public.mp_estados s where s.estado = e returning * into x;
+  if not found or x.creado < now() - interval '15 minutes' then return null; end if;
+  return jsonb_build_object('negocio', x.negocio_id, 'quien', x.quien, 'verificador', x.verificador);
+end $$;
+-- 3. Con las llaves que dio Mercado Pago (al conectar o al renovarlas): se guardan en Vault y el negocio queda conectado.
+--    "d" es la respuesta de Mercado Pago: access_token, refresh_token, user_id, expires_in y live_mode.
+--    "quien" va vacío cuando la función solo las renueva.
+create or replace function public.mp_guardar_cuenta(n uuid, quien uuid, d jsonb) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+  c   public.mp_cuentas%rowtype;
+  acc text := d ->> 'access_token';
+  ren text := d ->> 'refresh_token';
+  usu text := d ->> 'user_id';
+  seg integer := case when coalesce(d ->> 'expires_in', '') ~ '^[0-9]{1,9}$' then (d ->> 'expires_in')::integer else 15552000 end;
+  la  uuid;
+  lr  uuid;
+begin
+  if coalesce(acc, '') !~ '^[A-Za-z0-9_-]+$' or char_length(acc) not between 20 and 400
+     or coalesce(ren, '') !~ '^[A-Za-z0-9_-]+$' or char_length(ren) not between 10 and 400 or coalesce(usu, '') !~ '^[0-9]{1,20}$' then
+    raise exception 'Mercado Pago no devolvió una cuenta válida' using errcode = '22023';
+  end if;
+  if not exists (select 1 from public.negocios x where x.id = n) then raise exception 'No existe ese negocio' using errcode = 'P0002'; end if;
+  select * into c from public.mp_cuentas x where x.negocio_id = n for update;
+  if found and c.llave_id is not null and c.renovar_id is not null then
+    perform vault.update_secret(c.llave_id, acc);
+    perform vault.update_secret(c.renovar_id, ren);
+    update public.mp_cuentas x set mp_usuario = usu, vence = now() + make_interval(secs => seg),
+           real = coalesce(d ->> 'live_mode', 'true') <> 'false', reconectar = false, actualizado = now(),
+           quien = coalesce(mp_guardar_cuenta.quien, x.quien),
+           conectado = case when mp_guardar_cuenta.quien is not null then now() else x.conectado end
+     where x.negocio_id = n;
+  else
+    delete from vault.secrets s where s.name in ('mercadopago_llave_' || n, 'mercadopago_renovar_' || n);
+    la := vault.create_secret(acc, 'mercadopago_llave_' || n);
+    lr := vault.create_secret(ren, 'mercadopago_renovar_' || n);
+    insert into public.mp_cuentas as x (negocio_id, mp_usuario, llave_id, renovar_id, vence, real, quien)
+      values (n, usu, la, lr, now() + make_interval(secs => seg), coalesce(d ->> 'live_mode', 'true') <> 'false', mp_guardar_cuenta.quien)
+      on conflict (negocio_id) do update set mp_usuario = excluded.mp_usuario, llave_id = excluded.llave_id, renovar_id = excluded.renovar_id,
+         vence = excluded.vence, real = excluded.real, reconectar = false, quien = excluded.quien, conectado = now(), actualizado = now();
+  end if;
+  return jsonb_build_object('conectado', true, 'cuenta', usu);
+end $$;
+-- Las llaves de un negocio, para la función (cobrar, consultar un pago, devolver, renovar)
+create or replace function public.mp_llaves(n uuid) returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select jsonb_build_object('negocio', c.negocio_id, 'usuario', c.mp_usuario, 'vence', c.vence, 'reconectar', c.reconectar,
+           'llave', (select s.decrypted_secret from vault.decrypted_secrets s where s.id = c.llave_id),
+           'renovar', (select s.decrypted_secret from vault.decrypted_secrets s where s.id = c.renovar_id))
+    from public.mp_cuentas c where c.negocio_id = n
+$$;
+-- No se pudo renovar (el dueño quitó el permiso desde Mercado Pago, por ejemplo): hay que conectarla de nuevo.
+-- Mientras tanto el negocio no cobra la seña y sale de la lista (sigue andando por su link, sin cobrar).
+create or replace function public.mp_marcar_reconectar(n uuid) returns void
+language sql security definer set search_path = '' as $$
+  update public.mp_cuentas set reconectar = true, actualizado = now() where negocio_id = n
+$$;
+-- Las cuentas cuya llave vence en menos de 30 días (la función las renueva una vez por día; ver pg_cron, abajo)
+create or replace function public.mp_por_renovar() returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select coalesce(jsonb_agg(c.negocio_id), '[]'::jsonb) from public.mp_cuentas c
+   where not c.reconectar and c.vence < now() + interval '30 days'
+$$;
+create or replace function public.mp_borrar_llaves(a uuid, b uuid) returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  delete from vault.secrets s where s.id in (a, b);
+exception when others then
+  raise warning 'Bookea: no se pudieron borrar las llaves de Mercado Pago: %', sqlerrm;
+end $$;
+
+-- ---------- Panel: cómo está la conexión, y desconectarla ----------
+-- Lo ve cualquiera del equipo (sin las llaves). "sin_devolver": señas que Mercado Pago no dejó devolver (por ejemplo,
+-- sin saldo en la cuenta): el negocio las tiene que devolver desde Mercado Pago.
+create or replace function public.mi_mercado_pago(n uuid) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare c public.mp_cuentas%rowtype;
+begin
+  if not public.es_miembro_activo(n) then raise exception 'sin permiso para ver este negocio' using errcode = '42501'; end if;
+  select * into c from public.mp_cuentas x where x.negocio_id = n;
+  return jsonb_build_object('conectado', c.negocio_id is not null, 'cuenta', c.mp_usuario, 'real', c.real,
+    'reconectar', coalesce(c.reconectar, false), 'desde', c.conectado, 'dueno', public.es_dueno(n),
+    'cobradas', (select count(*) from public.mp_cobros k where k.negocio_id = n and k.estado = 'aprobado'),
+    'sin_devolver', (select count(*) from public.mp_cobros k where k.negocio_id = n and k.devolucion = 'fallo'));
+end $$;
+-- El dueño la desconecta: las señas dejan de cobrarse y sale de la lista. No se puede mientras alguien está pagando
+-- una seña o hay una por devolver (las dos cosas necesitan la cuenta).
+create or replace function public.mp_desconectar(n uuid) returns boolean
+language plpgsql security definer set search_path = '' as $$
+declare c public.mp_cuentas%rowtype;
+begin
+  if not public.es_dueno(n) then raise exception 'Solo el dueño puede desconectar Mercado Pago' using errcode = '42501'; end if;
+  if exists (select 1 from public.turnos t where t.negocio_id = n and t.estado = 'pendiente' and t.vence > now())
+     or exists (select 1 from public.mp_cobros k where k.negocio_id = n and k.devolucion = 'pendiente') then
+    raise exception 'Hay un cobro en curso: probá de nuevo en unos minutos' using errcode = '55006';
+  end if;
+  delete from public.mp_cuentas x where x.negocio_id = n returning * into c;
+  if c.negocio_id is null then return false; end if;
+  perform public.mp_borrar_llaves(c.llave_id, c.renovar_id);
+  return true;
+end $$;
+
+-- ---------- Cobrar la seña ----------
+-- Lo que la función necesita para cobrar la seña de un turno (solo el cliente del turno). Trae también los cobros
+-- abiertos de ese turno: la función los consulta (y usa el mismo si sigue abierto, así no se arman dos).
+create or replace function public.mp_datos_cobro(turno uuid, quien uuid) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+  t public.turnos%rowtype;
+  c public.clientes%rowtype;
+begin
+  perform public.vencer_pendientes(); -- si ya se le pasó el tiempo, el turno dice "cancelado" (y un pago tardío se devuelve)
+  select * into t from public.turnos x where x.id = turno and x.cliente_id = quien;
+  if not found then raise exception 'No existe ese turno' using errcode = 'P0002'; end if;
+  select * into c from public.clientes x where x.id = quien;
+  return jsonb_build_object('turno', t.id, 'estado', t.estado, 'pago', t.pago, 'negocio', t.negocio_id, 'codigo', t.codigo,
+    'monto', t.sena, 'comision', t.comision, 'email', c.email,
+    'titulo', left('Seña · ' || t.lugar || ' · ' || to_char(t.fecha, 'DD/MM') || ' ' || to_char(t.hora, 'HH24:MI') || ' · ' || t.cancha, 120),
+    -- minutos que le quedan para pagar (el cobro de Mercado Pago vence un poco antes que el turno guardado)
+    'minutos', case when t.estado = 'pendiente' then floor(extract(epoch from (t.vence - now())) / 60)::integer else 0 end,
+    'cobra', t.negocio_id is not null and public.tiene_mercado_pago(t.negocio_id),
+    'intento', (select count(*) from public.mp_cobros k where k.turno_id = t.id),
+    'abiertos', (select coalesce(jsonb_agg(jsonb_build_object('orden', k.orden, 'url', k.url) order by k.creado desc), '[]'::jsonb)
+                   from public.mp_cobros k where k.turno_id = t.id and k.estado = 'creado'));
+end $$;
+-- La función armó el cobro en Mercado Pago: se anota (para encontrarlo cuando Mercado Pago avise)
+create or replace function public.mp_cobro_creado(turno uuid, orden text, url text, monto integer, comision integer) returns void
+language sql security definer set search_path = '' as $$
+  insert into public.mp_cobros (orden, turno_id, negocio_id, monto, comision, url)
+    select mp_cobro_creado.orden, t.id, t.negocio_id, mp_cobro_creado.monto, mp_cobro_creado.comision,
+           left(coalesce(mp_cobro_creado.url, ''), 500)
+      from public.turnos t where t.id = mp_cobro_creado.turno
+  on conflict (orden) do update set url = excluded.url, actualizado = now()
+$$;
+-- Un cobro, por su orden (para el aviso de Mercado Pago: de qué negocio es, así se consulta con sus llaves)
+create or replace function public.mp_cobro(orden text) returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select jsonb_build_object('orden', k.orden, 'negocio', k.negocio_id, 'turno', k.turno_id, 'estado', k.estado, 'monto', k.monto)
+    from public.mp_cobros k where k.orden = mp_cobro.orden
+$$;
+-- Lo que dice Mercado Pago de un cobro (la función se lo pregunta a Mercado Pago con las llaves del negocio):
+-- su estado y su detalle ("processed" y "accredited" = se acreditó) y lo que se pagó.
+-- Devuelve qué pasó: "confirmado" (el turno quedó confirmado), "devolver" (se pagó un turno que ya no esperaba el pago:
+-- queda en la cola para devolverlo), "devuelto", "rechazado" o "nada" (sigue en curso, o ya se sabía).
+create or replace function public.mp_resultado(orden text, estado text, detalle text, pagado numeric) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare
+  k  public.mp_cobros%rowtype;
+  t  public.turnos%rowtype;
+  st text := coalesce(mp_resultado.estado, '');
+  de text := coalesce(mp_resultado.detalle, '');
+begin
+  select * into k from public.mp_cobros x where x.orden = mp_resultado.orden for update;
+  if not found then return jsonb_build_object('accion', 'desconocido'); end if;
+  update public.mp_cobros x set detalle = left(st || ' / ' || de, 200), actualizado = now() where x.orden = k.orden;
+  if k.turno_id is not null then select * into t from public.turnos x where x.id = k.turno_id for update; end if;
+  -- Se devolvió entero (desde Bookea o desde Mercado Pago)
+  if st = 'refunded' then
+    update public.mp_cobros x set estado = 'devuelto', devolucion = case when x.devolucion = '' then '' else 'hecha' end
+     where x.orden = k.orden;
+    update public.turnos x set pago = 'devuelto' where x.id = t.id and x.pago = 'aprobado' and x.estado = 'cancelado';
+    return jsonb_build_object('accion', 'devuelto', 'turno', t.id, 'estado', t.estado);
+  end if;
+  if st = 'processed' and de = 'accredited' then
+    if k.estado <> 'creado' then return jsonb_build_object('accion', 'nada', 'turno', t.id, 'estado', t.estado); end if;
+    if coalesce(mp_resultado.pagado, k.monto) < k.monto then
+      raise exception 'Mercado Pago dice que se pagó menos que la seña' using errcode = '22023';
+    end if;
+    update public.mp_cobros x set estado = 'aprobado' where x.orden = k.orden;
+    if t.id is not null and t.estado = 'pendiente' then
+      update public.turnos x set estado = 'confirmado', pago = 'aprobado', pagado = now(), vence = null where x.id = t.id;
+      update public.reservas r set sena = t.sena,
+             nota = left('Reservó en bookea.ar · código ' || t.codigo || ' · Seña de $ ' || t.sena || ' pagada con Mercado Pago.', 500)
+       where r.id = t.reserva_id;
+      return jsonb_build_object('accion', 'confirmado', 'turno', t.id, 'estado', 'confirmado');
+    end if;
+    -- Se pagó un turno que ya no esperaba el pago (venció, se canceló, o ya estaba pago con otro cobro): se devuelve
+    update public.mp_cobros x set devolucion = 'pendiente' where x.orden = k.orden;
+    perform public.mp_avisar_devolucion();
+    return jsonb_build_object('accion', 'devolver', 'turno', t.id, 'estado', t.estado);
+  end if;
+  if st in ('canceled', 'failed') then
+    update public.mp_cobros x set estado = 'rechazado' where x.orden = k.orden and x.estado = 'creado';
+    return jsonb_build_object('accion', 'rechazado', 'turno', t.id, 'estado', t.estado);
+  end if;
+  return jsonb_build_object('accion', 'nada', 'turno', t.id, 'estado', t.estado);  -- created, processing, action_required…
+end $$;
+
+-- ---------- Devolver la seña ----------
+-- Turno pagado que se cancela y cuya seña se devuelve (lo canceló el cliente con tiempo, o el negocio sin quedarse con
+-- la seña): su cobro queda en la cola y se le avisa a la función.
+create or replace function public.turno_a_devolver() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  update public.mp_cobros k set devolucion = 'pendiente', actualizado = now()
+   where k.turno_id = new.id and k.estado = 'aprobado' and k.devolucion = '';
+  if found then perform public.mp_avisar_devolucion(); end if;
+  return new;
+end $$;
+drop trigger if exists turno_a_devolver on public.turnos;
+create trigger turno_a_devolver after update of estado on public.turnos
+  for each row when (new.estado = 'cancelado' and old.estado = 'confirmado' and new.pago = 'aprobado' and new.devuelta is true)
+  execute function public.turno_a_devolver();
+-- El aviso a la función (con pg_net, el mismo de los mails). No lleva nada: la función mira la cola en la base. Si
+-- pg_net no está o el aviso falla, la cancelación sigue igual y la devolución sale en la próxima vuelta (pg_cron).
+create or replace function public.mp_avisar_devolucion() returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  if to_regnamespace('net') is null then return; end if;  -- sin pg_net: lo toma pg_cron o el próximo aviso
+  perform net.http_post(url := public.bookea_url_funciones() || '/mp/devolver', body := '{}'::jsonb,
+                        headers := '{"Content-Type": "application/json"}'::jsonb);
+exception when others then
+  raise warning 'Bookea: no se pudo avisar que hay una seña para devolver: %', sqlerrm;
+end $$;
+-- La cola, para la función: los cobros a devolver, de a 20
+create or replace function public.mp_por_devolver() returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select coalesce(jsonb_agg(jsonb_build_object('orden', k.orden, 'negocio', k.negocio_id, 'monto', k.monto, 'intentos', k.intentos)
+                            order by k.actualizado), '[]'::jsonb)
+    from (select * from public.mp_cobros x where x.devolucion = 'pendiente' order by x.actualizado limit 20) k
+$$;
+-- La función devolvió la seña (o no pudo: se vuelve a intentar en la próxima vuelta, hasta 48 veces)
+create or replace function public.mp_devolucion(orden text, hecha boolean, detalle text) returns void
+language plpgsql security definer set search_path = '' as $$
+declare k public.mp_cobros%rowtype;
+begin
+  update public.mp_cobros x
+     set devolucion = case when hecha then 'hecha' when x.intentos + 1 >= 48 then 'fallo' else 'pendiente' end,
+         estado = case when hecha then 'devuelto' else x.estado end, intentos = x.intentos + 1,
+         detalle = left(coalesce(mp_devolucion.detalle, ''), 200), actualizado = now()
+   where x.orden = mp_devolucion.orden and x.devolucion = 'pendiente'
+   returning * into k;
+  if hecha and k.turno_id is not null then
+    update public.turnos t set pago = 'devuelto' where t.id = k.turno_id and t.pago = 'aprobado' and t.estado = 'cancelado';
+  end if;
+end $$;
+
+-- Cada minuto, los turnos que nadie pagó; cada 15 minutos, las devoluciones que quedaron sin hacer; y una vez por día,
+-- renovar las llaves que están por vencer. Hacen falta las extensiones pg_cron y pg_net (Supabase → Database →
+-- Extensions); sin pg_cron, los turnos vencidos igual se liberan al reservar y al abrir la agenda, y las llaves se
+-- renuevan al cobrar.
+do $$ begin
+  if exists (select 1 from pg_extension where extname = 'pg_cron') then
+    perform cron.schedule('bookea-vencer-pendientes', '* * * * *', 'select public.vencer_pendientes()');
+    perform cron.schedule('bookea-devoluciones', '*/15 * * * *',
+      'select public.mp_avisar_devolucion() where exists (select 1 from public.mp_cobros where devolucion = ''pendiente'')');
+    perform cron.schedule('bookea-renovar-mercado-pago', '17 6 * * *',
+      'select net.http_post(url := public.bookea_url_funciones() || ''/mp/renovar'', body := ''{}''::jsonb, headers := ''{"Content-Type": "application/json"}''::jsonb)'
+      || ' where exists (select 1 from public.mp_cuentas where not reconectar and vence < now() + interval ''30 days'')');
+  end if;
+exception when others then
+  raise warning 'Bookea: no se pudieron programar las tareas de pg_cron: %', sqlerrm;
+end $$;
+
+revoke all on function public.bookea_comision_pct() from public, anon, authenticated;
+revoke all on function public.comision_de(integer) from public, anon, authenticated;
+revoke all on function public.bookea_url_funciones() from public, anon, authenticated;
+revoke all on function public.tiene_mercado_pago(uuid) from public, anon, authenticated;
+revoke all on function public.en_la_lista(uuid) from public, anon, authenticated;
+revoke all on function public.vencer_pendientes() from public, anon;
+grant execute on function public.vencer_pendientes() to authenticated;  -- el panel, al abrir la agenda
+revoke all on function public.mp_borrar_llaves(uuid, uuid) from public, anon, authenticated;
+revoke all on function public.turno_a_devolver() from public, anon, authenticated;
+revoke all on function public.mp_avisar_devolucion() from public, anon, authenticated;
+revoke all on function public.mi_mercado_pago(uuid) from public, anon;
+grant execute on function public.mi_mercado_pago(uuid) to authenticated;
+revoke all on function public.mp_desconectar(uuid) from public, anon;
+grant execute on function public.mp_desconectar(uuid) to authenticated;
+-- Solo la función (con la clave secreta)
+do $$
+declare f text;
+begin
+  foreach f in array array['mp_empezar_conexion(uuid, uuid)', 'mp_tomar_estado(text)', 'mp_guardar_cuenta(uuid, uuid, jsonb)',
+    'mp_llaves(uuid)', 'mp_marcar_reconectar(uuid)', 'mp_datos_cobro(uuid, uuid)', 'mp_cobro_creado(uuid, text, text, integer, integer)',
+    'mp_cobro(text)', 'mp_resultado(text, text, text, numeric)', 'mp_por_devolver()', 'mp_devolucion(text, boolean, text)',
+    'mp_por_renovar()'] loop
+    execute format('revoke all on function public.%s from public, anon, authenticated', f);
+    execute format('grant execute on function public.%s to service_role', f);
+  end loop;
+end $$;
+
+-- =====================================================================================
 -- Negocios en la página (bookea.ar)
 --
 -- La página muestra cada negocio aprobado con lo que cargó en Mi negocio: nombre, rubro, ciudad, dirección, foto,
@@ -777,19 +1225,13 @@ grant execute on function public.borrar_mi_cuenta() to authenticated;
 -- agenda, sin decir de quién son. Nada más: ni el email del dueño, ni su WhatsApp, ni sus clientes.
 --
 -- Cuáles aparecen:
---   · En la lista de la página (inicio y resultados): los aprobados que ya pueden cobrar la seña con Mercado Pago.
---     Hasta que esté Mercado Pago, ninguno (tiene_mercado_pago dice que no).
+--   · En la lista de la página (inicio y resultados): los aprobados que ya cobran la seña con Mercado Pago, con una
+--     cuenta de verdad (en_la_lista, en "Mercado Pago", arriba).
 --   · Con su link (bookea.ar/su-link): cualquiera aprobado que ya tenga canchas y horarios, para que el dueño se vea
 --     y lo pruebe.
 -- Los turnos: reservar_turno los pone también en la agenda del negocio (reservas). Si el cliente cancela, el horario
 -- se libera en la agenda; si el negocio cancela desde el panel, se cancela también el del cliente y le llega el mail.
 -- =====================================================================================
-
--- ¿Ya puede cobrar la seña con Mercado Pago? Es el paso que sigue: hasta entonces, ninguno.
-create or replace function public.tiene_mercado_pago(n uuid) returns boolean
-language sql stable set search_path = '' as $$
-  select false
-$$;
 
 -- ¿Tiene lo mínimo para tomar turnos? Al menos una cancha, la duración del turno y los horarios de los 7 días.
 create or replace function public.lugar_listo(aj jsonb) returns boolean
@@ -808,6 +1250,7 @@ language sql stable set search_path = '' as $$
   select coalesce(jsonb_agg(jsonb_build_array(r.recurso, r.fecha, r.hora) order by r.fecha, r.hora, r.recurso), '[]'::jsonb)
   from public.reservas r
   where r.negocio_id = n and r.estado <> 'cancelada'
+    and not exists (select 1 from public.turnos t where t.reserva_id = r.id and t.estado = 'pendiente' and t.vence < now())
     and r.fecha between public.ahora_mendoza()::date - 1 and public.ahora_mendoza()::date + 8
 $$;
 
@@ -877,7 +1320,8 @@ language sql stable set search_path = '' as $$
         'serv', public.fotos_publicas(x.id, x.pagina #> '{tarjetas,serv}', 2),
         'ubi', public.fotos_publicas(x.id, x.pagina #> '{tarjetas,ubi}', 2)),
       'whatsapp', case when x.pagina ->> 'mostrar_whatsapp' = 'true' then x.whatsapp else '' end),
-    'publicado', public.tiene_mercado_pago(x.id),
+    'publicado', public.en_la_lista(x.id),
+    'cobra', public.tiene_mercado_pago(x.id),  -- la seña se paga con Mercado Pago (si no, Bookea está en prueba)
     'ocupados', public.ocupados_de(x.id))
 $$;
 
@@ -887,7 +1331,7 @@ language sql stable security definer set search_path = '' as $$
   select coalesce(jsonb_agg(public.lugar_publico(x) order by x.nombre), '[]'::jsonb)
   from public.negocios x
   where x.estado = 'aprobado' and public.lugar_listo(x.ajustes)
-    and (public.tiene_mercado_pago(x.id) or x.slug = lower(btrim(coalesce(incluir, ''))))
+    and (public.en_la_lista(x.id) or x.slug = lower(btrim(coalesce(incluir, ''))))
 $$;
 
 -- Los horarios ocupados de un negocio, al momento (la página los vuelve a pedir al abrir su ficha)
@@ -904,8 +1348,8 @@ create or replace function public.reserva_web_antes() returns trigger
 language plpgsql security definer set search_path = '' as $$
 begin
   if tg_op = 'DELETE' then
-    update public.turnos t set estado = 'cancelado', cancelado = now(), cancelado_por = 'negocio', devuelta = true
-     where t.reserva_id = old.id and t.estado = 'confirmado';
+    update public.turnos t set estado = 'cancelado', cancelado = now(), cancelado_por = 'negocio', devuelta = t.estado = 'confirmado'
+     where t.reserva_id = old.id and t.estado in ('pendiente', 'confirmado');
     return old;
   end if;
   if old.estado = 'cancelada' and new.estado <> 'cancelada'
@@ -924,8 +1368,9 @@ create trigger reserva_web_antes before update or delete on public.reservas
 create or replace function public.reserva_web_cancelada() returns trigger
 language plpgsql security definer set search_path = '' as $$
 begin
-  update public.turnos t set estado = 'cancelado', cancelado = now(), cancelado_por = 'negocio', devuelta = not new.retenida
-   where t.reserva_id = new.id and t.estado = 'confirmado';
+  update public.turnos t set estado = 'cancelado', cancelado = now(), cancelado_por = 'negocio',
+         devuelta = t.estado = 'confirmado' and not new.retenida
+   where t.reserva_id = new.id and t.estado in ('pendiente', 'confirmado');
   return new;
 end $$;
 drop trigger if exists reserva_web_cancelada on public.reservas;
@@ -973,7 +1418,6 @@ do $$ begin
   end if;
 end $$;
 
-revoke all on function public.tiene_mercado_pago(uuid) from public, anon, authenticated;
 revoke all on function public.foto_publica(uuid, text) from public, anon, authenticated;
 revoke all on function public.fotos_publicas(uuid, jsonb, integer) from public, anon, authenticated;
 revoke all on function public.red_social(text) from public, anon, authenticated;

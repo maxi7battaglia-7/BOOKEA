@@ -82,7 +82,9 @@
     : r.estado === "cancelada" ? (r.retenida ? r.sena : 0)
     : r.estado === "confirmada" ? r.sena : 0;
   const ETQ = { confirmada: "Seña cobrada", jugada: "Pagado", ausente: "No vino", cancelada: "Cancelado", bloqueo: "Bloqueado" };
-  const etiqueta = (r) => (r.estado === "confirmada" && !r.sena ? "Sin seña" : ETQ[r.estado]);
+  // Un turno de bookea.ar en un negocio con Mercado Pago, mientras el cliente paga la seña (si no paga, sale solo de la agenda)
+  const esperaSena = (r) => r.estado === "confirmada" && !r.sena && r.origen === "link" && /Esperando que pague la seña/.test(r.nota || "");
+  const etiqueta = (r) => (esperaSena(r) ? "Esperando la seña" : r.estado === "confirmada" && !r.sena ? "Sin seña" : ETQ[r.estado]);
   const ORIGEN = { link: "por el link", telefono: "por teléfono", fijo: "turno fijo" };
   const unidad = (neg) => (/p[aá]del|f[uú]tbol|tenis|cancha|v[oó]ley|b[aá]squet/i.test(neg.rubro) ? "Cancha" : "Lugar");
 
@@ -385,6 +387,9 @@
     otro: "Algo salió mal. Probá de nuevo en un rato.",
     "falta-base": "Falta actualizar la base de Bookea: hay que correr de nuevo esquema.sql en Supabase.",
     "no-existe": "Ese negocio ya no está en Bookea.",
+    "mp-sin-configurar": "Todavía no se puede conectar Mercado Pago: falta un paso de configuración en Bookea.",
+    "mp-no-anda": "No pudimos hablar con Mercado Pago. Probá de nuevo en un rato.",
+    "mp-ocupado": "Hay un cliente pagando una seña (o una seña por devolver). Probá de nuevo en unos minutos.",
   };
   const ocupado = (btn, si, txt) => {
     if (si) { btn.dataset.txt = btn.textContent; btn.textContent = txt; btn.disabled = true; btn.setAttribute("aria-busy", "true"); }
@@ -476,7 +481,11 @@
     if (!Array.isArray(YO.permisos)) YO.permisos = [];
     $("#entrada").hidden = true; $("#cargando").hidden = true; $("#panel").hidden = false;
     pintarLado(); pintarMenu();
-    ir(primeraVista(vistaInicial || "agenda"), { foco: false });
+    MPE = null; mpEsperando = false; mpConfirmar = false;
+    // Volvió de Mercado Pago en esta misma pestaña (el navegador no dejó abrir otra): a Mi negocio, con lo que pasó
+    const mp = MP_AL_ENTRAR; MP_AL_ENTRAR = null;
+    ir(primeraVista(mp && puedeVer("negocio") ? "negocio" : vistaInicial || "agenda"), { foco: false });
+    if (mp) setTimeout(() => aviso(MP_VUELTA[mp]), 400);
     if (store.modo === "nube") sincronizar(); // un negocio nuevo guarda acá sus ajustes iniciales
   };
   const salir = async (opc) => {
@@ -1591,6 +1600,107 @@
   const DURACIONES = Array.from({ length: 24 }, (_, i) => (i + 1) * 10); // de 10 minutos a 4 horas, cada 10
   const durTexto = (d) => (d < 60 ? `${d} minutos` : `${d} minutos (${Math.floor(d / 60)} h${d % 60 ? ` ${d % 60}` : ""})`);
   const durCorto = (d) => (d < 60 ? `${d} min` : `${Math.floor(d / 60)} h${d % 60 ? ` ${d % 60}` : ""}`);
+
+  // ---------- Mercado Pago: el negocio cobra la seña con su cuenta (pedido del dueño, 26/11) ----------
+  // Una tarjeta a lo ancho en Mi negocio, entre "Seña y cancelaciones" y "Cómo es el lugar": cómo está la conexión y, para
+  // el dueño, "Conectar Mercado Pago" (se abre en otra pestaña, así el panel sigue abierto) o "Desconectar". La conexión la
+  // hace la función "mp" de Supabase: las llaves de la cuenta nunca pasan por el panel.
+  const MP_VUELTA = {
+    conectado: "¡Listo! Tu cuenta de Mercado Pago quedó conectada: la seña de cada turno que reservan en bookea.ar entra en tu Mercado Pago.",
+    cancelado: "No se conectó: en Mercado Pago no diste el permiso. Podés intentarlo de nuevo cuando quieras.",
+    vencido: "Ese pedido venció. Tocá “Conectar Mercado Pago” de nuevo.",
+    error: "No pudimos conectar tu cuenta de Mercado Pago. Probá de nuevo en un rato.",
+  };
+  const MP_PESTANA = "bookea:mp-pestana", MP_RESULTADO = "bookea:mp-resultado";
+  let MPE = null, mpEsperando = false, mpConfirmar = false, MP_AL_ENTRAR = null;
+  let mpCanal = null;
+  try { mpCanal = new BroadcastChannel("bookea-mp"); } catch { /* sin BroadcastChannel: el aviso va por localStorage */ }
+  const diaMes = (iso) => { const d = new Date(iso); return isNaN(d.getTime()) ? "" : `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`; };
+  const htmlMP = () => {
+    if (store.modo !== "nube") return `<div class="mpc__info"><span class="estado estado--cancelada"><i></i>Versión de prueba</span><p class="mpc__t">Acá no se conecta Mercado Pago. Con tu cuenta de Bookea, la conectás en este lugar y la seña de cada turno se cobra sola.</p></div>`;
+    const m = MPE;
+    if (!m) return `<div class="mpc__info"><p class="mpc__t mpc__t--cargando">Mirando tu cuenta de Mercado Pago…</p></div>`;
+    if (m.error) return `<div class="mpc__info"><p class="mpc__t">${esc(MENSAJES[m.error] || MENSAJES.otro)}</p></div><div class="mpc__acc"><button type="button" class="btn btn--line" data-mp="ver">Probar de nuevo</button></div>`;
+    const dueno = !!m.dueno, anda = m.conectado && !m.reconectar;
+    let estado, texto, datos = "", acc = "";
+    if (anda) {
+      estado = `<span class="estado estado--confirmada"><i></i>Conectada</span>`;
+      texto = "La seña de cada turno que reservan en bookea.ar se paga con Mercado Pago y entra en tu cuenta. Si cancelan con tiempo, se les devuelve sola.";
+      if (m.real === false) texto += " Es una cuenta de prueba de Mercado Pago: tu negocio no aparece en la lista de bookea.ar (sí con tu link).";
+      datos = [m.cuenta ? `Cuenta N° ${esc(m.cuenta)}` : "", m.desde ? `conectada el ${diaMes(m.desde)}` : "",
+        +m.cobradas ? `${m.cobradas} ${+m.cobradas === 1 ? "seña cobrada" : "señas cobradas"}` : ""].filter(Boolean).join(" · ");
+      if (dueno) acc = mpConfirmar
+        ? `<p class="mpc__conf">¿Desconectarla? La seña deja de cobrarse y tu negocio sale de la lista.</p><button type="button" class="btn btn--warn" data-mp="desconectar-si">Sí, desconectar</button><button type="button" class="btn btn--line" data-mp="desconectar-no">No</button>`
+        : `<button type="button" class="btn btn--line" data-mp="desconectar">Desconectar</button>`;
+    } else if (m.conectado) {
+      estado = `<span class="estado estado--ausente"><i></i>Hay que conectarla de nuevo</span>`;
+      texto = "Mercado Pago dejó de aceptar la conexión (quizás le quitaste el permiso a Bookea). Mientras tanto, la seña no se cobra.";
+      if (dueno) acc = `<button type="button" class="btn btn--naranja" data-mp="conectar">Conectar de nuevo</button>`;
+    } else {
+      estado = `<span class="estado estado--cancelada"><i></i>Sin conectar</span>`;
+      texto = "Mientras no la conectes, la seña no se cobra y tu negocio no aparece en la lista de bookea.ar (sí con tu link).";
+      if (dueno) acc = `<button type="button" class="btn btn--naranja" data-mp="conectar">Conectar Mercado Pago</button>`;
+    }
+    if (mpEsperando && dueno && !anda) {
+      texto = "Seguí en la pestaña de Mercado Pago: cuando des el permiso, esto se actualiza solo.";
+      acc = `<button type="button" class="btn btn--line" data-mp="ver">Ya di el permiso</button><button type="button" class="btn btn--ghost" data-mp="conectar">Abrir Mercado Pago de nuevo</button>`;
+    }
+    if (!dueno) acc = `<p class="solo-ver">${ico("candado")}Solo el dueño del negocio la conecta o la desconecta.</p>`;
+    const sinDev = +m.sin_devolver || 0;
+    return `<div class="mpc__info">${estado}<p class="mpc__t">${texto}</p>${datos ? `<p class="mpc__d">${datos}</p>` : ""}${sinDev
+      ? `<p class="mpc__alerta">${sinDev === 1 ? "Una seña no se pudo devolver" : `${sinDev} señas no se pudieron devolver`} por Mercado Pago (quizás no había saldo en tu cuenta). Devolvela desde tu Mercado Pago.</p>` : ""}</div>${acc ? `<div class="mpc__acc">${acc}</div>` : ""}`;
+  };
+  const pintarMP = () => { const c = $("#g-mp"); if (c) c.innerHTML = htmlMP(); };
+  const cargarMP = async () => {
+    if (store.modo !== "nube" || !store.mercadoPago) return pintarMP();
+    const r = await store.mercadoPago();
+    MPE = r.ok ? r.mp : { error: r.error };
+    if (MPE.conectado && !MPE.reconectar) mpEsperando = false;
+    pintarMP();
+  };
+  const conectarMP = async (b) => {
+    // la pestaña se abre en el toque (si se abre después de esperar a la función, el navegador la bloquea)
+    let w = null;
+    try { w = window.open("", "_blank"); } catch { w = null; }
+    ocupado(b, true, "Abriendo Mercado Pago…");
+    const r = await store.conectarMercadoPago();
+    ocupado(b, false);
+    if (!r.ok) { if (w) w.close(); aviso(MENSAJES[r.error] || MENSAJES.otro); return; }
+    local.set(MP_PESTANA, String(Date.now()));
+    if (w && !w.closed) {
+      try { w.opener = null; } catch { /* igual sigue */ }
+      w.location.href = r.url; mpEsperando = true; pintarMP();
+      const s = $('#g-mp [data-mp="ver"]'); s && s.focus();
+    } else window.location.href = r.url; // el navegador no dejó abrir otra pestaña: en esta, y al volver se entra de nuevo
+  };
+  const desconectarMP = async (b) => {
+    ocupado(b, true, "Desconectando…");
+    const r = await store.desconectarMercadoPago();
+    mpConfirmar = false;
+    if (!r.ok) { aviso(MENSAJES[r.error] || MENSAJES.otro); pintarMP(); return; }
+    aviso("Desconectaste Mercado Pago: la seña ya no se cobra.");
+    await cargarMP();
+    const s = $('#g-mp [data-mp="conectar"]'); s && s.focus();
+  };
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest && e.target.closest("#g-mp [data-mp]");
+    if (!b || b.disabled) return;
+    const q = b.dataset.mp;
+    if (q === "conectar") conectarMP(b);
+    else if (q === "ver") { MPE = null; pintarMP(); cargarMP(); }
+    else if (q === "desconectar") { mpConfirmar = true; pintarMP(); const s = $('#g-mp [data-mp="desconectar-no"]'); s && s.focus(); }
+    else if (q === "desconectar-no") { mpConfirmar = false; pintarMP(); const s = $('#g-mp [data-mp="desconectar"]'); s && s.focus(); }
+    else if (q === "desconectar-si") desconectarMP(b);
+  });
+  // La pestaña de Mercado Pago avisa cuando vuelve: el panel (que siguió abierto en esta) lo dice y se actualiza
+  const alVolverMP = (r) => {
+    if (!MP_VUELTA[r] || !YO) return;
+    mpEsperando = false; aviso(MP_VUELTA[r]);
+    if (vistaActual === "negocio") { MPE = null; pintarMP(); cargarMP(); }
+  };
+  if (mpCanal) mpCanal.onmessage = (e) => alVolverMP(e.data);
+  else window.addEventListener("storage", (e) => { if (e.key === MP_RESULTADO && e.newValue) alVolverMP(e.newValue.split("|")[0]); });
+
   VISTAS.negocio = () => {
     const n = NEG, U = unidad(n), u = U.toLowerCase();
     const filaRec = (r) => `<div class="fila fila--rec" data-id="${r.id}"><input aria-label="Nombre" value="${esc(r.nombre)}" placeholder="${U} 1" autocomplete="off" /><input aria-label="Detalle" value="${esc(r.detalle)}" placeholder="Detalle (opcional)" autocomplete="off" /><button type="button" class="quitar" data-quitar aria-label="Quitar ${esc(r.nombre)}">${ico("x")}</button></div>`;
@@ -1640,6 +1750,8 @@
             <div class="field campo"><label for="g-canc">Cancelan hasta</label><div class="pre pre--fin"><input id="g-canc" type="number" inputmode="numeric" min="0" max="72" value="${n.cancelarHoras}" aria-label="Pueden cancelar hasta cuántas horas antes" /><span aria-hidden="true">horas antes</span></div></div>
             <label class="chk"><input type="checkbox" id="g-dev" ${n.devolverSena ? "checked" : ""} /> Si cancelan a tiempo, se les devuelve la seña</label>
             <p class="ng-ej" id="g-sena-ayuda"></p>`)}
+          ${tarjeta("ng-mp", "plata", "Cobrar la seña con Mercado Pago", "La seña de cada turno que reservan en bookea.ar entra directo en tu cuenta de Mercado Pago.",
+            `<div class="mpc" id="g-mp" aria-live="polite">${htmlMP()}</div>`, "ng-card--mp")}
           ${tarjeta("ng-8", "texto", "Cómo es el lugar", "Lo que leen en tu ficha antes de reservar.", `
             <div class="field ng-desc"><label for="g-desc" class="sr-only">Descripción del lugar</label><textarea id="g-desc" rows="4" maxlength="300" placeholder="Qué tiene tu lugar: canchas, servicios, si prestan equipo, cómo es el estacionamiento…" aria-describedby="g-desc-cuenta">${esc(n.descripcion || "")}</textarea><p class="field__help ng-cuenta" id="g-desc-cuenta"></p></div>`, "ng-card--desc")}
           ${tarjeta("ng-6", "pin", "Cómo llegar", "El link que abren tus clientes para llegar. Sale de tu dirección.", `
@@ -1649,6 +1761,7 @@
             <div class="mapa" id="g-mapa-ver"></div>`, "ng-card--ubi")}
       </form>`;
     const f = $("#f-neg");
+    cargarMP();
     const msg = $("#g-msg");
     const estadoMsg = (tipo, html) => { msg.className = "guardado" + (tipo ? " " + tipo : ""); msg.innerHTML = html; };
     $("#g-copiar").addEventListener("click", async (e) => {
@@ -2390,11 +2503,38 @@
     falta && falta.focus({ preventScroll: true });
   };
 
+  // ---------- Vuelta de Mercado Pago ----------
+  // La función "mp" vuelve a admin.html?mp=conectado (o cancelado, vencido, error). Si es la pestaña que abrió "Conectar
+  // Mercado Pago", le avisa al panel (que sigue abierto en la otra), lo dice y se cierra; si no, se dice al entrar.
+  const VUELTA_MP = (() => {
+    const r = new URLSearchParams(window.location.search).get("mp");
+    if (!r || !MP_VUELTA[r]) return null;
+    try { history.replaceState(null, "", window.location.pathname + window.location.hash); } catch { /* queda la dirección */ }
+    const abierta = Date.now() - (+local.get(MP_PESTANA) || 0) < 30 * 60e3;
+    local.del(MP_PESTANA);
+    if (mpCanal) { try { mpCanal.postMessage(r); } catch { /* sin aviso: al volver, "Ya di el permiso" */ } }
+    else local.set(MP_RESULTADO, `${r}|${Date.now()}`);
+    return { r, abierta };
+  })();
+  const mostrarVueltaMP = (r) => {
+    $("#cargando").hidden = true; $("#panel").hidden = true; $("#entrada").hidden = true;
+    const ok = r === "conectado", m = document.createElement("main");
+    m.className = "mpv"; m.id = "mp-vuelta";
+    m.innerHTML = `<div class="mpv__caja"><span class="mpv__ic${ok ? "" : " mpv__ic--no"}">${ok ? tilde() : ico("x")}</span>
+      <h1>${ok ? "Mercado Pago quedó conectado" : "Mercado Pago no se conectó"}</h1><p>${ok ? "Desde ahora, la seña de cada turno que reservan en bookea.ar entra en tu cuenta de Mercado Pago." : esc(MP_VUELTA[r])}</p>
+      <p class="mpv__sub">Ya podés cerrar esta pestaña: el panel sigue abierto en la otra.</p><a class="btn btn--line" href="admin.html">Ir al panel</a></div>`;
+    document.body.append(m);
+    setTimeout(() => { try { window.close(); } catch { /* el navegador no deja: queda el mensaje */ } }, 1800);
+  };
+  if (VUELTA_MP && !VUELTA_MP.abierta) MP_AL_ENTRAR = VUELTA_MP.r;
+
   // ---------- Arranque ----------
   $$(".solo-nube").forEach((el) => (el.hidden = !NUBE));
   $$(".solo-local").forEach((el) => (el.hidden = NUBE));
   sesion.del(CLAVE_SES); sesion.del(CLAVE_VISTA);
-  if (!NUBE) {
+  if (VUELTA_MP && VUELTA_MP.abierta) {
+    mostrarVueltaMP(VUELTA_MP.r);
+  } else if (!NUBE) {
     // Modo de prueba: cada vez que se carga o se refresca la página, se pide email y contraseña de nuevo
     // (la sesión vive solo en memoria y no se guarda en el navegador).
     cargar().then(entradaInicial);

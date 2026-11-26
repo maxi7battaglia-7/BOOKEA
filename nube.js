@@ -134,6 +134,9 @@
       negId = ms[0].negocio_id;
       const { data: fila, error: e2 } = await sb.from("negocios").select("*").eq("id", negId).single();
       if (e2) return fallo(e2);
+      // Los turnos de bookea.ar que esperaban el pago de la seña y nadie pagó a tiempo salen de la agenda (si la base
+      // todavía no tiene Mercado Pago, no pasa nada)
+      try { await sb.rpc("vencer_pendientes"); } catch { /* sigue igual */ }
       let reservas;
       try { reservas = await traerReservas(); } catch (e) { return fallo(e); }
       const negocio = negDeFila(fila);
@@ -294,6 +297,38 @@
       },
       // ---------- Equipo del negocio ----------
       // Lo ve solo el dueño: las personas que ya están y las invitaciones sin usar
+      // ---------- Mercado Pago: la cuenta con la que el negocio cobra la seña (función "mp" de Supabase) ----------
+      async mercadoPago() {
+        try {
+          const { data, error } = await sb.rpc("mi_mercado_pago", { n: negId });
+          if (error) return fallo(error);
+          return { ok: true, mp: data || { conectado: false } };
+        } catch (e) { return fallo(e); }
+      },
+      // La dirección de Mercado Pago para darle permiso a Bookea (la arma la función, que sabe la aplicación)
+      async conectarMercadoPago() {
+        try {
+          const { data } = await sb.auth.getSession();
+          const s = data && data.session;
+          if (!s) return { ok: false, error: "sesion" };
+          const r = await fetch(`${supabaseUrl.replace(/\/$/, "")}/functions/v1/mp/conectar`, {
+            method: "POST", body: JSON.stringify({ negocio: negId }),
+            headers: { Authorization: `Bearer ${s.access_token}`, apikey: supabaseAnonKey, "Content-Type": "application/json" },
+          });
+          const d = await r.json().catch(() => ({}));
+          if (r.ok && d && typeof d.url === "string" && /^https?:\/\//.test(d.url)) return { ok: true, url: d.url };
+          const e = (d && d.error) || "";
+          return { ok: false, error: e === "permiso" ? "permiso" : e === "sesion" ? "sesion" : e === "sin-configurar" || r.status === 404 ? "mp-sin-configurar" : "mp-no-anda" };
+        } catch { return { ok: false, error: "mp-no-anda" }; }
+      },
+      async desconectarMercadoPago() {
+        try {
+          const { error } = await sb.rpc("mp_desconectar", { n: negId });
+          if (error) return error.code === "55006" ? { ok: false, error: "mp-ocupado" } : fallo(error);
+          return { ok: true };
+        } catch (e) { return fallo(e); }
+      },
+
       async equipo() {
         try {
           const [m, i] = await Promise.all([

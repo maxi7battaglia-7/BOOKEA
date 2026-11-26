@@ -175,7 +175,8 @@ create trigger avisar_negocio_rechazado after update of estado on public.negocio
 --   5. Turno cancelado: cuando lo cancela desde Mis turnos (o lo cancela el lugar), con lo que pasa con la seña.
 --   6 y 7. Al negocio (al email del dueño), en los turnos de un negocio de verdad: turno nuevo y turno cancelado.
 --   Como los avisos 2 y 3, solo se mandan con remitente de dominio propio (resend_remitente).
---   Mientras Bookea esté en prueba (bookea_en_prueba(), en esquema.sql), los mails dicen que la seña no se cobró.
+--   En un negocio sin Mercado Pago (bookea_en_prueba(), en esquema.sql), los mails dicen que la seña no se cobró.
+--   En uno que cobra con Mercado Pago, el turno se confirma (y se avisan 4 y 6) recién cuando se acredita la seña.
 -- =====================================================================================
 
 -- Adónde llevan los botones de estos mails
@@ -287,12 +288,12 @@ begin
          else '' end
       || public.fila_mail(case when new.rubro ilike 'barber%' then 'Con' else 'Cancha' end, public.html_seguro(new.cancha))
       || case when new.rubro ilike 'barber%' and new.servicio <> '' then public.fila_mail('Servicio', public.html_seguro(new.servicio)) else '' end
-      || public.fila_mail('Seña', public.plata(new.sena))
+      || public.fila_mail('Seña', public.plata(new.sena) || case when new.pago = 'aprobado' then ' · pagada con Mercado Pago' else '' end)
       || public.fila_mail('En el lugar', public.plata(new.precio - new.sena))
       || public.fila_mail('Código', '<b style="font-family:monospace;letter-spacing:1px">' || new.codigo || '</b>')
       || '</table>'
       || '<p style="margin:0 0 12px">Llegá 10 minutos antes. ' || public.regla_cancelar(new.devuelve_sena, new.cancelar_horas) || '</p>'
-      || public.nota_prueba(new.negocio_id is not null),
+      || case when new.pago = '' then public.nota_prueba(new.negocio_id is not null) else '' end,
       'Ver mis turnos', public.bookea_url_turnos(),
       'Te mandamos este mail porque reservaste un turno en Bookea con este email.')
   );
@@ -303,6 +304,10 @@ end $$;
 drop trigger if exists avisar_turno_confirmado on public.turnos;
 create trigger avisar_turno_confirmado after insert on public.turnos
   for each row when (new.estado = 'confirmado') execute function public.avisar_turno_confirmado();
+-- Con Mercado Pago: el turno esperaba el pago y la seña se acreditó
+drop trigger if exists avisar_turno_pagado on public.turnos;
+create trigger avisar_turno_pagado after update of estado on public.turnos
+  for each row when (new.estado = 'confirmado' and old.estado = 'pendiente') execute function public.avisar_turno_confirmado();
 
 -- 6. Turno nuevo en un negocio de verdad → mail al negocio, con el cliente y su WhatsApp (ya está en su agenda)
 create or replace function public.avisar_turno_al_negocio() returns trigger
@@ -331,7 +336,10 @@ begin
            then public.fila_mail('WhatsApp', '<a href="' || public.html_seguro(wa) || '" style="color:#0f5e52;font-weight:bold">' || public.html_seguro(btrim(c.celular)) || '</a>')
            else '' end
       || public.fila_mail('Precio', public.plata(new.precio))
-      || public.fila_mail('Seña', case when public.bookea_en_prueba() then 'No se cobró (Bookea está en prueba)' else public.plata(new.sena) || ' pagada' end)
+      || public.fila_mail('Seña', case when new.pago = 'aprobado' then public.plata(new.sena) || ' pagada con Mercado Pago (ya está en tu cuenta)'
+                                       when new.sena = 0 then 'Sin seña'
+                                       when public.bookea_en_prueba() then 'No se cobró (Bookea está en prueba)'
+                                       else public.plata(new.sena) || ' pagada' end)
       || public.fila_mail('Código', '<b style="font-family:monospace;letter-spacing:1px">' || new.codigo || '</b>')
       || '</table>',
       'Ver la agenda', public.bookea_url_panel(),
@@ -344,6 +352,10 @@ end $$;
 drop trigger if exists avisar_turno_al_negocio on public.turnos;
 create trigger avisar_turno_al_negocio after insert on public.turnos
   for each row when (new.estado = 'confirmado' and new.negocio_id is not null) execute function public.avisar_turno_al_negocio();
+drop trigger if exists avisar_turno_pagado_al_negocio on public.turnos;
+create trigger avisar_turno_pagado_al_negocio after update of estado on public.turnos
+  for each row when (new.estado = 'confirmado' and old.estado = 'pendiente' and new.negocio_id is not null)
+  execute function public.avisar_turno_al_negocio();
 
 -- 5. Turno cancelado → mail al cliente (lo canceló él desde Mis turnos, o el lugar desde su panel)
 -- 7. Si lo canceló el cliente en un negocio de verdad → mail al negocio (el horario ya está libre en su agenda)
@@ -378,14 +390,16 @@ begin
                 || ') quedó cancelado y el horario se liberó.' end
       || '</p><p style="margin:0 0 12px">'
       || case when new.sena = 0 then 'No tenías seña pagada.'
-              when por_lugar and devuelve then 'La seña de ' || public.plata(new.sena) || ' se te devuelve.'
+              when por_lugar and devuelve then 'La seña de ' || public.plata(new.sena) || ' se te devuelve'
+                   || case when new.pago in ('aprobado', 'devuelto') then ' por Mercado Pago (puede tardar unos días en verse).' else '.' end
               when por_lugar then 'El lugar se quedó con la seña de ' || public.plata(new.sena) || '.'
                    || coalesce(' Si tenés dudas, escribiles por <a href="' || public.html_seguro(wa) || '" style="color:#0f5e52;font-weight:bold">WhatsApp</a>.', '')
               when not new.devuelve_sena then 'En este lugar la seña no se devuelve: la seña de ' || public.plata(new.sena) || ' queda para el lugar.'
-              when devuelve then 'Lo cancelaste con más de ' || new.cancelar_horas || ' h de anticipación: la seña de ' || public.plata(new.sena) || ' se devuelve.'
+              when devuelve then 'Lo cancelaste con más de ' || new.cancelar_horas || ' h de anticipación: la seña de ' || public.plata(new.sena) || ' se devuelve'
+                   || case when new.pago in ('aprobado', 'devuelto') then ' por Mercado Pago (puede tardar unos días en verse).' else '.' end
               else 'Lo cancelaste con menos de ' || new.cancelar_horas || ' h de anticipación: la seña de ' || public.plata(new.sena) || ' queda para el lugar.' end
       || '</p>'
-      || public.nota_prueba(new.negocio_id is not null),
+      || case when new.pago = '' then public.nota_prueba(new.negocio_id is not null) else '' end,
       'Reservar otro turno', 'https://bookea.ar/' || coalesce(n.slug || '/reservar', ''),
       case when por_lugar then 'Si tenés dudas, escribinos a <a href="mailto:hola@bookea.ar" style="color:#0f5e52;font-weight:bold">hola@bookea.ar</a>.'
            else 'Si no lo cancelaste vos, escribinos a <a href="mailto:hola@bookea.ar" style="color:#0f5e52;font-weight:bold">hola@bookea.ar</a>.' end)
@@ -401,8 +415,9 @@ begin
         || '<p style="margin:0 0 12px"><b style="color:#11151c">' || public.html_seguro(c.nombre) || '</b> canceló su turno del ' || cuando
         || ' (' || public.html_seguro(new.cancha) || '). El horario ya está libre en tu agenda.</p>'
         || '<p style="margin:0 0 12px">'
-        || case when public.bookea_en_prueba() then 'Bookea está en prueba: no había seña cobrada.'
+        || case when new.pago = '' and public.bookea_en_prueba() then 'Bookea está en prueba: no había seña cobrada.'
                 when new.sena = 0 then 'No tenía seña pagada.'
+                when devuelve and new.pago in ('aprobado', 'devuelto') then 'Canceló con tiempo: la seña de ' || public.plata(new.sena) || ' se le devuelve sola por Mercado Pago, desde tu cuenta.'
                 when devuelve then 'Canceló con tiempo: la seña de ' || public.plata(new.sena) || ' se le devuelve.'
                 else 'Canceló con menos anticipación de la que pedís: la seña de ' || public.plata(new.sena) || ' queda para vos.' end
         || '</p>',

@@ -247,6 +247,54 @@ begin
   assert h like '%en este lugar la seña no se devuelve%', 'un lugar que no devuelve la seña: ' || h;
   raise notice 'OK  con su propio link de Google Maps usa ese; sin datos (o con un link que no es de Maps) no muestra esas filas';
 end $$;
+-- Con Mercado Pago: mientras espera el pago no sale ningún mail; al acreditarse, los dos (con la seña pagada); al
+-- cancelar con tiempo, la seña se devuelve por Mercado Pago y se le avisa a la función (las llaves son inventadas)
+select public.mp_guardar_cuenta(current_setting('prueba.neg')::uuid, null,
+  '{"access_token": "PRUEBA_LLAVE_martin_0123456789", "refresh_token": "PRUEBA_RENOVAR_martin", "user_id": "777"}') \g /dev/null
+update public.negocios set mapa = '', direccion = 'Av. San Martín 1234', ciudad = 'Tupungato', ajustes = ajustes || '{"devolverSena": true}'
+ where email_dueno = 'martin@prueba.com';
+select set_config('prueba.mails_antes', (select count(*)::text from net.enviados), false) \g /dev/null
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000e1', false) \g /dev/null
+set role authenticated;
+do $$ begin
+  perform set_config('prueba.turno_mp', (public.reservar_turno(jsonb_build_object('negocio_id', current_setting('prueba.neg'), 'recurso', 'r1',
+    'fecha_agenda', current_date + 9, 'minuto', 1170))) ->> 'id', false);
+end $$;
+reset role;
+do $$ begin
+  assert (select estado from public.turnos where id = current_setting('prueba.turno_mp')::uuid) = 'pendiente', 'el turno no quedó esperando el pago';
+  assert (select count(*) from net.enviados) = current_setting('prueba.mails_antes')::int, 'salió un mail de un turno que todavía no se pagó';
+end $$;
+select public.mp_cobro_creado(current_setting('prueba.turno_mp')::uuid, 'ORDTSTM1', 'https://x', 7000, 0) \g /dev/null
+select public.mp_resultado('ORDTSTM1', 'processed', 'accredited', 7000) \g /dev/null
+do $$
+declare e record;
+begin
+  select * into e from net.enviados where body -> 'to' ->> 0 = 'juli@prueba.com' order by id desc limit 1;
+  assert e.body ->> 'subject' like 'Turno confirmado: Los Álamos Pádel, %' and e.body ->> 'html' like '%$&nbsp;7.000 · pagada con Mercado Pago%'
+     and e.body ->> 'html' not like '%no se cobró%' and e.body ->> 'html' like '%>Cómo llegar<%', 'al cliente, pagado: ' || (e.body ->> 'html');
+  select * into e from net.enviados where body -> 'to' ->> 0 = 'martin@prueba.com' order by id desc limit 1;
+  assert e.body ->> 'subject' like 'Turno nuevo: Juli Paz, %' and e.body ->> 'html' like '%pagada con Mercado Pago (ya está en tu cuenta)%'
+     and e.body ->> 'html' not like '%Bookea está en prueba%', 'al negocio, pagado: ' || (e.body ->> 'html');
+  assert (select count(*) from net.enviados) = current_setting('prueba.mails_antes')::int + 2, 'al acreditarse no salieron los dos mails (o salieron de más)';
+  raise notice 'OK  con Mercado Pago: mientras espera el pago no sale ningún mail; al acreditarse llegan los dos, con la seña pagada';
+end $$;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000e1', false) \g /dev/null
+set role authenticated;
+do $$ begin perform public.cancelar_turno(current_setting('prueba.turno_mp')::uuid); end $$;
+reset role;
+do $$
+declare e record;
+begin
+  select * into e from net.enviados where body -> 'to' ->> 0 = 'juli@prueba.com' order by id desc limit 1;
+  assert e.body ->> 'html' like '%se devuelve por Mercado Pago (puede tardar unos días en verse).%' and e.body ->> 'html' not like '%no se cobró%',
+    'al cliente, cancelado: ' || (e.body ->> 'html');
+  select * into e from net.enviados where body -> 'to' ->> 0 = 'martin@prueba.com' order by id desc limit 1;
+  assert e.body ->> 'html' like '%se le devuelve sola por Mercado Pago, desde tu cuenta.%', 'al negocio, cancelado: ' || (e.body ->> 'html');
+  assert exists (select 1 from net.enviados where url = 'https://vpxzuutavdjwglglbvdt.supabase.co/functions/v1/mp/devolver'), 'no se le avisó a la función que devuelva la seña';
+  assert (select devolucion from public.mp_cobros where orden = 'ORDTSTM1') = 'pendiente', 'la seña no quedó para devolver';
+  raise notice 'OK  con Mercado Pago, al cancelar con tiempo los mails dicen que la seña vuelve por Mercado Pago y se le avisa a la función';
+end $$;
 -- si pg_net falla, registrarse sigue funcionando
 create or replace function net.http_post(url text, body jsonb default '{}', params jsonb default '{}',
   headers jsonb default '{}', timeout_milliseconds int default 5000) returns bigint

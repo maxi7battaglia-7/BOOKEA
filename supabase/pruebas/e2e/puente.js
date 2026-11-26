@@ -55,7 +55,8 @@ const filtros = (fs_) => {
 
 const FUNCIONES = new Set(['revisar_negocio', 'guardar_pagina', 'crear_invitacion', 'ver_invitacion', 'aceptar_invitacion', 'anular_invitacion', 'cambiar_permisos', 'quitar_miembro',
   'guardar_mis_datos', 'reservar_turno', 'cancelar_turno', 'borrar_mi_cuenta', // las de los clientes de bookea.ar (cuenta.js)
-  'lugares_publicos', 'horarios_ocupados']); // las que la página pide sin cuenta (los negocios de verdad y sus horarios ocupados)
+  'lugares_publicos', 'horarios_ocupados', // las que la página pide sin cuenta (los negocios de verdad y sus horarios ocupados)
+  'mi_mercado_pago', 'mp_desconectar', 'vencer_pendientes']); // Mercado Pago, desde el panel
 const consulta = async (q) => {
   if (q.op === 'rpc') {
     if (!FUNCIONES.has(q.fn)) return { error: { code: 'PGRST202', message: 'función' } };
@@ -141,8 +142,17 @@ const auth = async (ruta, b) => {
 };
 
 const TIPOS = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.webp': 'image/webp', '.json': 'application/json' };
+// Mercado Pago de juguete y la función "mp" (cobro de señas), con Supabase Auth y la clave secreta simulados
+const mercadoPago = require('./mp-falso')({ psql, lit, puerto: PUERTO, raiz: RAIZ });
 http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
+  try {
+    if (await mercadoPago(req, res, url)) return;
+  } catch (e) {
+    console.error('mp-falso:', e);
+    res.writeHead(500, { 'content-type': 'application/json' });
+    return res.end(JSON.stringify({ error: 'mp-falso' }));
+  }
   const json = (o, st = 200) => { res.writeHead(st, { 'content-type': 'application/json' }); res.end(JSON.stringify(o)); };
   if (req.method === 'POST') {
     let cuerpo = ''; for await (const c of req) cuerpo += c;

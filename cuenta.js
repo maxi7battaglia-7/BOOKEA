@@ -4,6 +4,8 @@
 //   · Nube (config.js con los datos de Supabase): la cuenta es de Supabase Auth (guarda solo un hash de la
 //     contraseña), los datos van a la tabla "clientes" y los turnos a "turnos" (supabase/esquema.sql).
 //     Cada cliente ve solo lo suyo. La base manda el mail de turno confirmado y el de cancelado (avisos-por-mail.sql).
+//     En un negocio que cobra con Mercado Pago, el turno queda esperando el pago y "cobrar" pide a la función "mp"
+//     (supabase/functions/mp) adónde ir a pagar la seña; al volver, "cobrar" con revisar pregunta cómo salió.
 //     La sesión queda guardada en este navegador (no hay que entrar cada vez).
 //   · Prueba (config.js vacío: la vista previa, la copia sin internet y las pruebas): todo en este navegador.
 // sitio.js usa window.BookeaCuenta.crear(config) y no sabe en qué modo está.
@@ -59,7 +61,11 @@
     t: String(f.hora).slice(0, 5), end: String(f.fin).slice(0, 5), unit: f.cancha,
     precio: +f.precio || 0, sena: +f.sena || 0, cancel: +f.cancelar_horas || 0, devuelve: f.devuelve_sena !== false, code: f.codigo,
     lugar: f.lugar || "", zona: f.zona || "", rubro: f.rubro || "", servicio: f.servicio || "",
+    // con Mercado Pago: "pendiente" mientras paga la seña (hasta "vence"); "pago" dice si se cobró ("aprobado")
+    estado: f.estado || "confirmado", pago: f.pago || "", vence: f.vence ? Date.parse(f.vence) || 0 : 0,
   });
+  // Un turno que esperaba el pago y ya venció no se muestra (la base lo libera sola)
+  const vivo = (f) => f.estado !== "pendiente" || (f.vence && Date.parse(f.vence) > Date.now());
   const clienteDe = (f, email) => (f ? { id: f.id, nombre: f.nombre || "", email: f.email || email || "", celular: f.celular || "", promos: !!f.promos } : null);
   // Lo que se manda a reservar_turno (los nombres van para el mail de confirmación)
   // En un negocio de verdad van su id, la cancha (recurso) y el horario como en su agenda (fecha_agenda y minuto):
@@ -194,10 +200,10 @@
       },
       turnos() {
         return conLibreria(async () => {
-          const { data, error } = await sb.from("turnos").select("*").eq("estado", "confirmado")
+          const { data, error } = await sb.from("turnos").select("*").in("estado", ["confirmado", "pendiente"])
             .order("fecha", { ascending: true }).order("hora", { ascending: true });
           if (error) return fallo(error);
-          return { ok: true, lista: data.map(turnoDeFila) };
+          return { ok: true, lista: data.filter(vivo).map(turnoDeFila) };
         });
       },
       reservar(r) {
@@ -205,6 +211,25 @@
           const { data, error } = await sb.rpc("reservar_turno", { t: filaDeTurno(r) });
           if (error) return fallo(error);
           return { ok: true, turno: turnoDeFila(data) };
+        });
+      },
+      // Pagar la seña con Mercado Pago: la función arma el cobro con la cuenta del negocio y devuelve adónde ir.
+      // Con revisar, le pregunta a Mercado Pago si ya se pagó (al volver de pagar). Devuelve el estado del turno.
+      cobrar(id, revisar) {
+        return conLibreria(async () => {
+          const { data } = await sb.auth.getSession();
+          const s = data && data.session;
+          if (!s) return { ok: false, error: "sesion" };
+          try {
+            const r = await fetch(`${supabaseUrl.replace(/\/$/, "")}/functions/v1/mp/cobrar`, {
+              method: "POST", body: JSON.stringify({ turno: id, revisar: !!revisar }),
+              headers: { Authorization: `Bearer ${s.access_token}`, apikey: supabaseAnonKey, "Content-Type": "application/json" },
+            });
+            const d = await r.json().catch(() => ({}));
+            if (r.ok) return { ok: true, estado: String(d.estado || ""), url: typeof d.url === "string" && /^https:\/\//.test(d.url) ? d.url : "" };
+            const e = String((d && d.error) || "");
+            return { ok: false, error: e === "vencido" ? "vencido" : ["no-cobra", "reconectar", "sin-cuenta"].includes(e) ? "no-cobra" : e === "sesion" ? "sesion" : e === "no-existe" ? "no-existe" : "mp" };
+          } catch { return { ok: false, error: "mp" }; }
         });
       },
       cancelar(id) {
@@ -275,6 +300,7 @@
       async lugares() { return { ok: true, lista: [] }; }, // en modo de prueba, solo los lugares de ejemplo
       async ocupados() { return { ok: true, lista: [] }; },
       async recuperar() { return { ok: false, error: "local" }; },
+      async cobrar() { return { ok: false, error: "local" }; }, // en modo de prueba no se cobra nada
       alRecuperar() {},
       async ponerClave() { return { ok: false, error: "local" }; },
       async turnos() { const c = yo(); return c ? { ok: true, lista: misTurnos(c.id) } : { ok: false, error: "sesion" }; },

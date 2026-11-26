@@ -15,8 +15,17 @@ Prueba el panel real (`admin.html`) contra un Postgres local con `supabase/esque
   entra en su agenda, prueba que si el negocio lo cancela se cancela también el del cliente, y que lo que la dueña
   carga en "Tu página" (portada, logo, historia, Instagram) se ve en su página.
 
-Necesita Postgres (con `su postgres`), Node y Playwright con Chromium:
+- `mp-falso.js` (lo usa `puente.js`): un Mercado Pago de juguete (permiso con PKCE, cobros de la API de Orders, avisos
+  firmados, devoluciones) y la función `supabase/functions/mp/index.ts` corriendo adentro, tal cual se publica, con
+  Supabase Auth y la clave secreta simulados. Nada sale de la compu; las llaves son inventadas.
+- `mp-e2e.js`: el cobro de la seña con Mercado Pago de punta a punta: conectar la cuenta, cobrar con la comisión, el
+  aviso firmado (y uno mal firmado), pagos rechazados y tardíos, devoluciones (y sin saldo), renovar las llaves y
+  reconectar; y en el navegador, la tarjeta de Mi negocio, la pestaña que vuelve de Mercado Pago, pagar desde la
+  página, volver con el turno confirmado y "Pagar seña" desde Mis turnos.
+
+Necesita Postgres (con `su postgres`), Node (22 o más nuevo, que lee TypeScript) y Playwright con Chromium:
 
     node supabase/pruebas/e2e/nube-e2e.js
+    node supabase/pruebas/e2e/mp-e2e.js
 
 Las capturas quedan en `supabase/pruebas/e2e/capturas/` (no se suben al repo).
