@@ -966,7 +966,7 @@ dialog .row { margin-top: 6px; }
 .loc__bloque { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); border: 1px solid var(--l-line); border-radius: 20px; background: #fff; overflow: hidden; }
 .loc__bloque:nth-child(even) > .loc__fotos { order: -1; }
 .loc__bloque.sin-fotos { grid-template-columns: minmax(0, 1fr); }
-.loc__bloque-t { align-self: center; padding: clamp(24px, 3vw, 40px); }
+.loc__bloque-t { align-self: center; padding: clamp(24px, 3vw, 40px); container-type: inline-size; }
 .loc__bloque h2 { text-align: left; }
 .loc__bloque h3 { margin: 18px 0 2px; font-size: 13px; font-weight: 600; letter-spacing: 0; color: var(--l-mute); }
 .loc__datos { list-style: none; padding: 0; margin-top: 16px; }
@@ -1040,6 +1040,40 @@ dialog .row { margin-top: 6px; }
 .loc__pie a:hover { color: var(--l-ink); }
 .loc__pie .loc__bk { width: 11px; height: 15px; margin-left: 2px; }
 .loc__pie b { color: var(--l-ink); font-weight: 700; letter-spacing: -.03em; }
+
+/* en la compu y el celular acostado, el texto y las fotos un poco más grandes (pedido del dueño, 26/11); en el celular
+   parado queda como está (ver abajo) */
+@media (min-width: 701px) {
+  .loc h2 { font-size: clamp(24px, 2.5vw, 34px); }
+  .loc__texto { max-width: 720px; }
+  .loc__texto p { font-size: 18px; }
+  .loc__bloques, .loc__gal, .loc__fin { max-width: 1200px; }
+  .loc__bloques { gap: 18px; }
+  .loc__bloque-t { padding: clamp(28px, 3.6vw, 52px); }
+  .loc__bloque h3 { margin-top: 22px; font-size: 14px; }
+  .loc__datos { margin-top: 20px; }
+  .loc__datos li { column-gap: 16px; padding-block: 16px; }
+  .loc__datos .icon { width: 26px; height: 26px; }
+  .loc__datos b { font-size: 18px; }
+  .loc__datos span { font-size: 15px; }
+  .loc__servs { margin-top: 22px; gap: 10px; }
+  .loc__servs li { gap: 12px; padding: 13px 14px; font-size: 16px; }
+  .loc__servs .icon { width: 21px; height: 21px; }
+  .loc__fotos { padding: 16px; gap: 10px; }
+  .loc__fotos--mapa { padding: 0; }
+  .loc__fotos figure { border-radius: 16px; }
+  .loc__fotos--mapa .loc__mapa { min-height: 400px; }
+  .loc__dir { margin-top: 14px; font-size: 18px; }
+  .loc__bloque .loc__hor th, .loc__bloque .loc__hor td { padding-block: 10px; font-size: 16px; }
+  .loc__acc { margin-top: 20px; }
+  .loc__acc a { min-height: 48px; padding: 0 18px; font-size: 15px; }
+  .loc__acc .icon { width: 18px; height: 18px; }
+  .loc__mapa--chico { height: 220px; }
+  .loc__fin h2 { font-size: clamp(22px, 2vw, 28px); }
+  .loc__fin p { font-size: 15px; }
+  /* los servicios en dos columnas solo si entran ("Estacionamiento" no se corta) */
+  @container (max-width: 400px) { .loc__servs { grid-template-columns: minmax(0, 1fr); } }
+}
 
 @media (max-width: 700px) {
   .loc__in { padding-block: 84px 64px; }

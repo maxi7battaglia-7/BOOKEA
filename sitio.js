@@ -773,8 +773,8 @@
     const figs = [...g.children].filter((f) => f.tagName === "FIGURE"), n = figs.length;
     if (!n) return;
     const enTarjeta = g.classList.contains("loc__fotos");
-    const gap = parseFloat(cs.columnGap) || 8, alto = W < 560 ? 160 : W < 900 ? 220 : 300;
-    const tope = enTarjeta ? (W < 560 ? 360 : 560) : alto * 1.35, porFila = enTarjeta ? n : W < 700 ? 2 : 3;
+    const gap = parseFloat(cs.columnGap) || 8, alto = W < 560 ? 160 : W < 900 ? 220 : 320;
+    const tope = enTarjeta ? (W < 560 ? 360 : 620) : alto * 1.35, porFila = enTarjeta ? n : W < 700 ? 2 : 3;
     // en una tarjeta angosta (el celular parado), las fotos una arriba de la otra, a todo el ancho de su lado
     const apiladas = enTarjeta && W < 300;
     const rs = figs.map((f) => +f.dataset.r || 4 / 3);
