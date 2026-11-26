@@ -978,7 +978,7 @@ dialog .row { margin-top: 6px; }
 
 /* sus fotos, enteras: cada una con su forma, en filas parejas que ocupan el ancho (las arma armarGaleria en sitio.js);
    sin JavaScript, tres por fila (dos en el celular) en 4:3 */
-.loc__gal { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; max-width: 1000px; margin: clamp(18px, 2vw, 24px) auto 0; }
+.loc__gal { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; max-width: 1160px; margin: clamp(18px, 2vw, 24px) auto 0; }
 .loc__gal figure { flex: none; width: calc((100% - 16px) / 3); aspect-ratio: 4 / 3; overflow: hidden; border-radius: 14px; background: var(--l-suave); }
 .loc__gal figure[style] { aspect-ratio: auto; }
 .loc__gal img { width: 100%; height: 100%; object-fit: cover; }

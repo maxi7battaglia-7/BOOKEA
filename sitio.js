@@ -758,6 +758,8 @@
   // forma, en filas que ocupan todo el ancho y tienen la misma altura dentro de la fila (como un álbum de fotos). Como
   // son pocas (hasta 8), se prueban todas las formas de cortarlas en filas y queda la de alturas más parejas y más
   // cerca de la buscada. Una fila que quedaría muy alta (una o dos fotos solas) no se estira: va centrada.
+  // Grandes (pedido del dueño, 26/11: "no me disgustaba 3 y 3, que se sigan viendo un poco más grandes"): en la compu,
+  // hasta tres por fila (seis fotos: 3 y 3) y más anchas que el resto de la página; en el celular, hasta dos.
   // Sin JavaScript: tres por fila (dos en el celular), en 4:3.
   let galAncho = 0, galRO = null;
   function armarGaleria(forzar) {
@@ -766,7 +768,8 @@
     const W = Math.floor(g.getBoundingClientRect().width) - 1;
     if (W <= 0 || (!forzar && W === galAncho)) return;
     galAncho = W;
-    const gap = parseFloat(getComputedStyle(g).columnGap) || 8, alto = W < 560 ? 150 : W < 900 ? 190 : 230, tope = alto * 1.35;
+    const gap = parseFloat(getComputedStyle(g).columnGap) || 8, alto = W < 560 ? 160 : W < 900 ? 220 : 300, tope = alto * 1.35;
+    const porFila = W < 700 ? 2 : 3;
     const figs = [...g.children], rs = figs.map((f) => +f.dataset.r || 4 / 3), n = rs.length;
     const altoDe = (a, b) => { let t = 0; for (let i = a; i < b; i++) t += rs[i]; return (W - gap * (b - a - 1)) / t; };
     let mejor = null, puntos = Infinity;
@@ -775,7 +778,10 @@
       for (let i = 0; i < n - 1; i++) if (m & (1 << i)) cortes.push(i + 1);
       cortes.push(n);
       let p = 0;
-      for (let k = 0; k < cortes.length - 1; k++) { const h = altoDe(cortes[k], cortes[k + 1]); p += (Math.min(h, tope) - alto) ** 2 + (h > tope ? (h - tope) * 40 : 0); }
+      for (let k = 0; k < cortes.length - 1 && p < Infinity; k++) {
+        if (cortes[k + 1] - cortes[k] > porFila) { p = Infinity; break; }
+        const h = altoDe(cortes[k], cortes[k + 1]); p += (Math.min(h, tope) - alto) ** 2 + (h > tope ? (h - tope) * 40 : 0);
+      }
       if (p < puntos) { puntos = p; mejor = cortes; }
     }
     for (let k = 0; k < mejor.length - 1; k++) {
