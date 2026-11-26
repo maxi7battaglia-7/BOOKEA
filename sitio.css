@@ -923,8 +923,8 @@ dialog .row { margin-top: 6px; }
    - Sin la barra de arriba, la de abajo ni el pie de Bookea (sitio.js pone .en-local en <html>) y sin la pantalla de carga.
    - Blanco, negro y grises: el color lo ponen sus fotos. Nada de naranja, verde agua ni crema.
    - Portada a toda la pantalla (la foto baja más despacio al bajar), con el logo de Bookea chico y transparente arriba a
-     la izquierda y sus redes a la derecha; tarjetas sutiles con lo que tiene el lugar; historia, galería, horarios con
-     el mapa al lado y al final una franja chica para reservar. Títulos centrados, de peso medio, como la referencia.
+     la izquierda y sus redes a la derecha; tarjetas sutiles con lo que tiene el lugar; historia con sus fotos enteras, horarios
+     con el mapa al lado y al final una franja chica para reservar. Títulos centrados, de peso medio, como la referencia.
    - Compacta (pedido del dueño, 26/11): poco aire entre secciones, títulos chicos, todo en un ancho de 1000px.
    ========================================================= */
 .sin-splash .splash { display: none; }
@@ -976,15 +976,12 @@ dialog .row { margin-top: 6px; }
 .loc__texto p { font-size: 17px; line-height: 1.65; color: var(--l-txt); text-align: center; }
 .loc__texto p + p { margin-top: 10px; }
 
-/* galería: mosaico a lo ancho, según cuántas fotos haya */
-.loc__gal { display: grid; gap: 8px; max-width: 1000px; margin: clamp(20px, 2.2vw, 28px) auto 0; grid-template-columns: repeat(6, minmax(0, 1fr)); grid-auto-rows: clamp(120px, 12.5vw, 176px); }
-.loc__gal figure { grid-column: span 3; overflow: hidden; border-radius: 14px; background: var(--l-suave); }
+/* sus fotos, enteras: cada una con su forma, en filas parejas que ocupan el ancho (las arma armarGaleria en sitio.js);
+   sin JavaScript, tres por fila (dos en el celular) en 4:3 */
+.loc__gal { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; max-width: 1000px; margin: clamp(22px, 2.4vw, 32px) auto 0; }
+.loc__gal figure { flex: none; width: calc((100% - 16px) / 3); aspect-ratio: 4 / 3; overflow: hidden; border-radius: 14px; background: var(--l-suave); }
+.loc__gal figure[style] { aspect-ratio: auto; }
 .loc__gal img { width: 100%; height: 100%; object-fit: cover; }
-.loc__gal.n1 figure { grid-column: 1 / -1; grid-row: span 2; }
-.loc__gal.n2 figure { grid-row: span 2; }
-.loc__gal.n3 figure:first-child, .loc__gal.n5 figure:first-child { grid-column: span 4; grid-row: span 2; }
-.loc__gal.n3 figure:not(:first-child), .loc__gal.n5 figure:nth-child(2), .loc__gal.n5 figure:nth-child(3) { grid-column: span 2; }
-.loc__gal.n6 figure { grid-column: span 2; }
 
 /* horarios y ubicación, juntos: a la izquierda una tarjeta con los horarios (los días seguidos que abren igual van
    en una sola fila) y la dirección; a la derecha el mapa, de la misma altura */
@@ -1040,9 +1037,8 @@ dialog .row { margin-top: 6px; }
   .loc__card b { font-size: 14px; }
   .loc__cards--serv .loc__card { flex-basis: auto; padding: 8px 12px 8px 10px; }
   .loc__cards--serv .loc__card b { font-size: 13px; }
-  .loc__gal { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 38vw; gap: 6px; }
-  .loc__gal figure, .loc__gal[class] figure:nth-child(n) { grid-column: span 1; grid-row: auto; border-radius: 12px; }
-  .loc__gal:is(.n1, .n3, .n5) figure:first-child { grid-column: 1 / -1; }
+  .loc__gal { gap: 6px; }
+  .loc__gal figure { width: calc((100% - 6px) / 2); border-radius: 12px; }
   .loc__visita, .loc__visita.sin-mapa { grid-template-columns: minmax(0, 1fr); }
   .loc__info { padding: 16px 18px 18px; }
   .loc__mapa, .loc__mapa iframe { min-height: 240px; }

@@ -713,9 +713,10 @@
             <ul class="loc__cards">${tarjetas.map(tarjeta).join("")}</ul>
             ${extras.length ? `<ul class="loc__cards loc__cards--serv" aria-label="Lo que ofrece ${esc(v.name)}">${extras.map(tarjeta).join("")}</ul>` : ""}
           </section>
-          ${pg.historia ? `<section class="loc__sec loc__hist" aria-labelledby="loc-hist"><h2 id="loc-hist">${v.real ? "Nuestra historia" : "Sobre el lugar"}</h2><div class="loc__texto">${parrafos(pg.historia)}</div></section>` : ""}
-          ${gal.length ? `<section class="loc__sec" aria-labelledby="loc-fotos"><h2 id="loc-fotos">Galería</h2>
-            <div class="loc__gal n${gal.length}">${gal.map((u, i) => `<figure><img src="${esc(u)}" alt="Foto ${i + 1} de ${esc(v.name)}" loading="lazy" /></figure>`).join("")}</div>
+          ${pg.historia || gal.length ? `<section class="loc__sec loc__hist" aria-labelledby="loc-hist">
+            <h2 id="loc-hist">${pg.historia ? (v.real ? "Nuestra historia" : "Sobre el lugar") : "El lugar"}</h2>
+            ${pg.historia ? `<div class="loc__texto">${parrafos(pg.historia)}</div>` : ""}
+            ${gal.length ? `<div class="loc__gal">${gal.map((u, i) => `<figure><img src="${esc(u)}" alt="Foto ${i + 1} de ${esc(v.name)}" loading="lazy" /></figure>`).join("")}</div>` : ""}
           </section>` : ""}
           <section class="loc__sec" aria-labelledby="loc-ubi">
             <h2 id="loc-ubi">Horarios y ubicación</h2>
@@ -743,6 +744,44 @@
       </div>`;
     const desc = document.querySelector('meta[name="description"]');
     if (desc && v.real) desc.setAttribute("content", (pg.frase || pg.historia || `${v.name}: reservá tu turno en Bookea.`).slice(0, 160));
+    // las fotos, enteras: apenas se sabe la forma de cada una, se arman las filas (ver armarGaleria)
+    galAncho = 0;
+    $$(".loc__gal img").forEach((im) => {
+      const lista = () => { if (!im.naturalWidth) return; im.parentElement.dataset.r = Math.min(2.4, Math.max(0.5, im.naturalWidth / im.naturalHeight)).toFixed(4); armarGaleria(true); };
+      if (im.complete) lista(); else im.addEventListener("load", lista, { once: true });
+    });
+    if (galRO) galRO.disconnect();
+    const galEl = $(".loc__gal");
+    if (galEl && "ResizeObserver" in window) { galRO = new ResizeObserver(() => armarGaleria()); galRO.observe(galEl); }
+  }
+  // Las fotos del negocio, enteras (pedido del dueño, 26/11: "que entren en los recuadros completas"): cada una con su
+  // forma, en filas que ocupan todo el ancho y tienen la misma altura dentro de la fila (como un álbum de fotos). Como
+  // son pocas (hasta 8), se prueban todas las formas de cortarlas en filas y queda la de alturas más parejas y más
+  // cerca de la buscada. Una fila que quedaría muy alta (una o dos fotos solas) no se estira: va centrada.
+  // Sin JavaScript: tres por fila (dos en el celular), en 4:3.
+  let galAncho = 0, galRO = null;
+  function armarGaleria(forzar) {
+    const g = $(".loc__gal");
+    if (!g) return;
+    const W = Math.floor(g.getBoundingClientRect().width) - 1;
+    if (W <= 0 || (!forzar && W === galAncho)) return;
+    galAncho = W;
+    const gap = parseFloat(getComputedStyle(g).columnGap) || 8, alto = W < 560 ? 160 : W < 900 ? 210 : 260, tope = alto * 1.6;
+    const figs = [...g.children], rs = figs.map((f) => +f.dataset.r || 4 / 3), n = rs.length;
+    const altoDe = (a, b) => { let t = 0; for (let i = a; i < b; i++) t += rs[i]; return (W - gap * (b - a - 1)) / t; };
+    let mejor = null, puntos = Infinity;
+    for (let m = 0; m < 1 << Math.max(0, n - 1); m++) { // cada bit: si hay corte de fila después de esa foto
+      const cortes = [0];
+      for (let i = 0; i < n - 1; i++) if (m & (1 << i)) cortes.push(i + 1);
+      cortes.push(n);
+      let p = 0;
+      for (let k = 0; k < cortes.length - 1; k++) { const h = altoDe(cortes[k], cortes[k + 1]); p += (Math.min(h, tope) - alto) ** 2 + (h > tope ? (h - tope) * 40 : 0); }
+      if (p < puntos) { puntos = p; mejor = cortes; }
+    }
+    for (let k = 0; k < mejor.length - 1; k++) {
+      const h = Math.min(altoDe(mejor[k], mejor[k + 1]), tope);
+      for (let i = mejor[k]; i < mejor[k + 1]; i++) { figs[i].style.width = `${Math.floor(rs[i] * h * 100) / 100}px`; figs[i].style.height = `${Math.round(h)}px`; }
+    }
   }
   // La portada: al bajar, la foto baja más despacio que la página y el nombre se va apagando (como en Mendoza Icons).
   // Con "reducir movimiento", quieta.
