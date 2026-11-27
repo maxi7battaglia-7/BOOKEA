@@ -294,6 +294,11 @@ bien (Mercado Pago rechaza al crearla lo que esté mal armado, y las órdenes se
    lleva un mail de prueba (`test_user_bookea@testuser.com`), nunca el del cliente.
 5. Al terminar, volvé a poner los secretos de BOOKEA.
 
+**Lo que se encontró (27/11, con cuentas reales):** el pago anduvo **sin comisión**; **con** `marketplace_fee` Mercado
+Pago muestra "No pudimos procesar tu pago" y no registra ningún pago (`pagos = []`). Por eso `bookea_comision_pct()`
+va en 0 hasta pasar el cobro a **Preferences** (`/checkout/preferences` con `marketplace_fee`), la forma que Mercado Pago
+documenta para marketplaces.
+
 **En las dos:** cada prueba con un **turno nuevo**: la comisión queda fija al reservar y, si el turno ya tiene un cobro
 abierto, se vuelve a usar ese mismo. **Para ver por qué no se pudo pagar**, en el SQL Editor:
 `select orden, estado, detalle, pagos, creado from mp_cobros order by creado desc limit 5;` — `pagos` tiene cada

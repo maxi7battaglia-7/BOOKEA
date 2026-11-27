@@ -827,9 +827,12 @@ grant execute on function public.borrar_mi_cuenta() to authenticated;
 
 -- La comisión de Bookea: qué parte de cada seña cobrada se queda Bookea (en %). Para cambiarla, cambiá el número y
 -- volvé a correr este archivo (vale para los cobros que se armen desde ese momento). No se muestra en la página.
--- 1 % de la seña (pedido del dueño, 27/11: "tendría que ser muy bajo, un 1 o 0,5"): en una seña de $ 12.500, $ 125.
+-- El dueño pidió el 1 % (27/11: "tendría que ser muy bajo, un 1 o 0,5"), pero por ahora va en 0: con la API de Orders,
+-- un cobro con marketplace_fee no se puede pagar (Mercado Pago muestra "No pudimos procesar tu pago" sin registrar ningún
+-- pago; probado el 27/11 con cuentas reales: con comisión falla siempre y sin comisión anda). La comisión vuelve cuando
+-- el cobro pase a la forma que Mercado Pago documenta para marketplaces (Preferences). Ver LEEME, "Probarlo".
 create or replace function public.bookea_comision_pct() returns numeric language sql immutable as $$
-  select 1::numeric
+  select 0::numeric
 $$;
 -- La comisión de una seña, en pesos: redondeada, hasta la mitad de la seña y nunca la seña entera
 create or replace function public.comision_de(sena integer) returns integer
