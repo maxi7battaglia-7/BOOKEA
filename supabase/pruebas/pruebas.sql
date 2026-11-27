@@ -1119,6 +1119,15 @@ begin
   perform public.mp_cobro_creado(current_setting('prueba.mp_turno')::uuid, 'ORDTST01', 'https://www.mercadopago.com.ar/checkout/v1/redirect?order_id=ORDTST01', 12500, 1250);
   d := public.mp_datos_cobro(current_setting('prueba.mp_turno')::uuid, '00000000-0000-0000-0000-0000000000e1');
   assert d -> 'abiertos' -> 0 ->> 'orden' = 'ORDTST01' and (d ->> 'intento')::int = 1, 'cobro abierto: ' || d::text;
+  -- con una cuenta de prueba de Mercado Pago no va el mail del cliente (en modo prueba, Mercado Pago rechaza un mail real)
+  reset role;
+  update public.mp_cuentas set real = false where negocio_id = current_setting('prueba.neg_eva')::uuid;
+  set role service_role;
+  assert public.mp_datos_cobro(current_setting('prueba.mp_turno')::uuid, '00000000-0000-0000-0000-0000000000e1') ->> 'email' = '',
+    'con una cuenta de prueba fue el mail del cliente';
+  reset role;
+  update public.mp_cuentas set real = true where negocio_id = current_setting('prueba.neg_eva')::uuid;
+  set role service_role;
   assert public.mp_cobro('ORDTST01') ->> 'negocio' = current_setting('prueba.neg_eva'), 'cobro: ' || public.mp_cobro('ORDTST01')::text;
   -- mientras no se acredite, nada cambia; si dice que se pagó menos que la seña, no se confirma
   assert public.mp_resultado('ORDTST01', 'action_required', 'waiting_payment', 0) ->> 'accion' = 'nada', 'en curso';

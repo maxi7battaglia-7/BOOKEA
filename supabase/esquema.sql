@@ -1080,7 +1080,10 @@ begin
   if not found then raise exception 'No existe ese turno' using errcode = 'P0002'; end if;
   select * into c from public.clientes x where x.id = quien;
   return jsonb_build_object('turno', t.id, 'estado', t.estado, 'pago', t.pago, 'negocio', t.negocio_id, 'codigo', t.codigo,
-    'monto', t.sena, 'comision', t.comision, 'email', c.email,
+    'monto', t.sena, 'comision', t.comision,
+    -- el mail del cliente, para que Mercado Pago lo complete; con una cuenta de prueba de Mercado Pago, no: en modo
+    -- prueba rechaza el pago si una de las partes tiene un mail real (probado el 27/11)
+    'email', case when exists (select 1 from public.mp_cuentas k where k.negocio_id = t.negocio_id and k.real) then c.email else '' end,
     'titulo', left('Seña · ' || t.lugar || ' · ' || to_char(t.fecha, 'DD/MM') || ' ' || to_char(t.hora, 'HH24:MI') || ' · ' || t.cancha, 120),
     -- minutos que le quedan para pagar (el cobro de Mercado Pago vence un poco antes que el turno guardado)
     'minutos', case when t.estado = 'pendiente' then floor(extract(epoch from (t.vence - now())) / 60)::integer else 0 end,
