@@ -824,8 +824,9 @@ grant execute on function public.borrar_mi_cuenta() to authenticated;
 
 -- La comisión de Bookea: qué parte de cada seña cobrada se queda Bookea (en %). Para cambiarla, cambiá el número y
 -- volvé a correr este archivo (vale para los cobros que se armen desde ese momento). No se muestra en la página.
+-- 1 % de la seña (pedido del dueño, 27/11: "tendría que ser muy bajo, un 1 o 0,5"): en una seña de $ 12.500, $ 125.
 create or replace function public.bookea_comision_pct() returns numeric language sql immutable as $$
-  select 0::numeric
+  select 1::numeric
 $$;
 -- La comisión de una seña, en pesos: redondeada, hasta la mitad de la seña y nunca la seña entera
 create or replace function public.comision_de(sena integer) returns integer

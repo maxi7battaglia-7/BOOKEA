@@ -252,8 +252,9 @@ Cómo anda:
 5. **Supabase → Edge Functions → Deploy a new function → Via Editor:** nombre **`mp`**, borrá el ejemplo, pegá todo
    `functions/mp/index.ts` y tocá **Deploy**. Después, en la función → **Details** (o Settings): apagá **Verify JWT**
    ("Enforce JWT verification"): cada ruta controla quién la llama (la página, el panel, Mercado Pago o la base).
-6. **La comisión de Bookea:** en `esquema.sql`, `bookea_comision_pct()` (hoy `0`). Cambiá el número (por ejemplo `8`
-   para el 8 % de cada seña) y corré de nuevo `esquema.sql`. Vale para los cobros que se armen desde ese momento.
+6. **La comisión de Bookea:** en `esquema.sql`, `bookea_comision_pct()`: hoy **1 %** de cada seña. Para cambiarla
+   (por ejemplo a `0.5`), cambiá el número y corré de nuevo `esquema.sql`. Vale para los cobros que se armen desde ese
+   momento.
 
 ### Probarlo sin plata de verdad
 
