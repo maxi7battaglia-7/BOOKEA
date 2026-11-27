@@ -258,8 +258,11 @@ const conectar = async (token, negocio, cambiar) => {
       await Promise.all([fr.waitForURL(/mercadopago\.com\.ar\/checkout/, { timeout: 10000 }), fr.click('.chk__side [data-act="pay"]')]);
       const orden2 = new URL(fr.url()).searchParams.get('order_id');
       const o2 = (await mp()).ordenes.find((x) => x.id === orden2);
+      await mp('/pagar', { orden: orden2, rechazo: 'high_risk' }); // Mercado Pago rechaza la tarjeta: el cobro sigue abierto
       await fr.goto(o2.config.online.failure_url);
       await fr.waitForSelector('.okban--espera', { timeout: 15000 });
+      ok((await sql(`select to_json(pagos -> 0 ->> 'detalle') from mp_cobros where orden = '${orden2}'`)) === 'high_risk',
+        'el motivo del pago rechazado (lo que "No pudimos procesar tu pago" no dice) queda anotado en mp_cobros.pagos');
       ok(/La seña todavía no se pagó/.test(await fr.textContent('.okban--espera')) && /Esperando el pago/.test(await fr.textContent('.tcard--espera'))
         && await fr.isVisible('.tcard--espera [data-act="mp-pagar"]'), 'página: si el pago no sale, el turno sigue esperando en Mis turnos, con "Pagar seña"');
       await fr.screenshot({ path: `${out}/mp-espera.png` });

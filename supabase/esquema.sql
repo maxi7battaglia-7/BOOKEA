@@ -881,6 +881,8 @@ create table if not exists public.mp_cobros (
   creado      timestamptz not null default now(),
   actualizado timestamptz not null default now()
 );
+-- Los intentos de pago de cada cobro, como los dice Mercado Pago (estado y motivo de cada uno; mp_anotar_pagos)
+alter table public.mp_cobros add column if not exists pagos jsonb not null default '[]'::jsonb check (jsonb_typeof(pagos) = 'array');
 create index if not exists mp_cobros_por_turno on public.mp_cobros (turno_id);
 create index if not exists mp_cobros_por_negocio on public.mp_cobros (negocio_id);
 create index if not exists mp_cobros_a_devolver on public.mp_cobros (actualizado) where devolucion = 'pendiente';
@@ -1081,9 +1083,10 @@ begin
   select * into c from public.clientes x where x.id = quien;
   return jsonb_build_object('turno', t.id, 'estado', t.estado, 'pago', t.pago, 'negocio', t.negocio_id, 'codigo', t.codigo,
     'monto', t.sena, 'comision', t.comision,
-    -- el mail del cliente, para que Mercado Pago lo complete; con una cuenta de prueba de Mercado Pago, no: en modo
-    -- prueba rechaza el pago si una de las partes tiene un mail real (probado el 27/11)
-    'email', case when exists (select 1 from public.mp_cuentas k where k.negocio_id = t.negocio_id and k.real) then c.email else '' end,
+    -- el mail del cliente, para que Mercado Pago lo complete; con una cuenta de prueba de Mercado Pago, uno de prueba:
+    -- en modo prueba no puede intervenir una persona real (probado el 27/11), y la referencia lo pide en todo cobro
+    'email', case when exists (select 1 from public.mp_cuentas k where k.negocio_id = t.negocio_id and k.real) then c.email
+                  else 'test_user_bookea@testuser.com' end,
     'titulo', left('Seña · ' || t.lugar || ' · ' || to_char(t.fecha, 'DD/MM') || ' ' || to_char(t.hora, 'HH24:MI') || ' · ' || t.cancha, 120),
     -- minutos que le quedan para pagar (el cobro de Mercado Pago vence un poco antes que el turno guardado)
     'minutos', case when t.estado = 'pendiente' then floor(extract(epoch from (t.vence - now())) / 60)::integer else 0 end,
@@ -1092,6 +1095,15 @@ begin
     'abiertos', (select coalesce(jsonb_agg(jsonb_build_object('orden', k.orden, 'url', k.url) order by k.creado desc), '[]'::jsonb)
                    from public.mp_cobros k where k.turno_id = t.id and k.estado = 'creado'));
 end $$;
+-- Los intentos de pago de un cobro, con el motivo de cada uno (status_detail): "No pudimos procesar tu pago" no le dice
+-- a nadie por qué (27/11). La función los anota cada vez que consulta el cobro. Para verlos, en el SQL Editor:
+--   select orden, estado, detalle, pagos, creado from mp_cobros order by creado desc limit 5;
+create or replace function public.mp_anotar_pagos(orden text, pagos jsonb) returns void
+language sql security definer set search_path = '' as $$
+  update public.mp_cobros k set pagos = mp_anotar_pagos.pagos
+   where k.orden = mp_anotar_pagos.orden and jsonb_typeof(mp_anotar_pagos.pagos) = 'array'
+     and octet_length(mp_anotar_pagos.pagos::text) <= 4000 and k.pagos is distinct from mp_anotar_pagos.pagos
+$$;
 -- La función armó el cobro en Mercado Pago: se anota (para encontrarlo cuando Mercado Pago avise)
 create or replace function public.mp_cobro_creado(turno uuid, orden text, url text, monto integer, comision integer) returns void
 language sql security definer set search_path = '' as $$
@@ -1244,7 +1256,7 @@ begin
   foreach f in array array['mp_empezar_conexion(uuid, uuid)', 'mp_tomar_estado(text)', 'mp_guardar_cuenta(uuid, uuid, jsonb)',
     'mp_llaves(uuid)', 'mp_marcar_reconectar(uuid)', 'mp_datos_cobro(uuid, uuid)', 'mp_cobro_creado(uuid, text, text, integer, integer)',
     'mp_cobro(text)', 'mp_resultado(text, text, text, numeric)', 'mp_por_devolver()', 'mp_devolucion(text, boolean, text)',
-    'mp_por_renovar()'] loop
+    'mp_por_renovar()', 'mp_anotar_pagos(text, jsonb)'] loop
     execute format('revoke all on function public.%s from public, anon, authenticated', f);
     execute format('grant execute on function public.%s to service_role', f);
   end loop;

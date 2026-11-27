@@ -264,30 +264,44 @@ aparece en la lista (`en_la_lista()`). De esos turnos Bookea no cobra comisión:
    (por ejemplo a `0.5`), cambiá el número y corré de nuevo `esquema.sql`. Vale para los cobros que se armen desde ese
    momento.
 
-### Probarlo sin plata de verdad
+### Probarlo (27/11: lo que aprendimos)
 
-**Antes de probar:** en Supabase → Edge Functions → Secrets, agregá `MP_TEST_TOKEN` con el valor `true`. Así, al
-conectar, la función le pide a Mercado Pago **llaves de prueba** (`test_token`); sin eso, un vendedor de prueba recibe
-llaves de producción y Mercado Pago rechaza las tarjetas de prueba con "No pudimos procesar tu pago" (pasó el 27/11).
-Si el vendedor de prueba ya estaba conectado, desconectalo y conectalo de nuevo. **Antes de cobrar de verdad, borrá
-`MP_TEST_TOKEN`** (y que cada negocio conecte su cuenta real): con ese secreto, todas las conexiones son de prueba.
+**Mercado Pago no deja mezclar cuentas de prueba con cuentas reales en un mismo pago** (su error 145: "Una de las partes
+con la que intentás hacer el pago es de prueba y la otra es usuario real"). En Bookea, la aplicación BOOKEA (que arma
+el cobro y recibe la comisión) es de una cuenta **real**; con un **vendedor de prueba** conectado, Mercado Pago rechaza
+la tarjeta con el genérico "Algo salió mal... No pudimos procesar tu pago". Pasó el 27/11 de todas las formas: con y
+sin comisión, con y sin mail, sin sesión o con el comprador de prueba, y con `test_token`. El código y la orden están
+bien (Mercado Pago rechaza al crearla lo que esté mal armado, y las órdenes se crean). Hay dos formas de probarlo:
 
-En Mercado Pago → Tus integraciones → BOOKEA → **Cuentas de prueba**, creá dos: un **vendedor** y un **comprador**
-(Mercado Pago ya trae uno de cada uno). Para pagar no hace falta el comprador: se paga sin iniciar sesión, con una
-tarjeta de prueba y un email inventado. Con un vendedor de prueba, el cobro va sin el mail del cliente
-(`mp_datos_cobro`): en modo prueba, Mercado Pago rechaza un mail real.
+**A. Con plata de verdad, chiquito (la recomendada):**
+1. En Supabase → Edge Functions → Secrets, que **no** esté `MP_TEST_TOKEN` (no sirve para esto: con la API de Orders
+   la llave de un vendedor es siempre `APP_USR-`).
+2. Un negocio de prueba en Bookea conecta la cuenta **real** de Mercado Pago de alguien de confianza (no la dueña de
+   BOOKEA). Precio bajo y seña chica: por ejemplo, turno de $ 1.000 con seña del 10 % = $ 100.
+3. Otra persona reserva y paga con su tarjeta. Tiene que volver con el turno **confirmado**, llegar los dos mails y verse
+   la seña en la agenda; al negocio le llega la seña menos el costo de Mercado Pago y el 1 % de Bookea.
+4. Cancelalo desde Mis turnos con tiempo: la seña tiene que volver sola (y el 1 % también).
 
-1. En una ventana de incógnito, entrá a mercadopago.com.ar con el **vendedor de prueba**. En otra pestaña de esa
-   misma ventana, entrá al panel (bookea.ar/admin.html) con un negocio aprobado y tocá **Conectar Mercado Pago**: el
-   permiso lo da el vendedor de prueba. Con una cuenta de prueba, el negocio no aparece en la lista (sí con su link).
-2. En otra ventana de incógnito, en bookea.ar/su-link/reservar reservá con una cuenta de cliente y tocá **Pagar seña**.
-   En Mercado Pago pagá con el **comprador de prueba** y una tarjeta de prueba (las de la documentación de Mercado
-   Pago; el nombre del titular decide el resultado: `APRO` aprobada, `OTHE` rechazada).
-3. Tiene que volver a bookea.ar con el turno **confirmado**, llegar los dos mails y verse la seña en la agenda del
-   negocio. Cancelalo desde Mis turnos con tiempo: la seña tiene que volver a la cuenta del comprador de prueba.
+**B. Todo de prueba (sin plata, más trabajo):** todas las partes tienen que ser de prueba, también la aplicación.
+1. En Cuentas de prueba, usá tres cuentas de Argentina: **Integrador** (o "Marketplace"), **Vendedor** y **Comprador**.
+2. En una ventana de incógnito, entrá a Mercado Pago Developers con el **Integrador** y creá otra aplicación (Checkout
+   Pro, API de Orders, marketplace) con la misma URL de redireccionamiento y el mismo webhook que BOOKEA; activá
+   producción para tener su Client ID y su Client Secret.
+3. Por un rato, cambiá en los Secrets `MP_CLIENT_ID`, `MP_CLIENT_SECRET` y `MP_WEBHOOK_SECRET` por los de esa aplicación
+   (anotá antes los de BOOKEA). Mientras tanto, ningún negocio real puede conectar.
+4. Conectá un negocio de prueba con el **Vendedor**, y pagá en otra ventana de incógnito **sin iniciar sesión**, con
+   la tarjeta `APRO` (Mastercard 5031 7557 3453 0604, 11/30, 123, DNI 12345678). Con un vendedor de prueba, el cobro
+   lleva un mail de prueba (`test_user_bookea@testuser.com`), nunca el del cliente.
+5. Al terminar, volvé a poner los secretos de BOOKEA.
 
-Si algo falla: **Edge Functions → mp → Logs** dice qué contestó Mercado Pago (nunca muestra llaves). En la base,
-`select * from mp_cobros order by creado desc` muestra cada cobro, su estado y si se devolvió.
+**En las dos:** cada prueba con un **turno nuevo**: la comisión queda fija al reservar y, si el turno ya tiene un cobro
+abierto, se vuelve a usar ese mismo. **Para ver por qué no se pudo pagar**, en el SQL Editor:
+`select orden, estado, detalle, pagos, creado from mp_cobros order by creado desc limit 5;` — `pagos` tiene cada
+intento con su motivo (`detalle`: por ejemplo `high_risk`, `rejected_by_issuer`, `processing_error`). También lo dice
+**Edge Functions → mp → Logs** (nunca muestra llaves): el cobro con sus intentos, qué llave dio Mercado Pago al
+conectar (solo `APP_USR` o `TEST`) y los avisos mal firmados. Si Mercado Pago sigue rechazando con todas las partes
+reales o todas de prueba, el plan B es cobrar con **Preferences** (`/checkout/preferences` con `marketplace_fee`), el
+único camino de marketplace que Mercado Pago documenta para Checkout Pro.
 
 ## Que Supabase no pause el proyecto (25/11)
 

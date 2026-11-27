@@ -186,7 +186,16 @@ module.exports = function montar({ psql, lit, puerto, raiz }) {
       const b = JSON.parse((await leerCuerpo(req)).toString() || '{}');
       const o = MP.ordenes.get(b.orden);
       if (!o) { enviar(res, 404, { error: 'orden' }); return true; }
+      // cada intento queda en transactions.payments, como en la API de Orders; uno rechazado deja el cobro abierto
+      const pagos = ((o.transactions = o.transactions || {}).payments = o.transactions.payments || []);
+      const id = 'PAY' + (pagos.length + 1);
+      if (b.rechazo) {
+        pagos.push({ id, status: 'failed', status_detail: b.rechazo, amount: o.total_amount, payment_method: { id: 'master', type: 'credit_card' } });
+        enviar(res, 200, { ok: true });
+        return true;
+      }
       o.status = b.estado || 'processed'; o.status_detail = b.detalle || 'accredited';
+      pagos.push({ id, status: o.status, status_detail: o.status_detail, amount: o.total_amount, payment_method: { id: 'master', type: 'credit_card' } });
       o.total_paid_amount = b.pagado !== undefined ? String(b.pagado) : o.total_amount;
       enviar(res, 200, b.avisar === false ? { ok: true } : await avisar(o.id, b.firma || 'buena'));
       return true;

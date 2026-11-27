@@ -168,8 +168,27 @@ async function consultar(llave: string, orden: string, turno?: string): Promise<
     console.error(`mp: el cobro ${orden} no es del turno que dice la base`);
     return null;
   }
+  // Cada intento de pago, con su motivo (status_detail): lo que Mercado Pago no le dice al cliente ("No pudimos procesar
+  // tu pago"). Queda en los Logs de la función y en mp_cobros.pagos (pedido del dueño, 27/11: saber por qué no se cobra).
+  const pagos = resumenPagos(o.d);
+  console.log(`mp: cobro ${orden}: ${o.d.status || "?"}/${o.d.status_detail || ""} · pagos ${JSON.stringify(pagos)}`
+    + `${o.d.marketplace_fee ? ` · comisión ${o.d.marketplace_fee}` : " · sin comisión"}${o.d.payer && o.d.payer.email ? " · con mail" : " · sin mail"}`);
+  try {
+    await base("mp_anotar_pagos", { orden, pagos });
+  } catch (e) {
+    console.error(`mp: no se pudieron anotar los pagos del cobro ${orden}: ${(e as Error).message}`);
+  }
   const r = await base("mp_resultado", { orden, estado: String(o.d.status || ""), detalle: String(o.d.status_detail || ""), pagado: numero(o.d.total_paid_amount) });
   return { ...(r || {}), status: o.d.status };
+}
+// Los intentos de pago de un cobro (transactions.payments de la API de Orders), sin datos de nadie
+function resumenPagos(o: Datos): Datos[] {
+  const lista = o && o.transactions && Array.isArray(o.transactions.payments) ? o.transactions.payments : [];
+  const t = (v: unknown, n: number) => String(v ?? "").slice(0, n);
+  return lista.slice(0, 10).map((p: Datos) => ({
+    id: t(p.id, 40), estado: t(p.status, 40), detalle: t(p.status_detail, 60),
+    medio: t(p.payment_method && p.payment_method.id, 30), tipo: t(p.payment_method && p.payment_method.type, 30), monto: t(p.amount, 20),
+  }));
 }
 
 // ---------- Rutas ----------
@@ -201,6 +220,9 @@ async function alVolver(req: Request): Promise<Response> {
     console.error(`mp: Mercado Pago no dio las llaves: ${r.estado} ${r.d.error || ""} ${r.d.message || ""}`);
     return ir("error");
   }
+  // Qué llave dio Mercado Pago (solo el prefijo: APP_USR o TEST), si es de prueba (live_mode) y de qué cuenta
+  console.log(`mp: Mercado Pago dio las llaves del negocio ${e.negocio}: llave ${String(r.d.access_token || "").split("-")[0].slice(0, 10)}…`
+    + ` · live_mode ${r.d.live_mode} · cuenta ${r.d.user_id}${env("MP_TEST_TOKEN") === "true" ? " · pedidas con test_token" : ""}`);
   await base("mp_guardar_cuenta", { n: e.negocio, quien: e.quien, d: r.d });
   return ir("conectado");
 }
@@ -248,7 +270,7 @@ async function cobrar(req: Request): Promise<Datos> {
   if (comision) pedido.marketplace_fee = pesos(comision);
   const o = await mp(ll.llave, "POST", "/v1/orders", pedido, `bookea-${d.turno}-${d.intento}`);
   if (!o.ok || !esOrden(o.d.id) || !esDeMercadoPago(o.d.checkout_url)) {
-    console.error(`mp: Mercado Pago no armó el cobro del turno ${d.turno}: ${o.estado} ${o.d.message || o.d.error || ""}`);
+    console.error(`mp: Mercado Pago no armó el cobro del turno ${d.turno}: ${o.estado} ${JSON.stringify(o.d).slice(0, 800)}`);
     throw new Falla("mercado-pago", 502);
   }
   await base("mp_cobro_creado", { turno: d.turno, orden: o.d.id, url: o.d.checkout_url, monto: +d.monto, comision });
@@ -283,7 +305,11 @@ async function aviso(req: Request): Promise<Datos> {
   const id = String(qid || (b.data && b.data.id) || "");
   const tipo = String(url.searchParams.get("type") || url.searchParams.get("topic") || b.type || "");
   const secreto = env("MP_WEBHOOK_SECRET");
-  if (secreto && !(await firmaOk(req, qid || id, secreto))) throw new Falla("firma", 401);
+  if (secreto && !(await firmaOk(req, qid || id, secreto))) {
+    console.warn(`mp: aviso con una firma que no coincide (cobro ${id || "?"}): ¿MP_WEBHOOK_SECRET es la firma secreta de esta aplicación?`);
+    throw new Falla("firma", 401);
+  }
+  console.log(`mp: aviso de Mercado Pago: ${b.action || tipo || "?"} ${id}${b.live_mode !== undefined ? ` · live_mode ${b.live_mode}` : ""}`);
   if (!secreto) console.error("mp: falta MP_WEBHOOK_SECRET: el aviso no se puede comprobar (igual se consulta a Mercado Pago)");
   if (tipo !== "order" || !esOrden(id)) return { ok: true, ignorado: true };
   const k = await base("mp_cobro", { orden: id });

@@ -1123,12 +1123,18 @@ begin
   reset role;
   update public.mp_cuentas set real = false where negocio_id = current_setting('prueba.neg_eva')::uuid;
   set role service_role;
-  assert public.mp_datos_cobro(current_setting('prueba.mp_turno')::uuid, '00000000-0000-0000-0000-0000000000e1') ->> 'email' = '',
+  assert public.mp_datos_cobro(current_setting('prueba.mp_turno')::uuid, '00000000-0000-0000-0000-0000000000e1') ->> 'email' = 'test_user_bookea@testuser.com',
     'con una cuenta de prueba fue el mail del cliente';
   reset role;
   update public.mp_cuentas set real = true where negocio_id = current_setting('prueba.neg_eva')::uuid;
   set role service_role;
   assert public.mp_cobro('ORDTST01') ->> 'negocio' = current_setting('prueba.neg_eva'), 'cobro: ' || public.mp_cobro('ORDTST01')::text;
+  -- los intentos de pago, con su motivo (lo que "No pudimos procesar tu pago" no dice)
+  perform public.mp_anotar_pagos('ORDTST01', '[{"id": "PAY1", "estado": "failed", "detalle": "high_risk", "medio": "master", "tipo": "credit_card", "monto": "12500.00"}]');
+  perform public.mp_anotar_pagos('ORDTST01', '"no es una lista"');
+  reset role;
+  assert (select pagos -> 0 ->> 'detalle' from public.mp_cobros where orden = 'ORDTST01') = 'high_risk', 'no quedó anotado el motivo del pago';
+  set role service_role;
   -- mientras no se acredite, nada cambia; si dice que se pagó menos que la seña, no se confirma
   assert public.mp_resultado('ORDTST01', 'action_required', 'waiting_payment', 0) ->> 'accion' = 'nada', 'en curso';
   begin
