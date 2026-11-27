@@ -149,7 +149,8 @@ nombres, emails ni teléfonos.
 
 - **Dónde aparece:** con su link, `bookea.ar/su-link` (el que ve en Mi negocio; `../404.html` lo lleva a
   `bookea.ar/?lugar=su-link`). En la lista de la página (inicio y resultados) aparece recién cuando pueda cobrar la
-  seña con Mercado Pago con una cuenta de verdad (`en_la_lista()`; ver "Cobrar la seña con Mercado Pago").
+  seña con Mercado Pago con una cuenta de verdad, o enseguida si no pide seña (`en_la_lista()`; ver "Cobrar la seña
+  con Mercado Pago").
 - **Al reservar:** la base arma el turno con los datos del negocio (no con lo que manda la página): controla que la
   cancha exista, que el horario sea uno de los suyos y que esté libre, y calcula el precio y la seña. El turno entra
   en su agenda como "por el link", con el nombre y el celular del cliente. Si el negocio no cobra con Mercado Pago,
@@ -232,6 +233,11 @@ Cómo anda:
    vuelve a intentar; después de 48 intentos el panel le avisa al negocio que la devuelva él.
 5. **Renovar:** las llaves duran 180 días; la función las renueva sola un mes antes. Si el dueño le quita el permiso a
    Bookea desde Mercado Pago, el panel le pide que la conecte de nuevo (mientras tanto, la seña no se cobra).
+
+**Sin seña (27/11):** si el negocio pone la seña en **0 %** en Mi negocio, no hay nada que cobrar: el turno queda
+**confirmado al reservar**, sin pasar por Mercado Pago (aunque tenga la cuenta conectada), y en la página dice "Sin
+seña" y "Confirmar turno" en vez de "Pagar seña". Aparece en la lista sin conectar Mercado Pago (`pide_sena()`,
+`en_la_lista()`). De esos turnos Bookea no cobra comisión: la comisión sale de la seña.
 
 ### Ponerlo en marcha (una vez, en este orden)
 

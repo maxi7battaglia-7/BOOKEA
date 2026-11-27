@@ -268,6 +268,37 @@ const conectar = async (token, negocio, cambiar) => {
       await fr.goto(o2.config.online.success_url);
       await fr.waitForSelector('#page-turnos:not([hidden]) .okban:not(.okban--espera)', { timeout: 15000 });
       ok((await fr.locator('.tcard--espera').count()) === 0, 'después de pagar, ya no queda ninguno esperando');
+      // ---------- Sin seña (pregunta del dueño, 27/11): con la seña en 0 %, el turno se confirma sin pasar por Mercado Pago ----------
+      await an.click('.menu__i[data-vista="negocio"]'); await an.waitForSelector('#g-sena');
+      await an.fill('#g-sena', '0');
+      ok(/En 0 %, sin seña/.test(await an.textContent('#g-sena-ayuda')) && /tu seña está en 0 %/.test(await an.textContent('#g-mp')) && /Conectada/.test(await an.textContent('#g-mp')),
+        'panel: con la seña en 0 %, la ayuda y la tarjeta de Mercado Pago dicen que los turnos se confirman sin cobrar nada');
+      for (let i = 0; i < 40 && (await sql(`select to_json(ajustes ->> 'senaPct') from negocios where id = '${neg}'`)) !== '0'; i++) await an.waitForTimeout(250);
+      ok((await sql(`select to_json(ajustes ->> 'senaPct') from negocios where id = '${neg}'`)) === '0', 'panel: la seña en 0 % queda guardada');
+      await an.locator('.ng-card--mp').screenshot({ path: `${out}/mp-panel-sin-sena.png` });
+      await fr.goto(F + '?lugar=canchaana'); await frenteListo(fr);
+      await fr.waitForFunction(() => document.querySelector('.page:not([hidden])').dataset.page === 'ficha', null, { timeout: 8000 });
+      ok(/Sin seña/.test(await fr.textContent('.ficha__head')) && /no pide seña/.test(await fr.textContent('#ficha-root')), 'página: la ficha dice "Sin seña"');
+      await fr.click('.cupo[data-i="1"]'); await fr.click('.slot[data-t="22:00"]'); await fr.waitForTimeout(300);
+      ok(/^Reservar/.test((await fr.textContent('#ir-pagar [data-act="reservar"]')).trim()) && /sin seña/.test(await fr.textContent('#ir-pagar')), 'página: el aviso verde dice "Reservar" y "sin seña", no "Ir a pagar"');
+      await fr.click('#ir-pagar [data-act="reservar"]'); await fr.waitForSelector('#pago-root .chk__turno');
+      const lado = await fr.textContent('.chk__side');
+      ok((await fr.textContent('.chk__side [data-act="pay"]')).trim() === 'Confirmar turno' && /Sin seña/.test(lado) && !/Mercado Pago|en prueba/.test(lado)
+        && (await fr.title()) === 'Confirmá tu turno · Bookea', 'página: sin seña, "Confirmar turno", sin Mercado Pago ni "en prueba"');
+      await fr.screenshot({ path: `${out}/sin-sena-confirmar.png` });
+      const antes = (await mp()).ordenes.length;
+      await fr.click('.chk__side [data-act="pay"]');
+      await fr.waitForSelector('#page-turnos:not([hidden]) .okban:not(.okban--espera)', { timeout: 15000 });
+      const ts = await sql(`select row_to_json(t) from turnos t where t.negocio_id = '${neg}' and t.hora = '22:00' and t.estado = 'confirmado'`);
+      ok(new URL(fr.url()).host === new URL(B).host && (await mp()).ordenes.length === antes && ts && ts.sena === 0 && ts.pago === ''
+        && !(await sql(`select to_json(count(*)) from mp_cobros where turno_id = '${ts && ts.id}'`)),
+        'página: "Confirmar turno" confirma en el momento, sin ir a Mercado Pago ni armar un cobro');
+      ok(/Listo, tu turno está confirmado/.test(await fr.textContent('.okban')) && /Lo pagás en el lugar/.test(await fr.textContent('.okban'))
+        && /Sin seña/.test(await fr.textContent('.tcard.is-new')) && /Confirmado/.test(await fr.textContent('.tcard.is-new')), 'Mis turnos: confirmado y "Sin seña"');
+      await fr.screenshot({ path: `${out}/sin-sena-turnos.png` });
+      await fr.click('.tcard.is-new [data-act="cancel"]');
+      ok(/no tiene seña/.test(await fr.textContent('#dlg-p')), 'cancelar uno sin seña: "Este turno no tiene seña"');
+      await fr.click('#dlg-no');
       for (const [n, p] of [['panel', an], ['página', fr], ['celular', cel]]) ok(!p.errs.length, `sin errores en la consola (${n}) ${p.errs.join(' | ')}`);
     } finally {
       await nav.close();

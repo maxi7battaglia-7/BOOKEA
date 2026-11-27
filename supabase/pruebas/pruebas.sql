@@ -1307,6 +1307,65 @@ begin
   raise notice 'OK  sin Mercado Pago el turno se confirma enseguida y la seña no se cobra';
 end $$;
 reset role;
+
+-- Sin seña (pregunta del dueño, 27/11): con la seña en 0 %, el turno se confirma enseguida aunque el negocio tenga
+-- Mercado Pago (no va a pagar nada), sin nota de "en prueba"; y el negocio está en la lista sin conectar Mercado Pago
+set role anon;
+do $$ begin
+  assert public.lugares_publicos() = '[]'::jsonb, 'un negocio que pide seña y no la cobra apareció en la lista';
+end $$;
+reset role;
+update public.negocios set ajustes = ajustes || '{"senaPct": 0}' where id = current_setting('prueba.neg_eva')::uuid;
+set role anon;
+do $$
+declare l jsonb := public.lugares_publicos();
+begin
+  assert jsonb_array_length(l) = 1 and l -> 0 ->> 'id' = current_setting('prueba.neg_eva') and (l -> 0 ->> 'publicado')::boolean
+     and not (l -> 0 ->> 'cobra')::boolean and (l -> 0 ->> 'senaPct')::numeric = 0, 'sin seña, en la lista: ' || l::text;
+end $$;
+reset role;
+set role service_role;
+select public.mp_guardar_cuenta(current_setting('prueba.neg_eva')::uuid, current_setting('prueba.eva')::uuid,
+  '{"access_token": "PRUEBA_LLAVE_tres_0123456789", "refresh_token": "PRUEBA_RENOVAR_tres", "user_id": 555, "expires_in": 15552000, "live_mode": true}') \g /dev/null
+reset role;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000e1', false) \g /dev/null
+set role authenticated;
+do $$
+declare t jsonb;
+begin
+  t := public.reservar_turno(jsonb_build_object('negocio_id', current_setting('prueba.neg_eva'), 'recurso', 'r2',
+    'fecha_agenda', (current_setting('prueba.dia_eva')::date + 7)::text, 'minuto', 1200));
+  assert t ->> 'estado' = 'confirmado' and t ->> 'pago' = '' and (t ->> 'sena')::int = 0 and t ->> 'vence' is null
+     and (t ->> 'comision')::int = 0 and (t ->> 'precio')::int = 50000, 'sin seña: ' || t::text;
+  perform set_config('prueba.sin_sena', t ->> 'id', false);
+end $$;
+reset role;
+do $$
+declare r public.reservas%rowtype;
+begin
+  select * into r from public.reservas where id = (select reserva_id from public.turnos where id = current_setting('prueba.sin_sena')::uuid);
+  assert r.sena = 0 and r.estado = 'confirmada' and r.nota not like '%prueba%' and r.nota not like '%Esperando%', 'agenda sin seña: ' || to_jsonb(r)::text;
+  assert not exists (select 1 from public.mp_cobros where turno_id = current_setting('prueba.sin_sena')::uuid), 'sin seña se armó un cobro';
+end $$;
+set role service_role;
+do $$
+declare d jsonb := public.mp_datos_cobro(current_setting('prueba.sin_sena')::uuid, '00000000-0000-0000-0000-0000000000e1');
+begin
+  assert d ->> 'estado' = 'confirmado' and (d ->> 'monto')::int = 0, 'la función cobraría un turno sin seña: ' || d::text;
+end $$;
+reset role;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000e1', false) \g /dev/null
+set role authenticated;
+do $$
+declare c jsonb := public.cancelar_turno(current_setting('prueba.sin_sena')::uuid);
+begin
+  assert not exists (select 1 from public.turnos where id = current_setting('prueba.sin_sena')::uuid and estado <> 'cancelado'), 'no se canceló';
+  raise notice 'OK  sin seña (0 %%), el turno se confirma enseguida aunque haya Mercado Pago, sin cobro ni nota de prueba, y el negocio está en la lista';
+end $$;
+reset role;
+-- vuelve como estaba: pide seña y sin Mercado Pago
+update public.negocios set ajustes = ajustes || '{"senaPct": 25}' where id = current_setting('prueba.neg_eva')::uuid;
+delete from public.mp_cuentas where negocio_id = current_setting('prueba.neg_eva')::uuid;
 create or replace function public.bookea_comision_pct() returns numeric language sql immutable as $$ select 0::numeric $$;
 
 \echo 'Todas las pruebas del esquema pasaron.'

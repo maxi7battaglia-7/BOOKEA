@@ -714,6 +714,7 @@ begin
               'Reservó en bookea.ar · código ' || cod
               || case when cobra then ' · Esperando que pague la seña de $ ' || sena || ' con Mercado Pago (hasta las '
                                       || to_char(limite at time zone 'America/Argentina/Mendoza', 'HH24:MI') || '; si no paga, el horario se libera solo).'
+                      when sena = 0 then ''  -- el negocio no pide seña: el turno queda confirmado y no hay nada que aclarar
                       when public.bookea_en_prueba() then ' · Bookea está en prueba: la seña no se cobró.' else '' end)
       returning id into rid;
   end if;
@@ -892,10 +893,20 @@ create or replace function public.tiene_mercado_pago(n uuid) returns boolean
 language sql stable set search_path = '' as $$
   select exists (select 1 from public.mp_cuentas c where c.negocio_id = n and not c.reconectar)
 $$;
--- ¿Aparece en la lista de la página? Cobra con una cuenta de verdad (con una de prueba de Mercado Pago, solo por su link)
+-- ¿Pide seña? El % de seña de su Mi negocio es más que 0. Sin seña (pregunta del dueño, 27/11: "un negocio que no
+-- quiere cobrar seña"), el turno queda confirmado al reservar, sin pasar por Mercado Pago (reservar_turno).
+create or replace function public.pide_sena(n uuid) returns boolean
+language sql stable set search_path = '' as $$
+  select coalesce((select case when coalesce(x.ajustes ->> 'senaPct', '') ~ '^[0-9]{1,3}(\.[0-9]+)?$'
+                               then (x.ajustes ->> 'senaPct')::numeric > 0 else false end
+                     from public.negocios x where x.id = n), false)
+$$;
+-- ¿Aparece en la lista de la página? Si pide seña, cuando la cobra con una cuenta de verdad de Mercado Pago (con una de
+-- prueba, solo por su link). Si no pide seña, no hay nada que cobrar: aparece sin conectar Mercado Pago.
 create or replace function public.en_la_lista(n uuid) returns boolean
 language sql stable set search_path = '' as $$
-  select exists (select 1 from public.mp_cuentas c where c.negocio_id = n and not c.reconectar and c.real)
+  select not public.pide_sena(n)
+      or exists (select 1 from public.mp_cuentas c where c.negocio_id = n and not c.reconectar and c.real)
 $$;
 
 -- Los turnos que nadie pagó a tiempo: se cancelan y salen de la agenda del negocio (el horario queda libre).
@@ -1195,6 +1206,7 @@ revoke all on function public.bookea_comision_pct() from public, anon, authentic
 revoke all on function public.comision_de(integer) from public, anon, authenticated;
 revoke all on function public.bookea_url_funciones() from public, anon, authenticated;
 revoke all on function public.tiene_mercado_pago(uuid) from public, anon, authenticated;
+revoke all on function public.pide_sena(uuid) from public, anon, authenticated;
 revoke all on function public.en_la_lista(uuid) from public, anon, authenticated;
 revoke all on function public.vencer_pendientes() from public, anon;
 grant execute on function public.vencer_pendientes() to authenticated;  -- el panel, al abrir la agenda
@@ -1227,7 +1239,7 @@ end $$;
 --
 -- Cuáles aparecen:
 --   · En la lista de la página (inicio y resultados): los aprobados que ya cobran la seña con Mercado Pago, con una
---     cuenta de verdad (en_la_lista, en "Mercado Pago", arriba).
+--     cuenta de verdad, y los que no piden seña (en_la_lista, en "Mercado Pago", arriba).
 --   · Con su link (bookea.ar/su-link): cualquiera aprobado que ya tenga canchas y horarios, para que el dueño se vea
 --     y lo pruebe.
 -- Los turnos: reservar_turno los pone también en la agenda del negocio (reservas). Si el cliente cancela, el horario
@@ -1322,7 +1334,7 @@ language sql stable set search_path = '' as $$
         'ubi', public.fotos_publicas(x.id, x.pagina #> '{tarjetas,ubi}', 2)),
       'whatsapp', case when x.pagina ->> 'mostrar_whatsapp' = 'true' then x.whatsapp else '' end),
     'publicado', public.en_la_lista(x.id),
-    'cobra', public.tiene_mercado_pago(x.id),  -- la seña se paga con Mercado Pago (si no, Bookea está en prueba)
+    'cobra', public.tiene_mercado_pago(x.id) and public.pide_sena(x.id),  -- la seña se paga con Mercado Pago (si no, Bookea está en prueba)
     'ocupados', public.ocupados_de(x.id))
 $$;
 

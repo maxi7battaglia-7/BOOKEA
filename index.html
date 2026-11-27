@@ -14,7 +14,7 @@
   <link rel="icon" href="marca/isotipo-32.png" sizes="32x32" type="image/png" />
   <link rel="apple-touch-icon" href="marca/isotipo-192.png" />
   <link rel="preload" href="assets/fuentes/inter-tight.woff2" as="font" type="font/woff2" crossorigin />
-  <link rel="stylesheet" href="sitio.css?v=35" />
+  <link rel="stylesheet" href="sitio.css?v=36" />
 </head>
 <body>
   <script>document.documentElement.classList.add("js");</script>
@@ -108,7 +108,7 @@
         <span class="brand__word">Bookea</span>
       </a>
       <nav class="top__act" aria-label="Principal">
-        <button class="btn btn--primary btn--s hold" type="button" data-go="pago" id="t-pago" hidden><svg class="icon" aria-hidden="true"><use href="#i-clock"/></svg><b data-reloj>10:00</b>Pagar seña</button>
+        <button class="btn btn--primary btn--s hold" type="button" data-go="pago" id="t-pago" hidden><svg class="icon" aria-hidden="true"><use href="#i-clock"/></svg><b data-reloj>10:00</b><span data-hold-txt>Pagar seña</span></button>
         <a class="btn btn--line btn--s top__neg" href="#" data-go="negocios">Sumá tu negocio</a>
         <a class="btn btn--ink btn--s" href="admin.html">Ingresar</a>
       </nav>
@@ -370,7 +370,7 @@
   <!-- Celular: mientras hay un turno guardado, a la vista en todas las pantallas (menos la ficha y el pago) -->
   <div class="hold-bar" id="hold-bar" hidden>
     <div class="hold-bar__t"><b>Tenés un turno guardado</b><span>Se libera en <b data-reloj>10:00</b></span></div>
-    <button type="button" class="btn btn--primary btn--s" data-go="pago">Pagar seña</button>
+    <button type="button" class="btn btn--primary btn--s" data-go="pago" data-hold-txt>Pagar seña</button>
   </div>
   <nav class="tabbar" aria-label="Secciones">
     <button type="button" data-go="home" data-tab="home"><svg class="icon"><use href="#i-home"/></svg>Reservar</button>
@@ -399,9 +399,9 @@
   <dialog id="dlg"><h2 id="dlg-t"></h2><p id="dlg-p"></p><div class="row"><button class="btn btn--line" type="button" id="dlg-no">Volver</button><button class="btn btn--primary" type="button" id="dlg-si">Confirmar</button></div></dialog>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-  <script src="config.js?v=35"></script>
-  <script src="cuenta.js?v=35"></script>
-  <script src="sitio.js?v=35"></script>
-  <script src="toque.js?v=35"></script>
+  <script src="config.js?v=36"></script>
+  <script src="cuenta.js?v=36"></script>
+  <script src="sitio.js?v=36"></script>
+  <script src="toque.js?v=36"></script>
 </body>
 </html>

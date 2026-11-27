@@ -1616,26 +1616,35 @@
   let mpCanal = null;
   try { mpCanal = new BroadcastChannel("bookea-mp"); } catch { /* sin BroadcastChannel: el aviso va por localStorage */ }
   const diaMes = (iso) => { const d = new Date(iso); return isNaN(d.getTime()) ? "" : `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`; };
+  // La seña que pide el negocio (la del campo de Mi negocio mientras la cambia; si no, la guardada). En 0 %, sin seña
+  // (pregunta del dueño, 27/11): los turnos se confirman al reservar, sin Mercado Pago, y el negocio está en la lista.
+  const senaPctAhora = () => { const i = $("#g-sena"); return Math.max(0, i ? +i.value || 0 : +NEG.senaPct || 0); };
   const htmlMP = () => {
     if (store.modo !== "nube") return `<div class="mpc__info"><span class="estado estado--cancelada"><i></i>Versión de prueba</span><p class="mpc__t">Acá no se conecta Mercado Pago. Con tu cuenta de Bookea, la conectás en este lugar y la seña de cada turno se cobra sola.</p></div>`;
     const m = MPE;
     if (!m) return `<div class="mpc__info"><p class="mpc__t mpc__t--cargando">Mirando tu cuenta de Mercado Pago…</p></div>`;
     if (m.error) return `<div class="mpc__info"><p class="mpc__t">${esc(MENSAJES[m.error] || MENSAJES.otro)}</p></div><div class="mpc__acc"><button type="button" class="btn btn--line" data-mp="ver">Probar de nuevo</button></div>`;
-    const dueno = !!m.dueno, anda = m.conectado && !m.reconectar;
+    const dueno = !!m.dueno, anda = m.conectado && !m.reconectar, sin = senaPctAhora() === 0;
     let estado, texto, datos = "", acc = "";
     if (anda) {
       estado = `<span class="estado estado--confirmada"><i></i>Conectada</span>`;
-      texto = "La seña de cada turno que reservan en bookea.ar se paga con Mercado Pago y entra en tu cuenta. Si cancelan con tiempo, se les devuelve sola.";
-      if (m.real === false) texto += " Es una cuenta de prueba de Mercado Pago: tu negocio no aparece en la lista de bookea.ar (sí con tu link).";
+      texto = sin ? "Está conectada, pero tu seña está en 0 %: los turnos se confirman al reservar y no se cobra nada. Si pedís seña, se cobra sola con esta cuenta."
+        : "La seña de cada turno que reservan en bookea.ar se paga con Mercado Pago y entra en tu cuenta. Si cancelan con tiempo, se les devuelve sola.";
+      if (m.real === false && !sin) texto += " Es una cuenta de prueba de Mercado Pago: tu negocio no aparece en la lista de bookea.ar (sí con tu link).";
       datos = [m.cuenta ? `Cuenta N° ${esc(m.cuenta)}` : "", m.desde ? `conectada el ${diaMes(m.desde)}` : "",
         +m.cobradas ? `${m.cobradas} ${+m.cobradas === 1 ? "seña cobrada" : "señas cobradas"}` : ""].filter(Boolean).join(" · ");
       if (dueno) acc = mpConfirmar
-        ? `<p class="mpc__conf">¿Desconectarla? La seña deja de cobrarse y tu negocio sale de la lista.</p><button type="button" class="btn btn--warn" data-mp="desconectar-si">Sí, desconectar</button><button type="button" class="btn btn--line" data-mp="desconectar-no">No</button>`
+        ? `<p class="mpc__conf">${sin ? "¿Desconectarla? Si más adelante pedís seña, la vas a tener que conectar de nuevo." : "¿Desconectarla? La seña deja de cobrarse y tu negocio sale de la lista."}</p><button type="button" class="btn btn--warn" data-mp="desconectar-si">Sí, desconectar</button><button type="button" class="btn btn--line" data-mp="desconectar-no">No</button>`
         : `<button type="button" class="btn btn--line" data-mp="desconectar">Desconectar</button>`;
     } else if (m.conectado) {
       estado = `<span class="estado estado--ausente"><i></i>Hay que conectarla de nuevo</span>`;
-      texto = "Mercado Pago dejó de aceptar la conexión (quizás le quitaste el permiso a Bookea). Mientras tanto, la seña no se cobra.";
+      texto = "Mercado Pago dejó de aceptar la conexión (quizás le quitaste el permiso a Bookea). "
+        + (sin ? "Como tu seña está en 0 %, no cambia nada: los turnos se confirman igual." : "Mientras tanto, la seña no se cobra.");
       if (dueno) acc = `<button type="button" class="btn btn--naranja" data-mp="conectar">Conectar de nuevo</button>`;
+    } else if (sin) {
+      estado = `<span class="estado estado--confirmada"><i></i>Sin seña</span>`;
+      texto = "Tu seña está en 0 %: los turnos que reservan en bookea.ar se confirman al momento, sin pasar por Mercado Pago, y tu negocio aparece en la lista. Si más adelante pedís seña, conectala para cobrarla.";
+      if (dueno) acc = `<button type="button" class="btn btn--line" data-mp="conectar">Conectar Mercado Pago</button>`;
     } else {
       estado = `<span class="estado estado--cancelada"><i></i>Sin conectar</span>`;
       texto = "Mientras no la conectes, la seña no se cobra y tu negocio no aparece en la lista de bookea.ar (sí con tu link).";
@@ -1801,8 +1810,13 @@
     };
     pintarMapa(); ["#g-dir", "#g-ciudad", "#g-mapa", "#g-nombre"].forEach((id) => $(id).addEventListener("input", pintarMapa));
     $("#g-mapa").addEventListener("blur", (e) => { const v = e.target.value.trim(); marcar(e.target, "g-mapa-err", !!v && !MAPS_OK.test(v)); });
-    const ayudaSena = () => { const p = n.franjas[0] ? +n.franjas[0].precio : 0, pc = +$("#g-sena").value || 0; $("#g-sena-ayuda").textContent = p ? `Con un turno de ${plata(p)}, la seña es de ${plata(Math.round((p * pc) / 100 / 100) * 100)}.` : ""; $("#g-sena-ayuda").hidden = !p; };
-    ayudaSena(); $("#g-sena").addEventListener("input", ayudaSena);
+    const ayudaSena = () => {
+      const p = n.franjas[0] ? +n.franjas[0].precio : 0, pc = +$("#g-sena").value || 0;
+      $("#g-sena-ayuda").textContent = pc <= 0 ? "En 0 %, sin seña: los turnos se confirman al reservar, sin pasar por Mercado Pago."
+        : p ? `Con un turno de ${plata(p)}, la seña es de ${plata(Math.round((p * pc) / 100 / 100) * 100)}.` : "";
+      $("#g-sena-ayuda").hidden = pc > 0 && !p;
+    };
+    ayudaSena(); $("#g-sena").addEventListener("input", () => { ayudaSena(); pintarMP(); });
     f.addEventListener("click", (e) => {
       const q = e.target.closest("[data-quitar]"); if (q) { const fila = q.closest(".fila"), cont = fila.parentElement; fila.remove(); const sig = $("input, select", cont); sig && sig.focus(); programar(0); }
     });
@@ -1835,7 +1849,7 @@
         ${desc ? `<p class="prev__desc">${esc(desc)}</p>` : ""}
         <div class="prev__hoy"><p>${horas.length ? `Hoy, ${DIAS[hoyD]}: ${plural(horas.length, "turno", "turnos")} de ${durCorto(dur)}` : `Hoy, ${DIAS[hoyD]}, está cerrado`}</p>
           ${horas.length ? `<ul class="prev__horas">${verHoras.map((t) => `<li>${aHora(t)}</li>`).join("")}${horas.length > verHoras.length ? `<li class="prev__mas">+${horas.length - verHoras.length}</li>` : ""}</ul>` : ""}</div>
-        <dl class="prev__datos"><div><dt>Turnos de</dt><dd>${durCorto(+$("#g-dur").value)}</dd></div><div><dt>Desde</dt><dd>${desde ? plata(desde) : "Sin precio"}</dd></div><div><dt>Seña</dt><dd>${desde ? plata(senaDe({ senaPct: pc }, desde)) : `${pc} %`}</dd></div></dl>`;
+        <dl class="prev__datos"><div><dt>Turnos de</dt><dd>${durCorto(+$("#g-dur").value)}</dd></div><div><dt>Desde</dt><dd>${desde ? plata(desde) : "Sin precio"}</dd></div><div><dt>Seña</dt><dd>${pc <= 0 ? "Sin seña" : desde ? plata(senaDe({ senaPct: pc }, desde)) : `${pc} %`}</dd></div></dl>`;
       const sl = esc(slugDe($("#g-slug").value) || n.slug);
       $("#g-prev-link").innerHTML = `${ico("afuera")}<span>bookea.ar/<b>${sl}</b>/reservar</span>`;
       $("#g-prev-link").href = $("#g-ver").href = linkPagina(n.slug); // el link guardado (el que se está escribiendo todavía no existe)

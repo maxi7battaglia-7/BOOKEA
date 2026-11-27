@@ -215,6 +215,11 @@
   const precioDe = (svc, di, start) => (svc.franjas ? precioFr(svc.franjas, start) : di.finde ? svc.p.finde : start >= 20 * 60 ? svc.p.noche : svc.p.dia);
   const senaDe = (p, v) => (v && v.real ? Math.round((p * v.senaPct) / 100 / 100) * 100 : Math.round((p * SENA) / 50) * 50);
   const pctDe = (v) => (v && v.real ? v.senaPct : Math.round(SENA * 100));
+  // Sin seña (pregunta del dueño, 27/11): un negocio de verdad con la seña en 0 % no cobra nada al reservar; el turno
+  // queda confirmado en el momento, sin pasar por Mercado Pago (reservar_turno, en esquema.sql). Los de ejemplo siempre piden.
+  const pideSena = (v) => !v || !v.real || v.senaPct > 0;
+  const sinSena = (t) => !!t && !(t.sena > 0); // un turno (guardado o ya reservado) sin seña
+  const SIN_SENA_CANCELAR = "Si no podés ir, cancelalo desde Mis turnos y el horario se libera.";
   // La regla para cancelar, como la lee el cliente
   const reglaCancelar = (devuelve, horas) => (devuelve === false ? "Si cancelás, el horario se libera, pero en este lugar la seña no se devuelve."
     : horas ? `Hasta ${horas} h antes, la seña se devuelve. Después, queda para el negocio.` : "Hasta que empiece el turno, la seña se devuelve.");
@@ -374,7 +379,8 @@
     revelar(el);
     $$(".tabbar [data-tab]").forEach((b) => b.classList.toggle("is-on", b.dataset.tab === (page === "resultados" || page === "local" ? "home" : page)));
     const vt = (page === "ficha" || page === "local") && venue(st.v);
-    document.title = vt && vt.real ? (page === "local" ? `${vt.name} · Bookea` : `Reservar en ${vt.name} · Bookea`) : TITLES[page];
+    document.title = vt && vt.real ? (page === "local" ? `${vt.name} · Bookea` : `Reservar en ${vt.name} · Bookea`)
+      : page === "pago" && sinSena(vigente()) ? "Confirmá tu turno · Bookea" : TITLES[page];
     if (!st.keepScroll) window.scrollTo(0, st.restore ? S.ys[page] || 0 : 0);
   }
   window.addEventListener("popstate", (e) => { S.nav = Math.max(0, S.nav - 1); show({ ...(e.state || { page: "home" }), restore: true }); });
@@ -593,7 +599,7 @@
   const preciosHTML = (v) => {
     const sv0 = v.svcs[0];
     return v.real
-        ? (sv0.franjas.length ? sv0.franjas : [{ desde: "", precio: 0 }]).map((x) => `<tr><th scope="row">${x.desde ? `${esc(x.desde)} a ${esc(x.hasta)}` : "Turno"}<small>seña ${money(senaDe(x.precio, v))}</small></th><td>${money(x.precio)}</td></tr>`).join("")
+        ? (sv0.franjas.length ? sv0.franjas : [{ desde: "", precio: 0 }]).map((x) => `<tr><th scope="row">${x.desde ? `${esc(x.desde)} a ${esc(x.hasta)}` : "Turno"}<small>${pideSena(v) ? `seña ${money(senaDe(x.precio, v))}` : "sin seña"}</small></th><td>${money(x.precio)}</td></tr>`).join("")
         : v.rubro === "barberia"
         ? v.svcs.map((s) => `<tr><th scope="row">${s.n}<small>${s.min} min</small></th><td>${money(s.p.dia)}</td></tr>`).join("")
         : `<tr><th scope="row">Lun a vie · hasta las 20<small>seña ${money(senaDe(sv0.p.dia))}</small></th><td>${money(sv0.p.dia)}</td></tr><tr><th scope="row">Lun a vie · desde las 20<small>seña ${money(senaDe(sv0.p.noche))}</small></th><td>${money(sv0.p.noche)}</td></tr><tr><th scope="row">Sáb y dom<small>seña ${money(senaDe(sv0.p.finde))}</small></th><td>${money(sv0.p.finde)}</td></tr>`;
@@ -607,7 +613,7 @@
       <div class="ficha">
         <div class="ficha__head">
           <div${v.real ? ` class="ficha__quien"><span class="ficha__av" aria-hidden="true">${IMG[v.id] ? `<img src="${IMG[v.id]}" alt="" />` : esc(iniciales(v.name))}</span><div` : ""}><p class="eyebrow">${SECCIONES[secDe(v.rubro)].n} · ${R.n}</p><h1>${esc(v.name)}</h1>
-          <div class="facts"><span><svg class="icon"><use href="#i-pin"/></svg>${ZONAS[v.zona]}</span><span><svg class="icon"><use href="#i-clock"/></svg>Turnos de ${v.dur} min</span><span><svg class="icon"><use href="#i-shield"/></svg>Seña ${pctDe(v)} %</span></div></div>${v.real ? "</div>" : ""}
+          <div class="facts"><span><svg class="icon"><use href="#i-pin"/></svg>${ZONAS[v.zona]}</span><span><svg class="icon"><use href="#i-clock"/></svg>Turnos de ${v.dur} min</span><span><svg class="icon"><use href="#i-shield"/></svg>${pideSena(v) ? `Seña ${pctDe(v)} %` : "Sin seña"}</span></div></div>${v.real ? "</div>" : ""}
           <p class="ficha__desde"><small>desde</small><b>${money(minPrecio(v))}</b><span>por turno</span></p>
         </div>
         ${v.real ? "" /* su foto es la de perfil (chica): va al lado del nombre, y los horarios suben */ : `<div class="gal${fotos.length < 2 ? " is-solo" : fotos.length === 2 ? " is-duo" : ""}">${fotos.map((k) => `<figure>${img(k, "")}</figure>`).join("")}</div>`}
@@ -621,9 +627,9 @@
           <div class="blk blk--ancho"><h2>Información adicional</h2><dl class="dl">
             ${v.real ? "" : `<div><dt>Horarios</dt><dd>Todos los días · ${horarios(v)}</dd></div>`}
             <div><dt>Llegada</dt><dd>Llegá 10 minutos antes para empezar a horario.</dd></div>
-            <div><dt>Pagos</dt><dd>Seña del ${pctDe(v)} % online con Mercado Pago. El resto lo abonás en el lugar.</dd></div>
-            <div><dt>Cancelación</dt><dd>${reglaCancelar(v.devuelve, v.cancel)}</dd></div>
-            <div><dt>Cómo reservás</dt><dd>Elegís día y horario, entrás con tu cuenta y pagás la seña. El turno queda en Mis turnos y te llega la confirmación por mail.</dd></div></dl>
+            <div><dt>Pagos</dt><dd>${pideSena(v) ? `Seña del ${pctDe(v)} % online con Mercado Pago. El resto lo abonás en el lugar.` : "Este lugar no pide seña: no pagás nada al reservar y el turno lo abonás en el lugar."}</dd></div>
+            <div><dt>Cancelación</dt><dd>${pideSena(v) ? reglaCancelar(v.devuelve, v.cancel) : SIN_SENA_CANCELAR}</dd></div>
+            <div><dt>Cómo reservás</dt><dd>${pideSena(v) ? "Elegís día y horario, entrás con tu cuenta y pagás la seña." : "Elegís día y horario, entrás con tu cuenta y confirmás."} El turno queda en Mis turnos y te llega la confirmación por mail.</dd></div></dl>
             ${v.real ? "" : `<span class="demo">Negocio de ejemplo · demo</span>`}</div>
         </div>
       </div>
@@ -654,13 +660,13 @@
         ${sl.length ? grupos.map(([g, a]) => `${grupos.length > 1 ? `<p class="slots__g">${FRANJAS[g]}</p>` : ""}<div class="slots">${a.map((s) => `<button type="button" class="slot${s.t === f.t ? " is-on" : ""}" data-act="f-slot" data-t="${s.t}" ${s.libres.length ? "" : "disabled"} aria-pressed="${s.t === f.t}"><b>${s.t}</b><small class="${s.libres.length === 1 ? "last" : ""}">${s.libres.length ? quedan(s, v) : "Completo"}</small></button>`).join("")}</div>${sel && a.includes(sel) ? eleccion : ""}`).join("") : `<p class="book__empty">Ya no quedan turnos para ${dayFull(f.dia).toLowerCase()}. Probá otro día.</p>`}
       </div>`;
     $("#book").innerHTML = `
-      <div class="reserva__top"><div><p class="eyebrow">Reservá tu turno</p><h2 id="book-t">Elegí el día</h2></div><p class="reserva__nota">Cada horario tiene su propio cupo. Al reservar, te lo guardamos 10 minutos para pagar la seña.</p></div>
+      <div class="reserva__top"><div><p class="eyebrow">Reservá tu turno</p><h2 id="book-t">Elegí el día</h2></div><p class="reserva__nota">${pideSena(v) ? "Cada horario tiene su propio cupo. Al reservar, te lo guardamos 10 minutos para pagar la seña." : "Cada horario tiene su propio cupo. Este lugar no pide seña: elegís el horario, confirmás y listo."}</p></div>
       <div class="cupos" role="group" aria-label="Día">${dias}</div>${panel}`;
     // El aviso verde de abajo: aparece solo con un horario elegido y no tapa la lectura
     const ir = $("#ir-pagar");
     if (sel) {
       const precio = precioDe(svc, di, sel.start), sena = senaDe(precio, v), unitTxt = f.unit === "any" ? sel.libres[0] : f.unit;
-      ir.innerHTML = `<div class="irpagar__t"><b>${keyLabel(di.key)} · ${sel.t}</b><span>${esc(unitTxt)}${v.svcs.length > 1 ? " · " + esc(svc.n) : ""} · seña ${money(sena)} · ${money(precio)} el turno · hasta las ${sel.end}</span></div><button type="button" class="btn irpagar__btn" data-act="reservar">Ir a pagar<svg class="icon" aria-hidden="true"><use href="#i-back"/></svg></button>`;
+      ir.innerHTML = `<div class="irpagar__t"><b>${keyLabel(di.key)} · ${sel.t}</b><span>${esc(unitTxt)}${v.svcs.length > 1 ? " · " + esc(svc.n) : ""}${sena ? ` · seña ${money(sena)}` : " · sin seña"} · ${money(precio)} el turno · hasta las ${sel.end}</span></div><button type="button" class="btn irpagar__btn" data-act="reservar">${sena ? "Ir a pagar" : "Reservar"}<svg class="icon" aria-hidden="true"><use href="#i-back"/></svg></button>`;
       if (ir.hidden) { ir.hidden = false; void ir.offsetWidth; }
       ir.classList.add("is-on");
     } else { ir.hidden = true; ir.classList.remove("is-on"); }
@@ -905,6 +911,7 @@
   // (no en la pantalla de pago, que ya lo muestra, ni en la ficha del celular, que tiene su propia barra)
   function pintarHold() {
     const hay = !!vigente();
+    $$("[data-hold-txt]").forEach((e) => (e.textContent = hay && sinSena(vigente()) ? "Confirmar turno" : "Pagar seña"));
     $("#t-pago").hidden = !hay || S.page === "pago";
     const barra = hay && S.page !== "pago" && S.page !== "ficha";
     $("#hold-bar").hidden = !barra;
@@ -917,6 +924,7 @@
     if (!v) { S.res = null; guardar(); return sinTurno(root); } // el lugar ya no está en la página
     const R = RUBROS[v.rubro], svc = v.svcs.find((s) => s.id === r.svc) || v.svcs[0];
     const quien = v.rubro === "barberia" ? `Con ${esc(r.unit)}` : esc(r.unit);
+    const sin = sinSena(r); // el lugar no pide seña: se confirma sin pagar nada
     root.innerHTML = `
       <a class="back" href="#" data-act="back"><svg class="icon"><use href="#i-back"/></svg>Volver</a>
       <div class="chk">
@@ -940,19 +948,21 @@
         ${cuentaHTML("pago")}
         <aside class="chk__side"><div class="panel panel--sum"><h2>Resumen</h2><div class="pay">
           <div><span>Turno</span><b>${money(r.precio)}</b></div>
-          <div><span>En el lugar</span><b>${money(r.precio - r.sena)}</b></div>
+          ${sin ? `<div><span>Seña</span><b>Sin seña</b></div>
+          <div class="big"><span>En el lugar</span><b>${money(r.precio)}</b></div></div>
+          <button type="button" class="btn btn--primary btn--lg btn--block" data-act="pay" style="margin-top:18px">Confirmar turno</button>` : `<div><span>En el lugar</span><b>${money(r.precio - r.sena)}</b></div>
           <div class="big"><span>Seña ahora (${pctDe(v)} %)</span><b>${money(r.sena)}</b></div></div>
-          <button type="button" class="btn btn--primary btn--lg btn--block" data-act="pay" style="margin-top:18px"><span class="mp">Pagar seña con Mercado Pago</span></button>
-          <p class="note note--ok"><svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg><span>${r.devuelve === false ? "Si cancelás, el horario se libera, pero en este lugar la seña no se devuelve." : r.cancel ? `Podés cancelar hasta ${r.cancel} h antes y la seña se devuelve.` : "Podés cancelar hasta que empiece y la seña se devuelve."}</span></p>
-          <p class="note">${v.real && v.cobra ? "Pagás la seña en Mercado Pago, con tarjeta o con el dinero de tu cuenta. El turno queda confirmado apenas se acredita." : v.real ? "Bookea está en prueba: todavía no se cobra la seña. El turno queda reservado igual en la agenda del lugar." : "Demo: los negocios son de ejemplo y no se cobra nada. En la versión real, acá se abre el pago de Mercado Pago."}</p></div>
+          <button type="button" class="btn btn--primary btn--lg btn--block" data-act="pay" style="margin-top:18px"><span class="mp">Pagar seña con Mercado Pago</span></button>`}
+          <p class="note note--ok"><svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg><span>${sin ? SIN_SENA_CANCELAR : r.devuelve === false ? "Si cancelás, el horario se libera, pero en este lugar la seña no se devuelve." : r.cancel ? `Podés cancelar hasta ${r.cancel} h antes y la seña se devuelve.` : "Podés cancelar hasta que empiece y la seña se devuelve."}</span></p>
+          <p class="note">${sin ? "Este lugar no pide seña: no pagás nada ahora y el turno queda confirmado en el momento." : v.real && v.cobra ? "Pagás la seña en Mercado Pago, con tarjeta o con el dinero de tu cuenta. El turno queda confirmado apenas se acredita." : v.real ? "Bookea está en prueba: todavía no se cobra la seña. El turno queda reservado igual en la agenda del lugar." : "Demo: los negocios son de ejemplo y no se cobra nada. En la versión real, acá se abre el pago de Mercado Pago."}</p></div>
           <div class="panel chk__mapa"><h2>Dónde queda</h2>${v.real ? dondeReal(v) : `<div class="mapbox">${mapSVG(v.id)}<div class="mapbox__t"><b>${ZONAS[v.zona]}</b>Valle de Uco, Mendoza</div></div>`}<p class="mapnote">Los datos del turno te llegan por mail al confirmar.</p></div></aside>
         <div class="pasos"><h2>Cómo sigue</h2><ol>
-          <li><span class="pasos__n">1</span><b>Pagás la seña</b><span>${money(r.sena)} con Mercado Pago. El turno queda confirmado en el momento.</span></li>
+          <li><span class="pasos__n">1</span>${sin ? "<b>Confirmás el turno</b><span>Sin seña: no pagás nada ahora. Queda confirmado en el momento.</span>" : `<b>Pagás la seña</b><span>${money(r.sena)} con Mercado Pago. El turno queda confirmado en el momento.</span>`}</li>
           <li><span class="pasos__n">2</span><b>Te llega por mail</b><span>La confirmación con el día, la hora, ${v.rubro === "barberia" ? "con quién" : "la cancha"} y el código del turno. También queda en Mis turnos.</span></li>
-          <li><span class="pasos__n">3</span><b>El resto, en el lugar</b><span>${money(r.precio - r.sena)} el día del turno. Llegá 10 minutos antes.</span></li>
+          <li><span class="pasos__n">3</span><b>${sin ? "Pagás en el lugar" : "El resto, en el lugar"}</b><span>${money(r.precio - r.sena)} el día del turno. Llegá 10 minutos antes.</span></li>
         </ol></div>
       </div>
-      <div class="mbar"><div class="mbar__t"><b>${money(r.sena)} <span style="display:inline;font-weight:400">de seña</span></b><span>Guardado por <b class="mbar__reloj" data-reloj>${mmss(r.vence - Date.now())}</b></span></div><button type="button" class="btn btn--primary" data-act="pay">Pagar seña</button></div>`;
+      <div class="mbar"><div class="mbar__t"><b>${sin ? `${money(r.precio)} <span style="display:inline;font-weight:400">en el lugar</span>` : `${money(r.sena)} <span style="display:inline;font-weight:400">de seña</span>`}</b><span>Guardado por <b class="mbar__reloj" data-reloj>${mmss(r.vence - Date.now())}</b></span></div><button type="button" class="btn btn--primary" data-act="pay">${sin ? "Confirmar turno" : "Pagar seña"}</button></div>`;
     reloj();
   }
   // Sin turno guardado: se venció el tiempo (y se puede volver a guardar) o se llegó sin elegir ninguno
@@ -963,7 +973,7 @@
         <div><h1>${x ? "Se terminó el tiempo" : "No tenés ningún turno por pagar"}</h1>
           <p>${x ? `El turno de ${keyLabel(x.key).toLowerCase()} a las ${x.t} en ${esc(v.name)} volvió a quedar libre. Si sigue libre, lo guardamos de nuevo por 10 minutos.` : "Elegí un horario y reservalo: te lo guardamos 10 minutos mientras pagás la seña."}</p>
           <div class="aviso__acts">${x ? `<button type="button" class="btn btn--primary" data-act="otra-vez">Volver a reservarlo</button>` : ""}<button type="button" class="btn ${x ? "btn--line" : "btn--primary"}" data-go="home" data-focus="pick">Buscar turnos</button></div></div>
-        ${x ? `<div class="aviso__turno"><div class="aviso__ph">${portada(v)}<span class="tag">${RUBROS[v.rubro].n}</span></div><div class="aviso__b"><b>${esc(v.name)}</b><span class="aviso__when">${keyLabel(x.key)} · ${x.t}–${x.end}</span><span>${esc(x.unit)} · seña ${money(x.sena)}</span></div></div>` : ""}
+        ${x ? `<div class="aviso__turno"><div class="aviso__ph">${portada(v)}<span class="tag">${RUBROS[v.rubro].n}</span></div><div class="aviso__b"><b>${esc(v.name)}</b><span class="aviso__when">${keyLabel(x.key)} · ${x.t}–${x.end}</span><span>${esc(x.unit)} · ${x.sena ? `seña ${money(x.sena)}` : "sin seña"}</span></div></div>` : ""}
       </div>${masLibres(rubro, `Libres ahora: ${RUBROS[rubro].n.toLowerCase()}`)}`;
   }
   function otraVez() {
@@ -1035,10 +1045,10 @@
         </div>${casillas()}
         <button type="submit" class="btn btn--ink btn--block">Guardar y seguir</button><p class="cuenta__msg" id="cu-msg" role="alert" hidden></p></form>${LEGAL}</div>`;
     }
-    const nueva = S.modoCu === "nueva";
+    const nueva = S.modoCu === "nueva", accion = sinSena(vigente()) ? "confirmar el turno" : "pagar la seña";
     const lead = nueva
-      ? (pago ? "Para pagar la seña necesitás una cuenta: ahí quedan tus turnos y te mandamos la confirmación por mail." : "Con tu cuenta ves tus turnos desde cualquier celular o compu.")
-      : (pago ? "Entrá con tu email y tu contraseña para pagar la seña." : "Entrá con tu email y tu contraseña para ver tus turnos.");
+      ? (pago ? `Para ${accion} necesitás una cuenta: ahí quedan tus turnos y te mandamos la confirmación por mail.` : "Con tu cuenta ves tus turnos desde cualquier celular o compu.")
+      : (pago ? `Entrá con tu email y tu contraseña para ${accion}.` : "Entrá con tu email y tu contraseña para ver tus turnos.");
     return `<div class="${cls}" id="cuenta">
       <div class="cuenta__top"><h2>${nueva ? "Creá tu cuenta" : "Entrá a tu cuenta"}</h2>
         <div class="secs cuenta__modo" role="group" aria-label="Tu cuenta" style="--i:${nueva ? 0 : 1}"><button type="button" data-act="cu-modo" data-k="nueva" aria-pressed="${nueva}">Soy nuevo</button><button type="button" data-act="cu-modo" data-k="entrar" aria-pressed="${!nueva}">Ya tengo cuenta</button></div></div>
@@ -1124,7 +1134,8 @@
   function pedirCuenta() {
     const caja = $("#cuenta"); if (!caja) return;
     caja.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "center" });
-    avisoCu(S.pend ? "Confirmá tu email para pagar la seña." : S.email ? "Completá tus datos para pagar la seña." : S.modoCu === "nueva" ? "Primero creá tu cuenta (o entrá con la tuya) y después pagás la seña." : "Primero entrá con tu cuenta y después pagás la seña.");
+    const sin = sinSena(vigente()), accion = sin ? "confirmar el turno" : "pagar la seña", despues = sin ? "confirmás el turno" : "pagás la seña";
+    avisoCu(S.pend ? `Confirmá tu email para ${accion}.` : S.email ? `Completá tus datos para ${accion}.` : S.modoCu === "nueva" ? `Primero creá tu cuenta (o entrá con la tuya) y después ${despues}.` : `Primero entrá con tu cuenta y después ${despues}.`);
     const f = $("#cuenta input"); if (f) setTimeout(() => f.focus({ preventScroll: true }), reduce ? 0 : 350);
   }
   async function olvido() {
@@ -1150,11 +1161,13 @@
     clearInterval(tic); tic = null; // ya está pagando: el tiempo no corre más
     const v = venue(r.vid), svc = v.svcs.find((s) => s.id === r.svc) || v.svcs[0];
     const ov = document.createElement("div"); ov.className = "mpov"; ov.setAttribute("role", "alertdialog"); ov.setAttribute("aria-live", "polite");
-    ov.innerHTML = `<div class="mpov__in"><div class="spin"></div><h2>Te llevamos a Mercado Pago</h2><p>Un momento, estamos preparando el pago de tu seña.</p></div>`;
+    const sin = sinSena(r);
+    ov.innerHTML = sin ? `<div class="mpov__in"><div class="spin"></div><h2>Confirmando tu turno</h2><p>Un momento, lo estamos guardando en la agenda del lugar.</p></div>`
+      : `<div class="mpov__in"><div class="spin"></div><h2>Te llevamos a Mercado Pago</h2><p>Un momento, estamos preparando el pago de tu seña.</p></div>`;
     document.body.appendChild(ov);
     const { vence, ...turno } = r;
     const pedido = CU.reservar({ ...turno, lugar: v.name, zona: ZONAS[v.zona], rubro: RUBROS[v.rubro].n, servicio: svc.n });
-    await espera(reduce ? 300 : 1500);
+    await espera(reduce ? 300 : sin ? 700 : 1500);
     const res = await pedido;
     if (!res.ok) {
       ov.remove(); pagando = false;
@@ -1167,12 +1180,12 @@
       return avisoCu(msj(res.error));
     }
     if (res.turno.estado === "pendiente") return irAMercadoPago(res.turno, ov, v, r); // el negocio cobra la seña de verdad
-    ov.innerHTML = `<div class="mpov__in"><div class="okc"><svg class="icon"><use href="#i-check"/></svg></div><h2>¡Turno confirmado!</h2><p>${v.real ? "Bookea está en prueba: no se cobró la seña." : "Es una demo: no se cobró nada."}</p></div>`;
+    ov.innerHTML = `<div class="mpov__in"><div class="okc"><svg class="icon"><use href="#i-check"/></svg></div><h2>¡Turno confirmado!</h2><p>${sin ? "Este lugar no pide seña: lo pagás en el lugar." : v.real ? "Bookea está en prueba: no se cobró la seña." : "Es una demo: no se cobró nada."}</p></div>`;
     if (v.real) v.ocup.add(`${r.rec}|${r.fa}|${r.min}`); // ya está en su agenda
     await espera(reduce ? 300 : 1200);
     S.turnos = S.turnos.concat(res.turno); S.res = null; S.vencida = null; guardar(); reloj();
     ov.remove(); pagando = false;
-    go("turnos", { nuevos: [res.turno.id] }); toast(v.real ? "Turno confirmado. Bookea está en prueba: no se cobró la seña." : "Turno confirmado (demo, sin cobro).");
+    go("turnos", { nuevos: [res.turno.id] }); toast(sin ? "¡Listo! Tu turno está confirmado." : v.real ? "Turno confirmado. Bookea está en prueba: no se cobró la seña." : "Turno confirmado (demo, sin cobro).");
   }
 
   // ---------- Pagar la seña en Mercado Pago (negocios que cobran: pedido del dueño, 26/11) ----------
@@ -1245,8 +1258,9 @@
     const ahora = Date.now(), esperan = lista.filter((x) => x.estado === "pendiente");
     const enEspera = st.espera && lista.find((x) => x.id === st.espera && x.estado === "pendiente");
     const aviso = enEspera ? `<div class="okban okban--espera"><span class="okban__ic"><svg class="icon" aria-hidden="true"><use href="#i-clock"/></svg></span><div><b>${st.pago === "error" ? "La seña todavía no se pagó" : "Tu pago se está procesando"}</b><span>${st.pago === "error" ? `Probá de nuevo antes de las ${horaDe(enEspera.vence)}: hasta entonces te guardamos el turno.` : "Cuando Mercado Pago lo acredite, el turno queda confirmado y te llega el mail. Si no se acredita, probá de nuevo desde acá."}</span></div><button type="button" class="btn btn--primary btn--s" data-act="mp-pagar" data-id="${enEspera.id}">Pagar seña</button></div>` : "";
-    const listo = st.nuevos ? `<div class="okban"><span class="okban__ic"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg></span><div><b>¡Listo, tu turno está confirmado!</b><span>Te mandamos los datos por mail a ${esc(S.yo.email)}. El resto lo pagás en el lugar.</span></div><button type="button" class="btn btn--ink btn--s" data-go="home" data-focus="pick">Reservar otro turno</button></div>` : "";
-    root.innerHTML = `<h1>Mis turnos</h1><p class="sub">${esperan.length ? "Tus turnos: los confirmados y los que esperan el pago de la seña." : "Tus turnos confirmados, con la seña ya paga."}</p>${aviso}${listo}<div class="mt"><div class="mt__lista">` + lista.map((it) => {
+    const nuevosSin = st.nuevos && lista.filter((x) => st.nuevos.includes(x.id)).every(sinSena);
+    const listo = st.nuevos ? `<div class="okban"><span class="okban__ic"><svg class="icon" aria-hidden="true"><use href="#i-check"/></svg></span><div><b>¡Listo, tu turno está confirmado!</b><span>Te mandamos los datos por mail a ${esc(S.yo.email)}. ${nuevosSin ? "Lo pagás en el lugar." : "El resto lo pagás en el lugar."}</span></div><button type="button" class="btn btn--ink btn--s" data-go="home" data-focus="pick">Reservar otro turno</button></div>` : "";
+    root.innerHTML = `<h1>Mis turnos</h1><p class="sub">${esperan.length ? "Tus turnos: los confirmados y los que esperan el pago de la seña." : lista.some(sinSena) ? "Tus turnos confirmados." : "Tus turnos confirmados, con la seña ya paga."}</p>${aviso}${listo}<div class="mt"><div class="mt__lista">` + lista.map((it) => {
       const v = lugarDeTurno(it), R = RUBROS[v.rubro], svc = v.svcs.find((s) => s.id === it.svc) || v.svcs[0], pasado = cuando(it).getTime() + 3600e3 < ahora;
       if (it.estado === "pendiente") return `<article class="tcard tcard--espera"><div class="tcard__h"><span class="code">${it.code}</span><span class="status status--espera">Esperando el pago</span></div>
         <div class="tcard__b"><div><h3>${esc(v.name)}</h3><div class="tcard__when">${keyLabel(it.key)} · ${it.t}–${it.end}</div><p>${R.n} · ${esc(it.unit)} · te lo guardamos hasta las ${horaDe(it.vence)}</p></div>
@@ -1256,7 +1270,7 @@
       return `<article class="tcard${st.nuevos && st.nuevos.includes(it.id) ? " is-new" : ""}"><div class="tcard__h"><span class="code">${it.code}</span><span class="status"${pasado ? ' style="color:var(--ink-500);background:var(--ink-100)"' : ""}>${pasado ? "Finalizado" : "Confirmado"}</span></div>
         <div class="tcard__b"><div><h3>${esc(v.name)}</h3><div class="tcard__when">${keyLabel(it.key)} · ${it.t}–${it.end}</div><p>${R.n}${v.rubro === "barberia" ? " · " + svc.n : ""} · ${esc(it.unit)} · ${ZONAS[v.zona]}</p></div>
         <div class="tcard__act"><a class="btn btn--line btn--s" href="https://wa.me/?text=${txt}" target="_blank" rel="noopener"><svg class="icon"><use href="#i-wa"/></svg>Compartir</a>${pasado ? "" : `<button type="button" class="btn btn--line btn--s" data-act="cancel" data-id="${it.id}">Cancelar</button>`}</div></div>
-        <div class="tcard__money"><span>Seña pagada <b>${money(it.sena)}</b></span><span>A pagar en el lugar <b>${money(it.precio - it.sena)}</b></span></div></article>`;
+        <div class="tcard__money">${sinSena(it) ? "<span>Sin seña</span>" : `<span>Seña pagada <b>${money(it.sena)}</b></span>`}<span>A pagar en el lugar <b>${money(it.precio - it.sena)}</b></span></div></article>`;
     }).join("") + `</div>${cuenta}</div>` + mas;
   }
   // Tu cuenta, al lado de los turnos: ver, corregir o borrar tus datos (Ley 25.326), contraseña y salir
@@ -1275,7 +1289,7 @@
     const horas = (cuando(it) - Date.now()) / 3600e3, devuelve = it.devuelve !== false && horas > it.cancel;
     const dlg = $("#dlg");
     $("#dlg-t").textContent = "¿Cancelar este turno?";
-    $("#dlg-p").textContent = it.estado === "pendiente" ? "Todavía no pagaste la seña: si lo cancelás, el horario se libera." : it.devuelve === false ? `En este lugar la seña no se devuelve: la seña de ${money(it.sena)} queda para el negocio y el turno se libera.` : devuelve ? `Cancelás con más de ${it.cancel} h de anticipación: la seña de ${money(it.sena)} se devuelve y el turno se libera.` : `Faltan menos de ${it.cancel} h: la seña de ${money(it.sena)} queda para el negocio y el turno se libera.`;
+    $("#dlg-p").textContent = it.estado === "pendiente" ? "Todavía no pagaste la seña: si lo cancelás, el horario se libera." : sinSena(it) ? "Este turno no tiene seña: si lo cancelás, el horario se libera." : it.devuelve === false ? `En este lugar la seña no se devuelve: la seña de ${money(it.sena)} queda para el negocio y el turno se libera.` : devuelve ? `Cancelás con más de ${it.cancel} h de anticipación: la seña de ${money(it.sena)} se devuelve y el turno se libera.` : `Faltan menos de ${it.cancel} h: la seña de ${money(it.sena)} queda para el negocio y el turno se libera.`;
     $("#dlg-si").textContent = "Cancelar turno";
     $("#dlg-si").onclick = async () => {
       const b = $("#dlg-si"); b.disabled = true;
@@ -1283,7 +1297,7 @@
       b.disabled = false; dlg.close();
       if (!r.ok && r.error !== "no-existe") return toast(msj(r.error));
       S.turnos = S.turnos.filter((x) => x.id !== id); badges(); renderTurnos();
-      toast(!r.ok ? msj(r.error) : r.devuelve ? "Turno cancelado. La seña vuelve." : "Turno cancelado.");
+      toast(!r.ok ? msj(r.error) : r.devuelve && !sinSena(it) ? "Turno cancelado. La seña vuelve." : "Turno cancelado.");
     };
     $("#dlg-no").onclick = () => dlg.close();
     dlg.showModal();

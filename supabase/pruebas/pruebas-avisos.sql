@@ -295,6 +295,39 @@ begin
   assert (select devolucion from public.mp_cobros where orden = 'ORDTSTM1') = 'pendiente', 'la seña no quedó para devolver';
   raise notice 'OK  con Mercado Pago, al cancelar con tiempo los mails dicen que la seña vuelve por Mercado Pago y se le avisa a la función';
 end $$;
+-- Sin seña (27/11): con la seña en 0 %, los mails dicen "Sin seña" y nada de "en prueba" ni de devolver la seña
+update public.negocios set ajustes = ajustes || '{"senaPct": 0}' where id = current_setting('prueba.neg')::uuid;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000e1', false) \g /dev/null
+set role authenticated;
+do $$ begin
+  perform set_config('prueba.turno_sin', (public.reservar_turno(jsonb_build_object('negocio_id', current_setting('prueba.neg'), 'recurso', 'r2',
+    'fecha_agenda', current_date + 9, 'minuto', 1170))) ->> 'id', false);
+end $$;
+reset role;
+do $$
+declare e record;
+begin
+  select * into e from net.enviados where body -> 'to' ->> 0 = 'juli@prueba.com' order by id desc limit 1;
+  assert e.body ->> 'subject' like 'Turno confirmado:%' and e.body ->> 'html' like '%Sin seña%' and e.body ->> 'html' like '%$&nbsp;28.000%'
+     and e.body ->> 'html' like '%cancelalo desde Mis turnos así el horario se libera.%'
+     and e.body ->> 'html' not like '%en prueba%' and e.body ->> 'html' not like '%seña se devuelve%', 'sin seña, al cliente: ' || (e.body ->> 'html');
+  select * into e from net.enviados where body -> 'to' ->> 0 = 'martin@prueba.com' and body ->> 'subject' like 'Turno nuevo%' order by id desc limit 1;
+  assert e.body ->> 'html' like '%Sin seña%' and e.body ->> 'html' not like '%en prueba%', 'sin seña, al negocio: ' || (e.body ->> 'html');
+end $$;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000e1', false) \g /dev/null
+set role authenticated;
+do $$ begin perform public.cancelar_turno(current_setting('prueba.turno_sin')::uuid); end $$;
+reset role;
+do $$
+declare e record;
+begin
+  select * into e from net.enviados where body -> 'to' ->> 0 = 'juli@prueba.com' order by id desc limit 1;
+  assert e.body ->> 'html' like '%Este turno no tenía seña.%' and e.body ->> 'html' not like '%en prueba%', 'sin seña, cancelado, al cliente: ' || (e.body ->> 'html');
+  select * into e from net.enviados where body -> 'to' ->> 0 = 'martin@prueba.com' order by id desc limit 1;
+  assert e.body ->> 'html' like '%El turno no tenía seña.%' and e.body ->> 'html' not like '%en prueba%', 'sin seña, cancelado, al negocio: ' || (e.body ->> 'html');
+  raise notice 'OK  sin seña: los mails de turno nuevo y cancelado dicen "Sin seña", sin nada de la prueba ni de devolver la seña';
+end $$;
+update public.negocios set ajustes = ajustes || '{"senaPct": 25}' where id = current_setting('prueba.neg')::uuid;
 -- si pg_net falla, registrarse sigue funcionando
 create or replace function net.http_post(url text, body jsonb default '{}', params jsonb default '{}',
   headers jsonb default '{}', timeout_milliseconds int default 5000) returns bigint
