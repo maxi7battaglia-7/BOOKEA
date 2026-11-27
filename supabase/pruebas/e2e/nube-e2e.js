@@ -17,7 +17,7 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
     const ctx = await b.newContext({ viewport: { width: w, height: h } });
     await ctx.addInitScript({ path: AQUI + '/falso-supabase.js' });
     const p = await ctx.newPage();
-    p.errs = []; p.on('pageerror', (e) => p.errs.push(e.message)); p.on('console', (m) => { if (m.type() === 'error') p.errs.push(m.text()); });
+    p.errs = []; p.on('pageerror', (e) => { p.errs.push(e.message); if (process.env.DEPURAR) console.log('ERR-PAGINA ' + e.stack); }); p.on('console', (m) => { if (m.type() === 'error') p.errs.push(m.text()); });
     return p;
   };
   const listo = (p) => p.waitForFunction(() => !document.querySelector('.bienv')).then(() => p.waitForTimeout(150));
@@ -306,7 +306,7 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
     // ---------- Frente (bookea.ar): el cliente crea su cuenta para pagar la seña (cuenta.js contra la base) ----------
     const F = 'http://localhost:8787/index.html';
     const confirmar = (si) => fetch('http://localhost:8787/api/confirmar', { method: 'POST', body: JSON.stringify({ si }) });
-    const frenteListo = (p) => p.waitForFunction(() => document.documentElement.classList.contains('is-ready') && !document.querySelector('.splash'), null, { timeout: 8000 }).then(() => p.waitForTimeout(500));
+    const frenteListo = async (p) => { const t0 = Date.now(); await p.waitForFunction(() => document.documentElement.classList.contains('is-ready') && !document.querySelector('.splash'), null, { timeout: process.env.DEPURAR ? 60000 : 8000 }); if (process.env.DEPURAR) console.log('LISTO en', Date.now() - t0, 'ms', p.url()); await p.waitForTimeout(500); };
     const pag = (p) => p.evaluate(() => document.querySelector('.page:not([hidden])').dataset.page);
     // captura de la página entera: antes baja hasta el final, así cada bloque hace su entrada y se ve
     const entera = async (p, ruta) => {
@@ -315,7 +315,8 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
     };
     const aPagar = async (p) => {
       await p.goto(F + '?rubro=padel'); await frenteListo(p);
-      await p.click('.qslot >> nth=0'); await p.waitForTimeout(500);
+      // un lugar de ejemplo (los de verdad también están en la lista, aunque no tengan Mercado Pago)
+      await p.click('.qslot:not([data-v^="n-"]) >> nth=0'); await p.waitForTimeout(500);
       await p.click('#ir-pagar [data-act="reservar"]'); await p.waitForSelector('#pago-root .chk__turno');
     };
     const crearCuenta = async (p, d) => {
@@ -420,7 +421,7 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
       select id, 'r1', '${mananaN}', 1200, 'Pepe a mano', 'confirmada', 'telefono' from negocios where slug = 'losalamospadel' returning 1) select count(*) from x`);
     const f4 = await nueva();
     await f4.goto(F + '?rubro=padel'); await frenteListo(f4);
-    ok(!/Los Álamos Pádel/.test(await f4.textContent('#r-list')), 'negocio de verdad: sin Mercado Pago todavía no aparece en la lista de la página');
+    ok(/Los Álamos Pádel/.test(await f4.textContent('#r-list')), 'negocio de verdad: sin Mercado Pago también aparece en la lista de la página (sin seña)');
     // bookea.ar/nombre: su página; bookea.ar/nombre/reservar: sus turnos (con la dirección limpia)
     await f4.goto('http://localhost:8787/losalamospadel'); await frenteListo(f4);
     await f4.waitForFunction(() => document.querySelector('.page:not([hidden])').dataset.page === 'local', null, { timeout: 8000 }).catch(() => {});
@@ -431,8 +432,8 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
     await f4.goto('http://localhost:8787/losalamospadel/reservar'); await frenteListo(f4);
     await f4.waitForFunction(() => document.querySelector('.page:not([hidden])').dataset.page === 'ficha', null, { timeout: 8000 }).catch(() => {});
     const ficha = (await pag(f4)) === 'ficha' ? await f4.textContent('#ficha-root') : '';
-    ok(/Los Álamos Pádel/.test(await f4.textContent('#ficha-root h1').catch(() => '')) && /Tunuyán/.test(ficha) && /Turnos de 60 min/.test(ficha) && /Seña 25 %/.test(ficha),
-      'negocio de verdad: bookea.ar/nombre/reservar abre su ficha con su nombre, su ciudad, la duración y la seña de Mi negocio');
+    ok(/Los Álamos Pádel/.test(await f4.textContent('#ficha-root h1').catch(() => '')) && /Tunuyán/.test(ficha) && /Turnos de 60 min/.test(ficha) && /Sin seña/.test(ficha) && !/Seña 25 %/.test(ficha),
+      'negocio de verdad: bookea.ar/nombre/reservar abre su ficha con su nombre, su ciudad y la duración (sin Mercado Pago, "Sin seña")');
     ok(/Todos los días/.test(ficha) && /08:00 a 23:00/.test(ficha) && /Belgrano 450/.test(ficha) && /\$\s20\.000/.test(ficha) && /\$\s26\.000/.test(ficha) && !/Negocio de ejemplo/.test(ficha)
       && (await f4.getAttribute('.dir__ir', 'href') || '').startsWith('https://www.google.com/maps/search/'),
       'negocio de verdad: sus horarios, sus precios por franja, su dirección con "Cómo llegar" y sin el cartel de ejemplo');
@@ -454,17 +455,19 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
     await f4.waitForFunction(() => document.querySelector('.page:not([hidden])').dataset.page === 'ficha', null, { timeout: 8000 });
     await f4.click('.cupo[data-i="1"]'); await f4.click('.slot[data-t="19:00"]'); await f4.waitForTimeout(300);
     if (await f4.isVisible('.slot--u')) await f4.click('.slot--u[data-u="Cancha 2 · techada"]');
-    ok(/seña \$\s6\.500 · \$\s26\.000 el turno/.test(await f4.textContent('#ir-pagar')), 'negocio de verdad: el precio y la seña salen de sus franjas (26.000, seña 6.500)');
+    ok(/sin seña · \$\s26\.000 el turno/.test(await f4.textContent('#ir-pagar')) && /^Reservar/.test((await f4.textContent('#ir-pagar [data-act="reservar"]')).trim()),
+      'negocio de verdad: el precio sale de sus franjas (26.000) y, sin Mercado Pago, va sin seña ("Reservar")');
     await f4.click('#ir-pagar [data-act="reservar"]'); await f4.waitForSelector('#pago-root .chk__turno');
-    ok(/Bookea está en prueba/.test(await f4.textContent('#pago-root')) && /Belgrano 450/.test(await f4.textContent('#pago-root')), 'negocio de verdad: al pagar avisa que la seña todavía no se cobra, y muestra la dirección');
+    ok(/Confirmar turno/.test(await f4.textContent('#pago-root')) && /Sin seña/.test(await f4.textContent('#pago-root')) && !/en prueba/.test(await f4.textContent('#pago-root'))
+      && /Belgrano 450/.test(await f4.textContent('#pago-root')), 'negocio de verdad: sin Mercado Pago, "Confirmar turno" sin seña (nada de "en prueba"), y muestra la dirección');
     await entera(f4, `${out}/nb-pago-real.png`);
     await f4.click('.chk__side [data-act="pay"]'); await f4.waitForSelector('.tcard', { timeout: 10000 });
     const tN = (await sql(`select json_agg(t) from (select t.*, r.cliente as r_cliente, r.wa as r_wa, r.origen as r_origen, r.sena as r_sena, r.recurso as r_recurso, r.hora as r_hora
       from turnos t join reservas r on r.id = t.reserva_id where t.negocio_id = (select id from negocios where slug = 'losalamospadel')) t`) || [])[0];
-    ok(tN && tN.cancha === 'Cancha 2 · techada' && tN.precio === 26000 && tN.sena === 6500 && tN.hora === '19:00:00' && tN.fecha === mananaN,
+    ok(tN && tN.cancha === 'Cancha 2 · techada' && tN.precio === 26000 && tN.sena === 0 && tN.hora === '19:00:00' && tN.fecha === mananaN,
       `negocio de verdad: el turno queda en la base con la cancha, el día, la hora y el precio de Mi negocio (${tN && tN.cancha}, ${tN && tN.precio})`);
     ok(tN && tN.r_cliente === 'Nico Ríos' && tN.r_wa === '261 444 0000' && tN.r_origen === 'link' && tN.r_sena === 0 && tN.r_recurso === 'r2' && tN.r_hora === 1140,
-      'negocio de verdad: el turno entra en la agenda de Ana, por el link, con el nombre y el celular de Nico (y sin seña cobrada, en prueba)');
+      'negocio de verdad: el turno entra en la agenda de Ana, por el link, con el nombre y el celular de Nico (sin seña)');
     ok(/Los Álamos Pádel/.test(await f4.textContent('.tcard')) && /Cancha 2/.test(await f4.textContent('.tcard')), 'negocio de verdad: el turno se ve en Mis turnos');
     // Ana lo cancela desde su panel: a Nico se le cancela también
     await sql(`with x as (update reservas set estado = 'cancelada', retenida = false where id = '${tN.reserva_id}' returning 1) select count(*) from x`);
@@ -568,6 +571,10 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
     for (const [n, p] of [['f1', f1], ['f2', f2], ['f3', f3], ['f4', f4], ['an', an]]) ok(!p.errs.filter((x) => !/Failed to load resource/.test(x)).length, `frente: sin errores en la consola (${n}) ${p.errs.join(' | ')}`);
   } catch (e) {
     console.log('FALLA (excepción)', e.message); process.exitCode = 1;
+    if (process.env.DEPURAR) for (const ctx of b.contexts()) for (const p of ctx.pages()) {
+      const st = await p.evaluate(() => ({ url: location.href, cls: document.documentElement.className, splash: !!document.querySelector('.splash'), page: (document.querySelector('.page:not([hidden])') || {}).dataset })).catch((x) => String(x));
+      console.log('PAGINA', JSON.stringify(st), (p.errs || []).join(' | '));
+    }
   } finally {
     await b.close(); srv.kill();
   }

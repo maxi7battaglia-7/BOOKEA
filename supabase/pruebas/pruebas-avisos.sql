@@ -176,15 +176,17 @@ begin
      and e.body ->> 'html' like '%https://www.google.com/maps/search/?api=1&amp;query=Los%20%C3%81lamos%20P%C3%A1del%2C%20Av.%20San%20Mart%C3%ADn%201234%2C%20Tupungato%'
      and e.body ->> 'html' like '%>Cómo llegar<%', 'falta la dirección o "Cómo llegar": ' || (e.body ->> 'html');
   assert e.body ->> 'html' like '%href="https://wa.me/5492615551234"%' and e.body ->> 'html' like '%>0261 555-1234<%', 'falta el WhatsApp: ' || (e.body ->> 'html');
-  assert e.body ->> 'html' like '%de 19:30 a 21:00%' and e.body ->> 'html' like '%$&nbsp;7.000%' and e.body ->> 'html' like '%hasta 6 h antes%'
-     and e.body ->> 'html' like '%Bookea está en prueba: la seña no se cobró.%' and e.body ->> 'html' not like '%son de ejemplo%', 'datos del turno: ' || (e.body ->> 'html');
+  -- todavía sin Mercado Pago: el turno va sin seña (y nada de "en prueba")
+  assert e.body ->> 'html' like '%de 19:30 a 21:00%' and e.body ->> 'html' like '%Sin seña%' and e.body ->> 'html' like '%$&nbsp;28.000%'
+     and e.body ->> 'html' like '%cancelalo desde Mis turnos así el horario se libera.%'
+     and e.body ->> 'html' not like '%en prueba%' and e.body ->> 'html' not like '%son de ejemplo%', 'datos del turno: ' || (e.body ->> 'html');
   raise notice 'OK  turno en un negocio real: el mail lleva la dirección, "Cómo llegar" (Google Maps) y el WhatsApp de Mi negocio';
   -- 6. Al negocio: turno nuevo, con el cliente y su WhatsApp
   select * into e from net.enviados where body -> 'to' ->> 0 = 'martin@prueba.com' and body ->> 'subject' like 'Turno nuevo%' order by id desc limit 1;
   assert e.body ->> 'subject' = 'Turno nuevo: Juli Paz, ' || public.fecha_larga(current_date + 8) || ' a las 19:30', 'asunto al negocio: ' || coalesce(e.body::text, 'no llegó');
   assert e.body ->> 'html' like '%Tenés un turno nuevo%' and e.body ->> 'html' like '%Hola, Martín:%' and e.body ->> 'html' like '%>Juli Paz<%'
      and e.body ->> 'html' like '%href="https://wa.me/5492615551234"%' and e.body ->> 'html' like '%>261 555 1234<%'
-     and e.body ->> 'html' like '%$&nbsp;28.000%' and e.body ->> 'html' like '%No se cobró (Bookea está en prueba)%'
+     and e.body ->> 'html' like '%$&nbsp;28.000%' and e.body ->> 'html' like '%Sin seña%' and e.body ->> 'html' not like '%en prueba%'
      and e.body ->> 'html' like '%https://bookea.ar/admin.html%', 'mail al negocio: ' || (e.body ->> 'html');
   raise notice 'OK  turno nuevo: al negocio le llega el mail con el día, la cancha, el cliente y su WhatsApp';
 end $$;
@@ -218,7 +220,7 @@ declare e record;
 begin
   assert (select count(*) from net.enviados) = current_setting('prueba.mails_antes')::int + 1, 'el negocio canceló y salieron otros mails que el del cliente';
   select * into e from net.enviados order by id desc limit 1;
-  assert e.body -> 'to' ->> 0 = 'juli@prueba.com' and e.body ->> 'html' like '%Los Álamos Pádel</b> canceló tu turno%' and e.body ->> 'html' like '%se te devuelve%',
+  assert e.body -> 'to' ->> 0 = 'juli@prueba.com' and e.body ->> 'html' like '%Los Álamos Pádel</b> canceló tu turno%' and e.body ->> 'html' like '%Este turno no tenía seña.%',
     'el lugar canceló: ' || e.body::text;
   raise notice 'OK  el negocio cancela desde su panel: al cliente le llega que lo canceló el lugar';
 end $$;
@@ -244,7 +246,8 @@ do $$
 declare h text := (select body ->> 'html' from net.enviados where body -> 'to' ->> 0 = 'juli@prueba.com' order by id desc limit 1);
 begin
   assert h not like '%javascript:%' and h not like '%wa.me%' and h not like '%Cómo llegar%' and h like '%Cancha 3%', 'con datos vacíos o un link raro: ' || h;
-  assert h like '%en este lugar la seña no se devuelve%', 'un lugar que no devuelve la seña: ' || h;
+  assert public.regla_cancelar(false, 6) like '%en este lugar la seña no se devuelve%' and public.regla_cancelar(true, 6) like '%hasta 6 h antes, la seña se devuelve%',
+    'la regla para cancelar: ' || public.regla_cancelar(false, 6);
   raise notice 'OK  con su propio link de Google Maps usa ese; sin datos (o con un link que no es de Maps) no muestra esas filas';
 end $$;
 -- Con Mercado Pago: mientras espera el pago no sale ningún mail; al acreditarse, los dos (con la seña pagada); al

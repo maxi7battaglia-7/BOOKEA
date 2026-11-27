@@ -1617,8 +1617,12 @@
   try { mpCanal = new BroadcastChannel("bookea-mp"); } catch { /* sin BroadcastChannel: el aviso va por localStorage */ }
   const diaMes = (iso) => { const d = new Date(iso); return isNaN(d.getTime()) ? "" : `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`; };
   // La seña que pide el negocio (la del campo de Mi negocio mientras la cambia; si no, la guardada). En 0 %, sin seña
-  // (pregunta del dueño, 27/11): los turnos se confirman al reservar, sin Mercado Pago, y el negocio está en la lista.
+  // (pregunta del dueño, 27/11): los turnos se confirman al reservar, sin Mercado Pago. Con o sin Mercado Pago, el
+  // negocio está en la lista; sin Mercado Pago, los turnos van sin seña hasta que lo conecte.
   const senaPctAhora = () => { const i = $("#g-sena"); return Math.max(0, i ? +i.value || 0 : +NEG.senaPct || 0); };
+  // ¿Se cobra la seña? Solo con Mercado Pago conectado y andando (en la versión de prueba, como si sí)
+  const cobraSena = () => store.modo !== "nube" || !MPE || !!MPE.error || (MPE.conectado && !MPE.reconectar);
+  let alCambiarMP = null; // Mi negocio repinta "Así te ven" cuando se sabe si cobra
   const htmlMP = () => {
     if (store.modo !== "nube") return `<div class="mpc__info"><span class="estado estado--cancelada"><i></i>Versión de prueba</span><p class="mpc__t">Acá no se conecta Mercado Pago. Con tu cuenta de Bookea, la conectás en este lugar y la seña de cada turno se cobra sola.</p></div>`;
     const m = MPE;
@@ -1634,12 +1638,12 @@
       datos = [m.cuenta ? `Cuenta N° ${esc(m.cuenta)}` : "", m.desde ? `conectada el ${diaMes(m.desde)}` : "",
         +m.cobradas ? `${m.cobradas} ${+m.cobradas === 1 ? "seña cobrada" : "señas cobradas"}` : ""].filter(Boolean).join(" · ");
       if (dueno) acc = mpConfirmar
-        ? `<p class="mpc__conf">${sin ? "¿Desconectarla? Si más adelante pedís seña, la vas a tener que conectar de nuevo." : "¿Desconectarla? La seña deja de cobrarse y tu negocio sale de la lista."}</p><button type="button" class="btn btn--warn" data-mp="desconectar-si">Sí, desconectar</button><button type="button" class="btn btn--line" data-mp="desconectar-no">No</button>`
+        ? `<p class="mpc__conf">${sin ? "¿Desconectarla? Si más adelante pedís seña, la vas a tener que conectar de nuevo." : "¿Desconectarla? La seña deja de cobrarse: los turnos se toman sin seña."}</p><button type="button" class="btn btn--warn" data-mp="desconectar-si">Sí, desconectar</button><button type="button" class="btn btn--line" data-mp="desconectar-no">No</button>`
         : `<button type="button" class="btn btn--line" data-mp="desconectar">Desconectar</button>`;
     } else if (m.conectado) {
       estado = `<span class="estado estado--ausente"><i></i>Hay que conectarla de nuevo</span>`;
       texto = "Mercado Pago dejó de aceptar la conexión (quizás le quitaste el permiso a Bookea). "
-        + (sin ? "Como tu seña está en 0 %, no cambia nada: los turnos se confirman igual." : "Mientras tanto, la seña no se cobra.");
+        + (sin ? "Como tu seña está en 0 %, no cambia nada: los turnos se confirman igual." : "Mientras tanto, los turnos se toman sin seña.");
       if (dueno) acc = `<button type="button" class="btn btn--naranja" data-mp="conectar">Conectar de nuevo</button>`;
     } else if (sin) {
       estado = `<span class="estado estado--confirmada"><i></i>Sin seña</span>`;
@@ -1647,7 +1651,7 @@
       if (dueno) acc = `<button type="button" class="btn btn--line" data-mp="conectar">Conectar Mercado Pago</button>`;
     } else {
       estado = `<span class="estado estado--cancelada"><i></i>Sin conectar</span>`;
-      texto = "Mientras no la conectes, la seña no se cobra y tu negocio no aparece en la lista de bookea.ar (sí con tu link).";
+      texto = "Tu negocio ya aparece en bookea.ar, pero mientras no la conectes los turnos se toman sin seña. Conectala para cobrar la seña.";
       if (dueno) acc = `<button type="button" class="btn btn--naranja" data-mp="conectar">Conectar Mercado Pago</button>`;
     }
     if (mpEsperando && dueno && !anda) {
@@ -1659,7 +1663,7 @@
     return `<div class="mpc__info">${estado}<p class="mpc__t">${texto}</p>${datos ? `<p class="mpc__d">${datos}</p>` : ""}${sinDev
       ? `<p class="mpc__alerta">${sinDev === 1 ? "Una seña no se pudo devolver" : `${sinDev} señas no se pudieron devolver`} por Mercado Pago (quizás no había saldo en tu cuenta). Devolvela desde tu Mercado Pago.</p>` : ""}</div>${acc ? `<div class="mpc__acc">${acc}</div>` : ""}`;
   };
-  const pintarMP = () => { const c = $("#g-mp"); if (c) c.innerHTML = htmlMP(); };
+  const pintarMP = () => { const c = $("#g-mp"); if (!c) return; c.innerHTML = htmlMP(); if (alCambiarMP) alCambiarMP(); };
   const cargarMP = async () => {
     if (store.modo !== "nube" || !store.mercadoPago) return pintarMP();
     const r = await store.mercadoPago();
@@ -1813,8 +1817,9 @@
     const ayudaSena = () => {
       const p = n.franjas[0] ? +n.franjas[0].precio : 0, pc = +$("#g-sena").value || 0;
       $("#g-sena-ayuda").textContent = pc <= 0 ? "En 0 %, sin seña: los turnos se confirman al reservar, sin pasar por Mercado Pago."
-        : p ? `Con un turno de ${plata(p)}, la seña es de ${plata(Math.round((p * pc) / 100 / 100) * 100)}.` : "";
-      $("#g-sena-ayuda").hidden = pc > 0 && !p;
+        : (p ? `Con un turno de ${plata(p)}, la seña es de ${plata(Math.round((p * pc) / 100 / 100) * 100)}.` : "")
+          + (cobraSena() ? "" : `${p ? " " : ""}Se cobra cuando conectes Mercado Pago (abajo); mientras tanto, los turnos van sin seña.`);
+      $("#g-sena-ayuda").hidden = !$("#g-sena-ayuda").textContent;
     };
     ayudaSena(); $("#g-sena").addEventListener("input", () => { ayudaSena(); pintarMP(); });
     f.addEventListener("click", (e) => {
@@ -1849,14 +1854,14 @@
         ${desc ? `<p class="prev__desc">${esc(desc)}</p>` : ""}
         <div class="prev__hoy"><p>${horas.length ? `Hoy, ${DIAS[hoyD]}: ${plural(horas.length, "turno", "turnos")} de ${durCorto(dur)}` : `Hoy, ${DIAS[hoyD]}, está cerrado`}</p>
           ${horas.length ? `<ul class="prev__horas">${verHoras.map((t) => `<li>${aHora(t)}</li>`).join("")}${horas.length > verHoras.length ? `<li class="prev__mas">+${horas.length - verHoras.length}</li>` : ""}</ul>` : ""}</div>
-        <dl class="prev__datos"><div><dt>Turnos de</dt><dd>${durCorto(+$("#g-dur").value)}</dd></div><div><dt>Desde</dt><dd>${desde ? plata(desde) : "Sin precio"}</dd></div><div><dt>Seña</dt><dd>${pc <= 0 ? "Sin seña" : desde ? plata(senaDe({ senaPct: pc }, desde)) : `${pc} %`}</dd></div></dl>`;
+        <dl class="prev__datos"><div><dt>Turnos de</dt><dd>${durCorto(+$("#g-dur").value)}</dd></div><div><dt>Desde</dt><dd>${desde ? plata(desde) : "Sin precio"}</dd></div><div><dt>Seña</dt><dd>${pc <= 0 || !cobraSena() ? "Sin seña" : desde ? plata(senaDe({ senaPct: pc }, desde)) : `${pc} %`}</dd></div></dl>`;
       const sl = esc(slugDe($("#g-slug").value) || n.slug);
       $("#g-prev-link").innerHTML = `${ico("afuera")}<span>bookea.ar/<b>${sl}</b>/reservar</span>`;
       $("#g-prev-link").href = $("#g-ver").href = linkPagina(n.slug); // el link guardado (el que se está escribiendo todavía no existe)
     };
     const programar = (ms = 1100) => { pintarPrev(); clearTimeout(espera); espera = setTimeout(() => { espera = null; if (estado() !== inicial) guardar({ auto: true }); }, ms); };
     f.addEventListener("input", () => programar()); f.addEventListener("change", () => programar());
-    pintarPrev();
+    pintarPrev(); alCambiarMP = () => { pintarPrev(); ayudaSena(); };
     const guardar = async ({ auto = false } = {}) => {
       const slugAntes = n.slug;
       const nombre = $("#g-nombre").value.trim(), slug = slugDe($("#g-slug").value);

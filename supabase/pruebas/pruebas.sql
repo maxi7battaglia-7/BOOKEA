@@ -620,11 +620,13 @@ set role anon;
 do $$
 declare l jsonb; o jsonb;
 begin
-  assert public.lugares_publicos() = '[]'::jsonb, 'un negocio sin Mercado Pago apareció en la lista';
+  -- sin Mercado Pago también está en la lista (pedido del dueño, 27/11), con la seña en 0: no hay cómo cobrarla
+  assert jsonb_array_length(public.lugares_publicos()) = 1, 'un negocio aprobado sin Mercado Pago no apareció en la lista';
   l := public.lugares_publicos('CanchaEva ');
   assert jsonb_array_length(l) = 1 and l -> 0 ->> 'nombre' = 'Cancha Eva' and l -> 0 ->> 'ciudad' = 'San Carlos'
      and l -> 0 ->> 'direccion' = 'Ruta 40 km 3' and (l -> 0 ->> 'duracion')::int = 60 and jsonb_array_length(l -> 0 -> 'recursos') = 2
-     and (l -> 0 -> 'franjas' -> 1 ->> 'precio')::int = 50000 and (l -> 0 ->> 'senaPct')::numeric = 25 and not (l -> 0 ->> 'publicado')::boolean
+     and (l -> 0 -> 'franjas' -> 1 ->> 'precio')::int = 50000 and (l -> 0 ->> 'senaPct')::numeric = 0 and (l -> 0 ->> 'publicado')::boolean
+     and not (l -> 0 ->> 'cobra')::boolean
      and (l -> 0 -> 'horario' -> 0 ->> 'cerrado')::boolean and not (l -> 0 -> 'horario' -> 1 ->> 'cerrado')::boolean, 'lugar: ' || l::text;
   assert l::text not like '%eva@prueba.com%' and l::text not like '%2622 44 5566%' and l::text not like '%Pepe%' and l::text not like '%2622 11 1111%',
     'la página ve datos que no son para el público: ' || l::text;
@@ -637,7 +639,7 @@ begin
     raise exception 'FALLA: sin cuenta se leyó un negocio por fuera de lugares_publicos';
   exception when insufficient_privilege then null;
   end;
-  raise notice 'OK  la página ve el negocio con su link (no en la lista hasta Mercado Pago), con sus horarios ocupados y sin datos de nadie';
+  raise notice 'OK  la página ve el negocio en la lista y con su link (sin Mercado Pago, sin seña), con sus horarios ocupados y sin datos de nadie';
 end $$;
 reset role;
 
@@ -651,17 +653,17 @@ begin
     'lugar_id', 'inventado', 'lugar', 'Nombre inventado', 'zona', 'Otra', 'cancha', 'Cancha 9', 'precio', 1, 'sena', 0, 'cancelar_horas', 0));
   assert t ->> 'lugar' = 'Cancha Eva' and t ->> 'zona' = 'San Carlos' and t ->> 'lugar_id' = 'canchaeva' and t ->> 'negocio_id' = current_setting('prueba.neg_eva')
      and t ->> 'cancha' = 'Cancha 2 · techada' and (t ->> 'fecha')::date = d and t ->> 'hora' = '21:00:00' and t ->> 'fin' = '22:00:00'
-     and (t ->> 'precio')::int = 50000 and (t ->> 'sena')::int = 12500 and (t ->> 'cancelar_horas')::int = 12 and (t ->> 'devuelve_sena')::boolean
+     and (t ->> 'precio')::int = 50000 and (t ->> 'sena')::int = 0 and (t ->> 'cancelar_horas')::int = 12 and (t ->> 'devuelve_sena')::boolean
      and t ->> 'servicio' = 'Turno de 60 min' and t ->> 'rubro' = 'Fútbol 5', 'el turno no salió de Mi negocio: ' || t::text;
   perform set_config('prueba.turno_eva', t ->> 'id', false);
-  raise notice 'OK  en un negocio de verdad, la cancha, el horario, el precio, la seña y la cancelación salen de su Mi negocio';
+  raise notice 'OK  en un negocio de verdad, la cancha, el horario, el precio y la cancelación salen de su Mi negocio (sin Mercado Pago, sin seña)';
   -- en la agenda del negocio, como un turno por el link, con el nombre y el celular del cliente
   reset role;
   select * into r from public.reservas where id = (t ->> 'reserva_id')::uuid;
   assert r.negocio_id = current_setting('prueba.neg_eva')::uuid and r.recurso = 'r2' and r.fecha = d and r.hora = 1260
      and r.cliente = 'Julieta Paz' and r.wa = '261 555 9999' and r.precio = 50000 and r.sena = 0 and r.estado = 'confirmada'
-     and r.origen = 'link' and r.nota like '%' || (t ->> 'codigo') || '%' and r.nota like '%no se cobró%', 'agenda: ' || to_jsonb(r)::text;
-  raise notice 'OK  el turno entra en la agenda del negocio con el nombre y el celular del cliente (en prueba, sin seña cobrada)';
+     and r.origen = 'link' and r.nota like '%' || (t ->> 'codigo') || '%' and r.nota not like '%prueba%', 'agenda: ' || to_jsonb(r)::text;
+  raise notice 'OK  el turno entra en la agenda del negocio con el nombre y el celular del cliente (sin Mercado Pago, sin seña)';
   set role authenticated;
   -- un horario ocupado en la agenda (por el link o cargado a mano) no se reserva
   begin
@@ -1291,7 +1293,8 @@ end $$;
 reset role;
 do $$ begin
   assert (select count(*) from vault.secrets where name like 'mercadopago_%') = 0, 'al desconectar quedaron las llaves en Vault';
-  assert not public.tiene_mercado_pago(current_setting('prueba.neg_eva')::uuid) and public.lugares_publicos() = '[]'::jsonb, 'desconectado sigue cobrando';
+  assert not public.tiene_mercado_pago(current_setting('prueba.neg_eva')::uuid) and public.en_la_lista(current_setting('prueba.neg_eva')::uuid)
+     and (public.lugares_publicos() -> 0 ->> 'senaPct')::numeric = 0, 'desconectado sigue cobrando (o salió de la lista)';
   raise notice 'OK  el panel ve la conexión sin las llaves; solo el dueño la desconecta (no con alguien pagando) y se borran las llaves';
 end $$;
 
@@ -1303,8 +1306,8 @@ declare t jsonb;
 begin
   t := public.reservar_turno(jsonb_build_object('negocio_id', current_setting('prueba.neg_eva'), 'recurso', 'r1',
     'fecha_agenda', current_setting('prueba.dia_eva'), 'minuto', 1380));
-  assert t ->> 'estado' = 'confirmado' and t ->> 'pago' = '' and t ->> 'vence' is null and (t ->> 'comision')::int = 0, 'sin Mercado Pago: ' || t::text;
-  raise notice 'OK  sin Mercado Pago el turno se confirma enseguida y la seña no se cobra';
+  assert t ->> 'estado' = 'confirmado' and t ->> 'pago' = '' and t ->> 'vence' is null and (t ->> 'comision')::int = 0 and (t ->> 'sena')::int = 0, 'sin Mercado Pago: ' || t::text;
+  raise notice 'OK  sin Mercado Pago el turno se confirma enseguida y va sin seña';
 end $$;
 reset role;
 
@@ -1312,7 +1315,8 @@ reset role;
 -- Mercado Pago (no va a pagar nada), sin nota de "en prueba"; y el negocio está en la lista sin conectar Mercado Pago
 set role anon;
 do $$ begin
-  assert public.lugares_publicos() = '[]'::jsonb, 'un negocio que pide seña y no la cobra apareció en la lista';
+  assert (public.lugares_publicos() -> 0 ->> 'publicado')::boolean and (public.lugares_publicos() -> 0 ->> 'senaPct')::numeric = 0,
+    'un negocio que pide seña sin Mercado Pago no está en la lista sin seña';
 end $$;
 reset role;
 update public.negocios set ajustes = ajustes || '{"senaPct": 0}' where id = current_setting('prueba.neg_eva')::uuid;

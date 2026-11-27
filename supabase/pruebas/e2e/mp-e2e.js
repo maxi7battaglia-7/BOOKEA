@@ -190,7 +190,8 @@ const conectar = async (token, negocio, cambiar) => {
       await an.fill('#i-email', 'ana@prueba.com'); await an.fill('#i-clave', 'canchas2026'); await an.click('#f-ingresar button[type=submit]');
       await an.waitForSelector('#panel:not([hidden])'); await an.waitForFunction(() => !document.querySelector('.bienv')); await an.waitForTimeout(200);
       await an.click('.menu__i[data-vista="negocio"]'); await an.waitForSelector('#g-mp [data-mp="conectar"]');
-      ok(/Sin conectar/.test(await an.textContent('#g-mp')) && /la seña no se cobra/.test(await an.textContent('#g-mp')), 'panel: Mi negocio muestra Mercado Pago sin conectar y "Conectar Mercado Pago"');
+      ok(/Sin conectar/.test(await an.textContent('#g-mp')) && /los turnos se toman sin seña/.test(await an.textContent('#g-mp')) && /Se cobra cuando conectes Mercado Pago/.test(await an.textContent('#g-sena-ayuda'))
+        && /Sin seña/.test(await an.textContent('#g-prev')), 'panel: sin conectar, Mi negocio avisa que los turnos van sin seña (también en "Así te ven") y ofrece "Conectar Mercado Pago"');
       await an.waitForTimeout(800); await an.locator('.ng-card--mp').screenshot({ path: `${out}/mp-panel-sin-conectar.png` });
       // Conectar: Mercado Pago se abre en otra pestaña, da el permiso y vuelve; el panel se actualiza solo
       const [pest] = await Promise.all([an.context().waitForEvent('page'), an.click('#g-mp [data-mp="conectar"]')]);

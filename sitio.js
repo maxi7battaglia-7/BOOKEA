@@ -129,9 +129,9 @@
   const minPrecio = (v) => Math.min(...v.svcs.flatMap((s) => Object.values(s.p)));
 
   // ---------- Negocios de verdad: los de la base, con lo que cargaron en Mi negocio ----------
-  // Llegan de cuenta.js (lugares_publicos de supabase/esquema.sql) con id "n-" + su link. Los que ya cobran la seña con
-  // Mercado Pago van a la lista junto a los de ejemplo (si su rubro es uno del buscador); el de un link se abre aunque
-  // todavía no esté en la lista. Sus horarios, precios, seña y cancelación son los de su panel, y los horarios ocupados
+  // Llegan de cuenta.js (lugares_publicos de supabase/esquema.sql) con id "n-" + su link. Los aprobados van a la lista
+  // junto a los de ejemplo (si su rubro es uno del buscador), con Mercado Pago o sin él (sin él, sin seña); el de un link
+  // se abre aunque no esté en la lista. Sus horarios, precios, seña y cancelación son los de su panel, y los horarios ocupados
   // son los de su agenda (la base los manda sin decir de quién son).
   const sinTildes = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
   const RUBRO_BASE = (t) => { const x = sinTildes(t); return /padel/.test(x) ? "padel" : /futbol|\bf5\b/.test(x) ? "futbol" : /tenis/.test(x) ? "tenis" : /barber/.test(x) ? "barberia" : ""; };
@@ -185,7 +185,8 @@
     return {
       id, real: true, nid: f.id, slug: f.slug, publicado: !!f.publicado, cobra: !!f.cobra, rubro, name: String(f.nombre || ""), zona: zonaDe(f.ciudad),
       fotos: foto ? [id] : [], dur, units, recIds, horario: Array.isArray(f.horario) ? f.horario : [], bloques: [],
-      senaPct: Math.max(0, Math.min(100, +f.senaPct || 0)), cancel: Math.max(0, Math.round(+f.cancelarHoras) || 0), devuelve: f.devolverSena !== false,
+      // la seña que de verdad se cobra: sin Mercado Pago conectado, ninguna (la base ya la manda en 0; por las dudas)
+      senaPct: f.cobra ? Math.max(0, Math.min(100, +f.senaPct || 0)) : 0, cancel: Math.max(0, Math.round(+f.cancelarHoras) || 0), devuelve: f.devolverSena !== false,
       desc: String(f.descripcion || "").trim(), ame: [], direccion: String(f.direccion || "").trim(), ciudad: String(f.ciudad || "").trim(),
       mapa: MAPS.test(f.mapa || "") ? f.mapa : "", ocup: ocupDe(f.ocupados), pagina: paginaDeFila(f.pagina),
       svcs: [{ id: "turno", n: `Turno de ${dur} min`, min: dur, p, franjas }],

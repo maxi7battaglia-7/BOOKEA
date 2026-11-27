@@ -175,8 +175,8 @@ create trigger avisar_negocio_rechazado after update of estado on public.negocio
 --   5. Turno cancelado: cuando lo cancela desde Mis turnos (o lo cancela el lugar), con lo que pasa con la seña.
 --   6 y 7. Al negocio (al email del dueño), en los turnos de un negocio de verdad: turno nuevo y turno cancelado.
 --   Como los avisos 2 y 3, solo se mandan con remitente de dominio propio (resend_remitente).
---   En un negocio sin Mercado Pago (bookea_en_prueba(), en esquema.sql), los mails dicen que la seña no se cobró.
---   En uno que no pide seña (seña 0 %), dicen "Sin seña" y nada de la prueba: el turno se confirmó sin pagar nada.
+--   En los lugares de ejemplo (bookea_en_prueba(), en esquema.sql), los mails dicen que la seña no se cobró.
+--   En un negocio que no pide seña (0 %) o que no conectó Mercado Pago, el turno va sin seña: dicen "Sin seña".
 --   En uno que cobra con Mercado Pago, el turno se confirma (y se avisan 4 y 6) recién cuando se acredita la seña.
 -- =====================================================================================
 

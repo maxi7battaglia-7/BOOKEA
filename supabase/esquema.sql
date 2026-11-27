@@ -590,8 +590,9 @@ begin
   return to_jsonb(fila);
 end $$;
 
--- En los negocios que todavía no conectaron Mercado Pago, la seña no se cobra: la página, la agenda del negocio y los
--- mails lo dicen ("Bookea está en prueba"). Los que lo conectaron cobran la seña de verdad (ver "Mercado Pago", abajo).
+-- Los lugares de ejemplo de la página no cobran nada: los mails lo dicen ("Bookea está en prueba"). Los negocios de verdad
+-- que todavía no conectaron Mercado Pago toman los turnos sin seña (pedido del dueño, 27/11: "si no conectan con Mercado
+-- Pago deben aparecer de igual forma"); los que lo conectaron cobran la seña de verdad (ver "Mercado Pago", abajo).
 create or replace function public.bookea_en_prueba() returns boolean language sql immutable as $$
   select true
 $$;
@@ -633,6 +634,7 @@ end $$;
 -- El turno entra también en su agenda, con el nombre y el celular del cliente.
 -- Si el negocio cobra la seña con Mercado Pago (tiene_mercado_pago), el turno queda "pendiente" y guardado 20 minutos
 -- mientras el cliente paga (la función "mp" arma el cobro); al acreditarse el pago queda confirmado (mp_resultado).
+-- Si no pide seña (0 %) o no conectó Mercado Pago, el turno va sin seña y queda confirmado enseguida.
 create or replace function public.reservar_turno(t jsonb) returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare
@@ -697,6 +699,7 @@ begin
                 || case when btrim(coalesce(rec ->> 'detalle', '')) <> '' then ' · ' || lower(left(btrim(rec ->> 'detalle'), 17)) else '' end;
     servicio := 'Turno de ' || dur || ' min';
     cobra    := sena > 0 and public.tiene_mercado_pago(neg.id);
+    if not cobra then sena := 0; end if;  -- sin Mercado Pago no hay cómo cobrarla: el turno va sin seña
   end if;
   if f + h < public.ahora_mendoza() then raise exception 'Ese horario ya pasó' using errcode = '23514'; end if;
   if f > current_date + 60 then raise exception 'Ese día está muy lejos' using errcode = '23514'; end if;
@@ -707,15 +710,14 @@ begin
   end if;
   -- En la agenda del negocio, como un turno "por el link". Si ese horario ya está ocupado (otro turno, uno cargado
   -- a mano o un bloqueo), la base no deja reservarlo. La seña va en 0 hasta que se acredita el pago (mp_resultado la
-  -- pone); en un negocio sin Mercado Pago, no se cobra (Bookea está en prueba).
+  -- pone); si no se cobra (sin seña o sin Mercado Pago), va sin seña y sin nota.
   if neg.id is not null then
     insert into public.reservas (negocio_id, recurso, fecha, hora, cliente, wa, precio, sena, estado, origen, nota)
       values (neg.id, rec ->> 'id', fa, m, left(yo.nombre, 80), left(yo.celular, 40), precio, 0, 'confirmada', 'link',
               'Reservó en bookea.ar · código ' || cod
               || case when cobra then ' · Esperando que pague la seña de $ ' || sena || ' con Mercado Pago (hasta las '
                                       || to_char(limite at time zone 'America/Argentina/Mendoza', 'HH24:MI') || '; si no paga, el horario se libera solo).'
-                      when sena = 0 then ''  -- el negocio no pide seña: el turno queda confirmado y no hay nada que aclarar
-                      when public.bookea_en_prueba() then ' · Bookea está en prueba: la seña no se cobró.' else '' end)
+                      else '' end)
       returning id into rid;
   end if;
   insert into public.turnos (cliente_id, negocio_id, reserva_id, codigo, lugar_id, lugar, zona, rubro, servicio_id, servicio, cancha,
@@ -901,12 +903,13 @@ language sql stable set search_path = '' as $$
                                then (x.ajustes ->> 'senaPct')::numeric > 0 else false end
                      from public.negocios x where x.id = n), false)
 $$;
--- ¿Aparece en la lista de la página? Si pide seña, cuando la cobra con una cuenta de verdad de Mercado Pago (con una de
--- prueba, solo por su link). Si no pide seña, no hay nada que cobrar: aparece sin conectar Mercado Pago.
+-- ¿Aparece en la lista de la página? Sí, con Mercado Pago o sin él (pedido del dueño, 27/11: "si no conectan con
+-- Mercado Pago deben aparecer de igual forma"; sin Mercado Pago toma los turnos sin seña). Menos el que cobra la seña
+-- con una cuenta de prueba de Mercado Pago: ese, solo por su link (para probar sin que se cuele en la página).
 create or replace function public.en_la_lista(n uuid) returns boolean
 language sql stable set search_path = '' as $$
-  select not public.pide_sena(n)
-      or exists (select 1 from public.mp_cuentas c where c.negocio_id = n and not c.reconectar and c.real)
+  select not (public.pide_sena(n)
+              and exists (select 1 from public.mp_cuentas c where c.negocio_id = n and not c.reconectar and not c.real))
 $$;
 
 -- Los turnos que nadie pagó a tiempo: se cancelan y salen de la agenda del negocio (el horario queda libre).
@@ -1000,7 +1003,7 @@ language sql stable security definer set search_path = '' as $$
     from public.mp_cuentas c where c.negocio_id = n
 $$;
 -- No se pudo renovar (el dueño quitó el permiso desde Mercado Pago, por ejemplo): hay que conectarla de nuevo.
--- Mientras tanto el negocio no cobra la seña y sale de la lista (sigue andando por su link, sin cobrar).
+-- Mientras tanto el negocio toma los turnos sin seña.
 create or replace function public.mp_marcar_reconectar(n uuid) returns void
 language sql security definer set search_path = '' as $$
   update public.mp_cuentas set reconectar = true, actualizado = now() where negocio_id = n
@@ -1033,7 +1036,7 @@ begin
     'cobradas', (select count(*) from public.mp_cobros k where k.negocio_id = n and k.estado = 'aprobado'),
     'sin_devolver', (select count(*) from public.mp_cobros k where k.negocio_id = n and k.devolucion = 'fallo'));
 end $$;
--- El dueño la desconecta: las señas dejan de cobrarse y sale de la lista. No se puede mientras alguien está pagando
+-- El dueño la desconecta: los turnos se toman sin seña. No se puede mientras alguien está pagando
 -- una seña o hay una por devolver (las dos cosas necesitan la cuenta).
 create or replace function public.mp_desconectar(n uuid) returns boolean
 language plpgsql security definer set search_path = '' as $$
@@ -1238,8 +1241,8 @@ end $$;
 -- agenda, sin decir de quién son. Nada más: ni el email del dueño, ni su WhatsApp, ni sus clientes.
 --
 -- Cuáles aparecen:
---   · En la lista de la página (inicio y resultados): los aprobados que ya cobran la seña con Mercado Pago, con una
---     cuenta de verdad, y los que no piden seña (en_la_lista, en "Mercado Pago", arriba).
+--   · En la lista de la página (inicio y resultados): todos los aprobados que ya tengan canchas y horarios, con
+--     Mercado Pago o sin él (sin él, sin seña); menos el que cobra con una cuenta de prueba (en_la_lista, arriba).
 --   · Con su link (bookea.ar/su-link): cualquiera aprobado que ya tenga canchas y horarios, para que el dueño se vea
 --     y lo pruebe.
 -- Los turnos: reservar_turno los pone también en la agenda del negocio (reservas). Si el cliente cancela, el horario
@@ -1305,7 +1308,9 @@ language sql stable set search_path = '' as $$
                                                              'precio', public.precio_en(jsonb_build_array(f), public.minutos(f ->> 'desde'))) order by i), '[]'::jsonb)
                   from jsonb_array_elements(case when jsonb_typeof(x.ajustes -> 'franjas') = 'array' then x.ajustes -> 'franjas' else '[]'::jsonb end)
                        with ordinality as e(f, i)),
-    'senaPct', case when coalesce(x.ajustes ->> 'senaPct', '') ~ '^[0-9]{1,3}(\.[0-9]+)?$' then least((x.ajustes ->> 'senaPct')::numeric, 100) else 0 end,
+    -- la seña que de verdad se cobra: sin Mercado Pago conectado, ninguna (el turno va sin seña)
+    'senaPct', case when public.tiene_mercado_pago(x.id) and coalesce(x.ajustes ->> 'senaPct', '') ~ '^[0-9]{1,3}(\.[0-9]+)?$'
+                    then least((x.ajustes ->> 'senaPct')::numeric, 100) else 0 end,
     'cancelarHoras', case when coalesce(x.ajustes ->> 'cancelarHoras', '') ~ '^[0-9]{1,3}$' then least((x.ajustes ->> 'cancelarHoras')::integer, 168) else 0 end,
     'devolverSena', coalesce(x.ajustes ->> 'devolverSena', '') <> 'false',
     -- su página: el WhatsApp, solo si eligió mostrarlo
@@ -1334,7 +1339,7 @@ language sql stable set search_path = '' as $$
         'ubi', public.fotos_publicas(x.id, x.pagina #> '{tarjetas,ubi}', 2)),
       'whatsapp', case when x.pagina ->> 'mostrar_whatsapp' = 'true' then x.whatsapp else '' end),
     'publicado', public.en_la_lista(x.id),
-    'cobra', public.tiene_mercado_pago(x.id) and public.pide_sena(x.id),  -- la seña se paga con Mercado Pago (si no, Bookea está en prueba)
+    'cobra', public.tiene_mercado_pago(x.id) and public.pide_sena(x.id),  -- la seña se paga con Mercado Pago (si no, va sin seña)
     'ocupados', public.ocupados_de(x.id))
 $$;
 
