@@ -666,6 +666,10 @@ html:has(#panel:not([hidden])) { scrollbar-gutter: stable; }
 .ng-card--prev .prev__link b { color: #fff; font-weight: 600; }
 .ng-card--prev .prev__link:focus-visible { outline: 3px solid var(--v); outline-offset: 3px; }
 @media (hover: hover) and (pointer: fine) { .ng-card--prev .prev__link:hover { text-decoration: underline; text-underline-offset: 0.25em; } }
+/* ¿Aparece en la lista de bookea.ar? (o qué le falta): en el subtítulo de "Así te ven", así no suma altura */
+.ng-card--prev .prev__lista { color: var(--v200); }
+.ng-card--prev .prev__lista .ico { width: 14px; height: 14px; margin: 0 5px -2px 0; color: inherit; }
+.ng-card--prev .prev__lista--falta { color: var(--n100); }
 .prev__hoy { display: grid; gap: 8px; }
 .prev__hoy p { font-size: 13px; font-weight: 600; color: var(--tx-2); }
 .prev__horas { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; }

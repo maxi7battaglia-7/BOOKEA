@@ -1647,11 +1647,11 @@
       if (dueno) acc = `<button type="button" class="btn btn--naranja" data-mp="conectar">Conectar de nuevo</button>`;
     } else if (sin) {
       estado = `<span class="estado estado--confirmada"><i></i>Sin seña</span>`;
-      texto = "Tu seña está en 0 %: los turnos que reservan en bookea.ar se confirman al momento, sin pasar por Mercado Pago, y tu negocio aparece en la lista. Si más adelante pedís seña, conectala para cobrarla.";
+      texto = "Tu seña está en 0 %: los turnos que reservan en bookea.ar se confirman al momento, sin pasar por Mercado Pago. Si más adelante pedís seña, conectala para cobrarla.";
       if (dueno) acc = `<button type="button" class="btn btn--line" data-mp="conectar">Conectar Mercado Pago</button>`;
     } else {
       estado = `<span class="estado estado--cancelada"><i></i>Sin conectar</span>`;
-      texto = "Tu negocio ya aparece en bookea.ar, pero mientras no la conectes los turnos se toman sin seña. Conectala para cobrar la seña.";
+      texto = "Mientras no la conectes, los turnos que reservan en bookea.ar se toman sin seña. Conectala para cobrar la seña.";
       if (dueno) acc = `<button type="button" class="btn btn--naranja" data-mp="conectar">Conectar Mercado Pago</button>`;
     }
     if (mpEsperando && dueno && !anda) {
@@ -1747,7 +1747,7 @@
           ${tarjeta("ng-3", "agenda", "Horario", "Los días y horas en que se puede reservar.", `
             <div class="filas filas--hr" id="g-hor">${ORDEN_DIAS.map(filaDia).join("")}</div>
             <p class="field__help">¿Cerrás después de medianoche? Elegí la hora igual (00:30).</p>`)}
-          ${tarjeta("ng-7", "clientes", "Así te ven", "Tu ficha en Bookea, con lo que vas cargando.", `<div class="prev" id="g-prev" aria-live="off"></div>
+          ${tarjeta("ng-7", "clientes", "Así te ven", `<span class="prev__lista" id="g-lista">Tu ficha en Bookea, con lo que vas cargando.</span>`, `<div class="prev" id="g-prev" aria-live="off"></div>
             <a class="prev__link" id="g-prev-link" href="${linkPagina(n.slug)}" target="_blank" rel="noopener"></a>`, "ng-card--prev")}
           ${tarjeta("ng-2", "cancha", "Qué se reserva", `Cada ${esc(u)} es una columna en tu agenda.`, `
             <div class="field campo"><label for="g-dur">Cada turno dura</label><select id="g-dur">${durs.map((d) => `<option value="${d}"${d === n.duracion ? " selected" : ""}>${durTexto(d)}</option>`).join("")}</select></div>
@@ -1857,6 +1857,17 @@
         <dl class="prev__datos"><div><dt>Turnos de</dt><dd>${durCorto(+$("#g-dur").value)}</dd></div><div><dt>Desde</dt><dd>${desde ? plata(desde) : "Sin precio"}</dd></div><div><dt>Seña</dt><dd>${pc <= 0 || !cobraSena() ? "Sin seña" : desde ? plata(senaDe({ senaPct: pc }, desde)) : `${pc} %`}</dd></div></dl>`;
       const sl = esc(slugDe($("#g-slug").value) || n.slug);
       $("#g-prev-link").innerHTML = `${ico("afuera")}<span>bookea.ar/<b>${sl}</b>/reservar</span>`;
+      // ¿Aparece en la lista de bookea.ar? Pedido del dueño (27/11): con ciudad y teléfono "sí o sí", y no las cuentas
+      // del equipo de Bookea (como en_la_lista() de la base). Con su link se abre igual.
+      const faltan = [$("#g-wa").value.replace(/\D/g, "").length < 8 && "tu WhatsApp", !$("#g-ciudad").value.trim() && "la ciudad"].filter(Boolean);
+      const equipo = store.modo === "nube" && YO && YO.admin && YO.rol === "dueno";
+      const deMPPrueba = MPE && MPE.conectado && !MPE.reconectar && MPE.real === false && pc > 0;
+      const lista = $("#g-lista");
+      lista.classList.toggle("prev__lista--falta", !!faltan.length && !equipo);
+      lista.innerHTML = equipo ? `${ico("candado")}<span>Es una cuenta del equipo de Bookea: no aparece en la lista de bookea.ar (sí con su link).</span>`
+        : faltan.length ? `${ico("pin")}<span>Para aparecer en la lista de bookea.ar, cargá ${faltan.join(" y ")}.</span>`
+        : deMPPrueba ? `${ico("candado")}<span>Con una cuenta de prueba de Mercado Pago no aparecés en la lista (sí con tu link).</span>`
+        : `${ico("check")}<span>Aparecés en la lista de bookea.ar.</span>`;
       $("#g-prev-link").href = $("#g-ver").href = linkPagina(n.slug); // el link guardado (el que se está escribiendo todavía no existe)
     };
     const programar = (ms = 1100) => { pintarPrev(); clearTimeout(espera); espera = setTimeout(() => { espera = null; if (estado() !== inicial) guardar({ auto: true }); }, ms); };

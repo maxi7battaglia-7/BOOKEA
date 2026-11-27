@@ -407,7 +407,7 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
     await frenteListo(f2); await f2.waitForSelector('#cuenta.cuenta--yo, .micuenta', { timeout: 8000 }).catch(() => {});
     ok(/Nico Ríos/.test(await f2.textContent('main')) && !/admin\.html/.test(f2.url()), 'panel: el link del mail de un cliente que cae en el panel lo lleva a la página de reservas, ya adentro');
     // ---------- Negocio de verdad en la página: el de Ana (aprobado), con su link y su agenda ----------
-    await sql(`with x as (update negocios set ciudad = 'Tunuyán', direccion = 'Belgrano 450', descripcion = 'Dos canchas de pádel.',
+    await sql(`with x as (update negocios set ciudad = 'Tunuyán', direccion = 'Belgrano 450', descripcion = 'Dos canchas de pádel.', whatsapp = '261 555 7777',
       ajustes = jsonb_build_object(
         'recursos', jsonb_build_array(jsonb_build_object('id', 'r1', 'nombre', 'Cancha 1', 'detalle', 'Blindex'), jsonb_build_object('id', 'r2', 'nombre', 'Cancha 2', 'detalle', 'Techada')),
         'duracion', 60,

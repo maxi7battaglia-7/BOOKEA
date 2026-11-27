@@ -903,13 +903,26 @@ language sql stable set search_path = '' as $$
                                then (x.ajustes ->> 'senaPct')::numeric > 0 else false end
                      from public.negocios x where x.id = n), false)
 $$;
--- ¿Aparece en la lista de la página? Sí, con Mercado Pago o sin él (pedido del dueño, 27/11: "si no conectan con
--- Mercado Pago deben aparecer de igual forma"; sin Mercado Pago toma los turnos sin seña). Menos el que cobra la seña
--- con una cuenta de prueba de Mercado Pago: ese, solo por su link (para probar sin que se cuele en la página).
+-- ¿Aparece en la lista de la página? Con Mercado Pago o sin él (pedido del dueño, 27/11: "si no conectan con Mercado
+-- Pago deben aparecer de igual forma"; sin Mercado Pago toma los turnos sin seña), si cargó en Mi negocio la ciudad y
+-- el teléfono (WhatsApp, "sí o sí": al menos 8 números) y si el dueño no es del equipo de Bookea (sus cuentas son para
+-- administrar o probar). Tampoco el que cobra la seña con una cuenta de prueba de Mercado Pago. Todos se abren igual
+-- con su link (bookea.ar/su-link).
+create or replace function public.lista_faltan(n uuid) returns text[]
+language sql stable set search_path = '' as $$
+  select array_remove(array[
+    case when btrim(coalesce(x.ciudad, '')) = '' then 'ciudad' end,
+    case when char_length(regexp_replace(coalesce(x.whatsapp, ''), '[^0-9]', '', 'g')) < 8 then 'telefono' end,
+    case when exists (select 1 from public.miembros m join public.admins_bookea a on a.user_id = m.user_id
+                      where m.negocio_id = x.id and m.rol = 'dueno') then 'equipo' end,
+    case when public.pide_sena(x.id)
+              and exists (select 1 from public.mp_cuentas c where c.negocio_id = x.id and not c.reconectar and not c.real)
+         then 'prueba' end], null)
+  from public.negocios x where x.id = n
+$$;
 create or replace function public.en_la_lista(n uuid) returns boolean
 language sql stable set search_path = '' as $$
-  select not (public.pide_sena(n)
-              and exists (select 1 from public.mp_cuentas c where c.negocio_id = n and not c.reconectar and not c.real))
+  select coalesce(cardinality(public.lista_faltan(n)) = 0, false)
 $$;
 
 -- Los turnos que nadie pagó a tiempo: se cancelan y salen de la agenda del negocio (el horario queda libre).
@@ -1210,6 +1223,7 @@ revoke all on function public.comision_de(integer) from public, anon, authentica
 revoke all on function public.bookea_url_funciones() from public, anon, authenticated;
 revoke all on function public.tiene_mercado_pago(uuid) from public, anon, authenticated;
 revoke all on function public.pide_sena(uuid) from public, anon, authenticated;
+revoke all on function public.lista_faltan(uuid) from public, anon, authenticated;
 revoke all on function public.en_la_lista(uuid) from public, anon, authenticated;
 revoke all on function public.vencer_pendientes() from public, anon;
 grant execute on function public.vencer_pendientes() to authenticated;  -- el panel, al abrir la agenda
@@ -1241,8 +1255,9 @@ end $$;
 -- agenda, sin decir de quién son. Nada más: ni el email del dueño, ni su WhatsApp, ni sus clientes.
 --
 -- Cuáles aparecen:
---   · En la lista de la página (inicio y resultados): todos los aprobados que ya tengan canchas y horarios, con
---     Mercado Pago o sin él (sin él, sin seña); menos el que cobra con una cuenta de prueba (en_la_lista, arriba).
+--   · En la lista de la página (inicio y resultados): los aprobados que ya tengan canchas, horarios, ciudad y teléfono,
+--     con Mercado Pago o sin él (sin él, sin seña); no los del equipo de Bookea ni el que cobra con una cuenta de prueba
+--     de Mercado Pago (en_la_lista, arriba).
 --   · Con su link (bookea.ar/su-link): cualquiera aprobado que ya tenga canchas y horarios, para que el dueño se vea
 --     y lo pruebe.
 -- Los turnos: reservar_turno los pone también en la agenda del negocio (reservas). Si el cliente cancela, el horario

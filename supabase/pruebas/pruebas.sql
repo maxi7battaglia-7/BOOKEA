@@ -1370,6 +1370,28 @@ reset role;
 -- vuelve como estaba: pide seña y sin Mercado Pago
 update public.negocios set ajustes = ajustes || '{"senaPct": 25}' where id = current_setting('prueba.neg_eva')::uuid;
 delete from public.mp_cuentas where negocio_id = current_setting('prueba.neg_eva')::uuid;
+-- Para estar en la lista (pedido del dueño, 27/11): ciudad y teléfono "sí o sí", y no las cuentas del equipo de Bookea.
+-- Con su link se abre igual.
+do $$
+declare n uuid := current_setting('prueba.neg_eva')::uuid; c text; w text;
+begin
+  select ciudad, whatsapp into c, w from public.negocios where id = n;
+  assert public.en_la_lista(n) and public.lista_faltan(n) = '{}'::text[], 'con todo, debería estar en la lista: ' || public.lista_faltan(n)::text;
+  update public.negocios set ciudad = '  ' where id = n;
+  assert not public.en_la_lista(n) and public.lista_faltan(n) = array['ciudad'], 'sin ciudad: ' || public.lista_faltan(n)::text;
+  update public.negocios set ciudad = c, whatsapp = '261 55-1' where id = n;
+  assert not public.en_la_lista(n) and public.lista_faltan(n) = array['telefono'], 'teléfono corto: ' || public.lista_faltan(n)::text;
+  update public.negocios set whatsapp = '' where id = n;
+  assert not public.en_la_lista(n), 'sin teléfono estuvo en la lista';
+  update public.negocios set whatsapp = w where id = n;
+  insert into public.admins_bookea (user_id) values (current_setting('prueba.eva')::uuid);
+  assert not public.en_la_lista(n) and public.lista_faltan(n) = array['equipo'], 'dueño del equipo de Bookea: ' || public.lista_faltan(n)::text;
+  assert jsonb_array_length(public.lugares_publicos()) = 0 and jsonb_array_length(public.lugares_publicos('canchaeva')) = 1,
+    'fuera de la lista tiene que abrirse igual con su link';
+  delete from public.admins_bookea where user_id = current_setting('prueba.eva')::uuid;
+  assert public.en_la_lista(n), 'no volvió a la lista';
+  raise notice 'OK  la lista pide ciudad y teléfono (al menos 8 números) y deja afuera las cuentas del equipo de Bookea; con el link se abre igual';
+end $$;
 create or replace function public.bookea_comision_pct() returns numeric language sql immutable as $$ select 0::numeric $$;
 
 \echo 'Todas las pruebas del esquema pasaron.'

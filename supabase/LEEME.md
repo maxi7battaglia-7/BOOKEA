@@ -149,8 +149,10 @@ nombres, emails ni teléfonos.
 
 - **Dónde aparece:** con su link, `bookea.ar/su-link` (el que ve en Mi negocio; `../404.html` lo lleva a
   `bookea.ar/?lugar=su-link`). En la lista de la página (inicio y resultados) aparece apenas lo aprobás y tiene
-  canchas y horarios, con Mercado Pago o sin él (pedido del dueño, 27/11); sin Mercado Pago, sus turnos van sin seña.
-  La única excepción: si cobra la seña con una cuenta de **prueba** de Mercado Pago, solo con su link (`en_la_lista()`).
+  canchas, horarios, **ciudad y teléfono** (el WhatsApp de Mi negocio, con 8 números o más), con Mercado Pago o sin él
+  (pedido del dueño, 27/11); sin Mercado Pago, sus turnos van sin seña. No aparecen los negocios cuyo dueño es del
+  equipo de Bookea (`admins_bookea`) ni el que cobra con una cuenta de **prueba** de Mercado Pago: esos, solo con su link
+  (`lista_faltan()` dice qué le falta; `en_la_lista()`). En el panel, "Así te ven" lo dice debajo del título.
 - **Al reservar:** la base arma el turno con los datos del negocio (no con lo que manda la página): controla que la
   cancha exista, que el horario sea uno de los suyos y que esté libre, y calcula el precio y la seña. El turno entra
   en su agenda como "por el link", con el nombre y el celular del cliente. Si el negocio no cobra con Mercado Pago,
