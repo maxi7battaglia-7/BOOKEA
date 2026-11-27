@@ -266,7 +266,16 @@ aparece en la lista (`en_la_lista()`). De esos turnos Bookea no cobra comisión:
 
 ### Probarlo sin plata de verdad
 
-En Mercado Pago → Tus integraciones → BOOKEA → **Cuentas de prueba**, creá dos: un **vendedor** y un **comprador**.
+**Antes de probar:** en Supabase → Edge Functions → Secrets, agregá `MP_TEST_TOKEN` con el valor `true`. Así, al
+conectar, la función le pide a Mercado Pago **llaves de prueba** (`test_token`); sin eso, un vendedor de prueba recibe
+llaves de producción y Mercado Pago rechaza las tarjetas de prueba con "No pudimos procesar tu pago" (pasó el 27/11).
+Si el vendedor de prueba ya estaba conectado, desconectalo y conectalo de nuevo. **Antes de cobrar de verdad, borrá
+`MP_TEST_TOKEN`** (y que cada negocio conecte su cuenta real): con ese secreto, todas las conexiones son de prueba.
+
+En Mercado Pago → Tus integraciones → BOOKEA → **Cuentas de prueba**, creá dos: un **vendedor** y un **comprador**
+(Mercado Pago ya trae uno de cada uno). Para pagar no hace falta el comprador: se paga sin iniciar sesión, con una
+tarjeta de prueba y un email inventado. Con un vendedor de prueba, el cobro va sin el mail del cliente
+(`mp_datos_cobro`): en modo prueba, Mercado Pago rechaza un mail real.
 
 1. En una ventana de incógnito, entrá a mercadopago.com.ar con el **vendedor de prueba**. En otra pestaña de esa
    misma ventana, entrá al panel (bookea.ar/admin.html) con un negocio aprobado y tocá **Conectar Mercado Pago**: el
