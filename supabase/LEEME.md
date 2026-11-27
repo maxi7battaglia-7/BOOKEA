@@ -294,6 +294,10 @@ bien (Mercado Pago rechaza al crearla lo que esté mal armado, y las órdenes se
    lleva un mail de prueba (`test_user_bookea@testuser.com`), nunca el del cliente.
 5. Al terminar, volvé a poner los secretos de BOOKEA.
 
+**Probado de punta a punta el 27/11 con cuentas reales, sin comisión:** el cliente pagó la seña, volvió con el turno
+confirmado, llegaron los dos mails, y al cancelarlo desde Mis turnos la seña se devolvió sola ("Devuelto" en el
+Mercado Pago del negocio) y llegó el mail de cancelación.
+
 **Lo que se encontró (27/11, con cuentas reales):** el pago anduvo **sin comisión**; **con** `marketplace_fee` Mercado
 Pago muestra "No pudimos procesar tu pago" y no registra ningún pago (`pagos = []`). Por eso `bookea_comision_pct()`
 va en 0 hasta pasar el cobro a **Preferences** (`/checkout/preferences` con `marketplace_fee`), la forma que Mercado Pago
