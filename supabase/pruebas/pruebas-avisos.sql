@@ -268,8 +268,8 @@ do $$ begin
   assert (select estado from public.turnos where id = current_setting('prueba.turno_mp')::uuid) = 'pendiente', 'el turno no quedó esperando el pago';
   assert (select count(*) from net.enviados) = current_setting('prueba.mails_antes')::int, 'salió un mail de un turno que todavía no se pagó';
 end $$;
-select public.mp_cobro_creado(current_setting('prueba.turno_mp')::uuid, 'ORDTSTM1', 'https://x', 7000, 0) \g /dev/null
-select public.mp_resultado('ORDTSTM1', 'processed', 'accredited', 7000) \g /dev/null
+select public.mp_cobro_creado(current_setting('prueba.turno_mp')::uuid, 'bk-prueba-m1', 'https://x', 7000, 0) \g /dev/null
+select public.mp_resultado('bk-prueba-m1', '201', 'approved', 'accredited', 7000) \g /dev/null
 do $$
 declare e record;
 begin
@@ -295,7 +295,7 @@ begin
   select * into e from net.enviados where body -> 'to' ->> 0 = 'martin@prueba.com' order by id desc limit 1;
   assert e.body ->> 'html' like '%se le devuelve sola por Mercado Pago, desde tu cuenta.%', 'al negocio, cancelado: ' || (e.body ->> 'html');
   assert exists (select 1 from net.enviados where url = 'https://vpxzuutavdjwglglbvdt.supabase.co/functions/v1/mp/devolver'), 'no se le avisó a la función que devuelva la seña';
-  assert (select devolucion from public.mp_cobros where orden = 'ORDTSTM1') = 'pendiente', 'la seña no quedó para devolver';
+  assert (select devolucion from public.mp_cobros where orden = 'bk-prueba-m1') = 'pendiente', 'la seña no quedó para devolver';
   raise notice 'OK  con Mercado Pago, al cancelar con tiempo los mails dicen que la seña vuelve por Mercado Pago y se le avisa a la función';
 end $$;
 -- Sin seña (27/11): con la seña en 0 %, los mails dicen "Sin seña" y nada de "en prueba" ni de devolver la seña

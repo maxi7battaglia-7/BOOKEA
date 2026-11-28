@@ -214,15 +214,16 @@
         });
       },
       // Pagar la seña con Mercado Pago: la función arma el cobro con la cuenta del negocio y devuelve adónde ir.
-      // Con revisar, le pregunta a Mercado Pago si ya se pagó (al volver de pagar). Devuelve el estado del turno.
-      cobrar(id, revisar) {
+      // Con revisar, le pregunta a Mercado Pago si ya se pagó (al volver de pagar, con el id del pago que trae la
+      // dirección; la función lo comprueba con Mercado Pago). Devuelve el estado del turno.
+      cobrar(id, revisar, pago) {
         return conLibreria(async () => {
           const { data } = await sb.auth.getSession();
           const s = data && data.session;
           if (!s) return { ok: false, error: "sesion" };
           try {
             const r = await fetch(`${supabaseUrl.replace(/\/$/, "")}/functions/v1/mp/cobrar`, {
-              method: "POST", body: JSON.stringify({ turno: id, revisar: !!revisar }),
+              method: "POST", body: JSON.stringify({ turno: id, revisar: !!revisar, ...(/^[0-9]{1,24}$/.test(String(pago || "")) ? { pago: String(pago) } : {}) }),
               headers: { Authorization: `Bearer ${s.access_token}`, apikey: supabaseAnonKey, "Content-Type": "application/json" },
             });
             const d = await r.json().catch(() => ({}));

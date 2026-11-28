@@ -1,13 +1,17 @@
 // Bookea — función "mp" de Supabase (Edge Function, Deno): cada negocio cobra la seña de sus turnos con su propia
-// cuenta de Mercado Pago (Checkout Pro, con la API de Orders), y Bookea se queda con su comisión.
+// cuenta de Mercado Pago (Checkout Pro con preferencias, la forma que Mercado Pago documenta para marketplaces), y
+// Bookea se queda con su comisión (marketplace_fee). Hasta el 28/11 era con la API de Orders, pero ahí un cobro con
+// comisión no se podía pagar (ver supabase/LEEME.md, "Probarlo").
 //
 // Rutas (https://<proyecto>.supabase.co/functions/v1/mp/…):
 //   POST /mp/conectar  el panel, con la sesión del dueño: { negocio } → { url } de Mercado Pago para darle permiso a Bookea
 //   GET  /mp/oauth     Mercado Pago vuelve acá con el permiso: guarda las llaves del negocio (en Vault) y vuelve al panel
 //   POST /mp/cobrar    la página, con la sesión del cliente: { turno } → { url } para pagar la seña en Mercado Pago;
-//                      con { turno, revisar: true } → { estado }: le pregunta a Mercado Pago si ya se pagó
-//   POST /mp/avisos    los avisos de Mercado Pago (webhook, firmado con la clave secreta)
+//                      con { turno, revisar: true, pago? } → { estado }: le pregunta a Mercado Pago si ya se pagó
+//                      ("pago" es el payment_id con el que vuelve de Mercado Pago; igual se comprueba con Mercado Pago)
+//   POST /mp/avisos    los avisos de Mercado Pago (webhook del evento "Pagos", firmado con la clave secreta)
 //   POST /mp/devolver  la base avisa que hay señas para devolver (no lleva nada: mira la cola en la base)
+//   POST /mp/revisar   pg_cron, cada 5 minutos: repasa los cobros abiertos, por si el aviso de un pago no llegó
 //   POST /mp/renovar   pg_cron, una vez por día: renueva las llaves que están por vencer
 //
 // Nunca le cree al navegador: el monto, la comisión y la cuenta del negocio salen de la base, y lo que pasó con cada
@@ -51,7 +55,10 @@ class Falla extends Error {
 
 const esUuid = (x: unknown): boolean => typeof x === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(x);
 const esOrden = (x: unknown): boolean => typeof x === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(x);
+const esPago = (x: unknown): boolean => /^[0-9]{1,24}$/.test(String(x ?? ""));
 const pesos = (n: number): string => `${Math.round(n)}.00`;
+// Una fecha como la pide Mercado Pago, con la hora de Argentina: 2026-11-28T12:00:00.000-03:00
+const fechaMP = (ms: number): string => new Date(ms - 3 * 3600e3).toISOString().replace("Z", "-03:00");
 const numero = (x: unknown): number | null => (x === null || x === undefined || x === "" ? null : Number.isFinite(+x) ? +x : null);
 // La dirección para pagar tiene que ser de Mercado Pago (nunca se manda al cliente a otro lado)
 const esDeMercadoPago = (u: unknown): boolean => {
@@ -156,39 +163,57 @@ async function renovar(negocio: string, ll: Datos): Promise<Datos> {
   throw new Falla("mercado-pago", 502);
 }
 
-// Lo que dice Mercado Pago de un cobro, anotado en la base
-async function consultar(llave: string, orden: string, turno?: string): Promise<Datos | null> {
-  const o = await mp(llave, "GET", `/v1/orders/${encodeURIComponent(orden)}`);
-  if (!o.ok) {
-    console.error(`mp: no se pudo consultar el cobro ${orden}: ${o.estado}`);
-    return null;
-  }
-  if (o.d.id && o.d.id !== orden) return null;
-  if (turno && o.d.external_reference && o.d.external_reference !== turno) {
+// Lo que dice Mercado Pago de un cobro, anotado en la base: sus pagos (los que tienen su referencia; "extra" son pagos
+// que ya se trajeron por su id, por si la búsqueda de Mercado Pago todavía no los muestra) y qué pasó con cada uno
+async function consultar(llave: string, orden: string, turno?: string, extra: Datos[] = []): Promise<Datos | null> {
+  // Primero, que sea un cobro de Bookea y de ese turno (sin pago, mp_resultado solo dice cómo está)
+  let r: Datos = (await base("mp_resultado", { orden, pago: "", estado: "", detalle: "", pagado: null })) || {};
+  if (r.accion === "desconocido") return null;
+  if (turno && r.turno && r.turno !== turno) {
     console.error(`mp: el cobro ${orden} no es del turno que dice la base`);
     return null;
   }
+  const q = new URLSearchParams({ external_reference: orden, sort: "date_created", criteria: "asc", limit: "30" });
+  const b = await mp(llave, "GET", `/v1/payments/search?${q}`);
+  if (!b.ok) console.error(`mp: no se pudieron buscar los pagos del cobro ${orden}: ${b.estado}`);
+  if (!b.ok && !extra.length) return null;
+  const todos = new Map<string, Datos>();
+  for (const p of [...(b.ok && Array.isArray(b.d.results) ? b.d.results : []), ...extra]) {
+    if (p && esPago(p.id) && p.external_reference === orden) todos.set(String(p.id), p);
+  }
+  const lista = [...todos.values()];
   // Cada intento de pago, con su motivo (status_detail): lo que Mercado Pago no le dice al cliente ("No pudimos procesar
   // tu pago"). Queda en los Logs de la función y en mp_cobros.pagos (pedido del dueño, 27/11: saber por qué no se cobra).
-  const pagos = resumenPagos(o.d);
-  console.log(`mp: cobro ${orden}: ${o.d.status || "?"}/${o.d.status_detail || ""} · pagos ${JSON.stringify(pagos)}`
-    + `${o.d.marketplace_fee ? ` · comisión ${o.d.marketplace_fee}` : " · sin comisión"}${o.d.payer && o.d.payer.email ? " · con mail" : " · sin mail"}`);
+  const pagos = resumenPagos(lista);
+  if (lista.length) console.log(`mp: cobro ${orden}: pagos ${JSON.stringify(pagos)}`);
   try {
-    await base("mp_anotar_pagos", { orden, pagos });
+    if (lista.length) await base("mp_anotar_pagos", { orden, pagos });
   } catch (e) {
     console.error(`mp: no se pudieron anotar los pagos del cobro ${orden}: ${(e as Error).message}`);
   }
-  const r = await base("mp_resultado", { orden, estado: String(o.d.status || ""), detalle: String(o.d.status_detail || ""), pagado: numero(o.d.total_paid_amount) });
-  return { ...(r || {}), status: o.d.status };
+  // Primero los acreditados (así un cobro pagado y otro rechazado del mismo link quedan bien), después los demás
+  const prioridad = (p: Datos) => (p.status === "approved" ? 0 : p.status === "refunded" ? 1 : 2);
+  const acciones = new Set<string>();
+  for (const p of lista.sort((a, c) => prioridad(a) - prioridad(c))) {
+    r = (await base("mp_resultado", { orden, pago: String(p.id), estado: String(p.status || ""), detalle: String(p.status_detail || ""),
+      pagado: numero(p.transaction_amount) })) || {};
+    acciones.add(String(r.accion || ""));
+  }
+  const accion = ["confirmado", "devolver", "devuelto", "rechazado"].find((a) => acciones.has(a)) || "nada";
+  return { ...r, accion };
 }
-// Los intentos de pago de un cobro (transactions.payments de la API de Orders), sin datos de nadie
-function resumenPagos(o: Datos): Datos[] {
-  const lista = o && o.transactions && Array.isArray(o.transactions.payments) ? o.transactions.payments : [];
+// Los intentos de pago de un cobro, sin datos de nadie (ni la tarjeta ni el que paga)
+function resumenPagos(lista: Datos[]): Datos[] {
   const t = (v: unknown, n: number) => String(v ?? "").slice(0, n);
-  return lista.slice(0, 10).map((p: Datos) => ({
-    id: t(p.id, 40), estado: t(p.status, 40), detalle: t(p.status_detail, 60),
-    medio: t(p.payment_method && p.payment_method.id, 30), tipo: t(p.payment_method && p.payment_method.type, 30), monto: t(p.amount, 20),
-  }));
+  return lista.slice(0, 10).map((p: Datos) => {
+    const fee = Array.isArray(p.fee_details) ? p.fee_details.find((f: Datos) => f && f.type === "application_fee") : null;
+    return { id: t(p.id, 40), estado: t(p.status, 40), detalle: t(p.status_detail, 60), medio: t(p.payment_method_id, 30),
+      tipo: t(p.payment_type_id, 30), monto: t(p.transaction_amount, 20), comision: t(fee && fee.amount, 20) };
+  });
+}
+// Un pago por su id, con las llaves del negocio (404 si no es de esa cuenta)
+async function pagoDe(llave: string, id: string): Promise<{ ok: boolean; estado: number; d: Datos }> {
+  return await mp(llave, "GET", `/v1/payments/${encodeURIComponent(id)}`);
 }
 
 // ---------- Rutas ----------
@@ -238,14 +263,20 @@ async function cobrar(req: Request): Promise<Datos> {
   const abiertos: Datos[] = Array.isArray(d.abiertos) ? d.abiertos : [];
   let ll: Datos | null = null;
   let reusar = "";
-  // Primero, los cobros que ya tiene: si alguno se pagó, el turno queda confirmado; si sigue abierto, se usa ese
+  // Primero, los cobros que ya tiene: si alguno se pagó, el turno queda confirmado; si sigue abierto, se usa ese link
   if (abiertos.length && d.negocio) {
     ll = await llavesDe(d.negocio);
+    // Volvió de Mercado Pago con el id del pago: se trae directo (la búsqueda puede tardar unos segundos en mostrarlo)
+    let vuelto: Datos | null = null;
+    if (esPago(b.pago)) {
+      const p = await pagoDe(ll.llave, String(b.pago));
+      if (p.ok && esPago(p.d.id)) vuelto = p.d;
+    }
     for (const a of abiertos) {
       if (!esOrden(a.orden)) continue;
-      const r = await consultar(ll.llave, a.orden, d.turno);
+      const r = await consultar(ll.llave, a.orden, d.turno, vuelto && vuelto.external_reference === a.orden ? [vuelto] : []);
       if (r && r.estado) estado = String(r.estado);
-      if (!reusar && r && (r.status === "created" || r.status === "action_required") && esDeMercadoPago(a.url)) reusar = a.url;
+      if (!reusar && r && r.cobro === "creado" && esDeMercadoPago(a.url)) reusar = a.url;
     }
   }
   if (b.revisar || estado !== "pendiente") return { estado };
@@ -253,28 +284,32 @@ async function cobrar(req: Request): Promise<Datos> {
   if (!(d.minutos >= 3)) throw new Falla("vencido", 409);
   if (reusar) return { estado, url: reusar };
   ll = ll || (await llavesDe(d.negocio));
-  const monto = pesos(+d.monto), titulo = String(d.titulo || "Seña").slice(0, 120);
+  const monto = Math.round(+d.monto), titulo = String(d.titulo || "Seña").slice(0, 120);
+  const orden = `bk-${d.turno}-${d.intento}`; // la referencia del cobro: con esta se buscan después sus pagos
   const volver = (r: string) => `${sitio()}/?pago=${r}&turno=${d.turno}`;
+  const ahora = Date.now();
   const pedido: Datos = {
-    type: "online", processing_mode: "manual", total_amount: monto, external_reference: d.turno,
-    expiration_time: `PT${Math.min(30, d.minutos - 2)}M`, // vence antes que el turno guardado
-    description: titulo,
-    items: [{ title: titulo, unit_price: monto, quantity: 1 }],
-    config: {
-      online: { success_url: volver("ok"), failure_url: volver("error"), pending_url: volver("pendiente"), auto_return: "approved" },
-      payment_method: { not_allowed_types: ["ticket", "atm"], max_installments: 1 }, // sin pagos en efectivo (tardan días)
-    },
+    items: [{ id: `sena-${String(d.codigo || "").slice(0, 20)}`, title: titulo, description: titulo, quantity: 1, unit_price: monto, currency_id: "ARS" }],
+    external_reference: orden,
+    back_urls: { success: volver("ok"), failure: volver("error"), pending: volver("pendiente") },
+    auto_return: "approved",
+    binary_mode: true, // aprobado o rechazado en el momento: el turno no puede quedar días "en proceso"
+    payment_methods: { excluded_payment_types: [{ id: "ticket" }, { id: "atm" }], installments: 1 }, // sin efectivo (tarda días)
+    // el link vence antes que el turno guardado
+    expires: true, expiration_date_from: fechaMP(ahora - 60e3), expiration_date_to: fechaMP(ahora + Math.min(30, d.minutos - 2) * 60e3),
   };
   if (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(d.email || ""))) pedido.payer = { email: d.email };
-  const comision = +d.comision > 0 && +d.comision < +d.monto ? +d.comision : 0;
-  if (comision) pedido.marketplace_fee = pesos(comision);
-  const o = await mp(ll.llave, "POST", "/v1/orders", pedido, `bookea-${d.turno}-${d.intento}`);
-  if (!o.ok || !esOrden(o.d.id) || !esDeMercadoPago(o.d.checkout_url)) {
+  const comision = +d.comision > 0 && +d.comision < monto ? Math.round(+d.comision) : 0;
+  if (comision) pedido.marketplace_fee = comision; // la parte de Bookea: Mercado Pago la pasa a la cuenta de Bookea
+  const o = await mp(ll.llave, "POST", "/checkout/preferences", pedido, `bookea-${d.turno}-${d.intento}`);
+  if (!o.ok || !o.d.id || !esDeMercadoPago(o.d.init_point)) {
     console.error(`mp: Mercado Pago no armó el cobro del turno ${d.turno}: ${o.estado} ${JSON.stringify(o.d).slice(0, 800)}`);
     throw new Falla("mercado-pago", 502);
   }
-  await base("mp_cobro_creado", { turno: d.turno, orden: o.d.id, url: o.d.checkout_url, monto: +d.monto, comision });
-  return { estado, url: o.d.checkout_url };
+  console.log(`mp: cobro ${orden} armado: preferencia ${o.d.id} · ${comision ? `comisión ${comision}` : "sin comisión"}`
+    + `${o.d.marketplace ? ` · ${o.d.marketplace}` : ""}${o.d.marketplace_fee !== undefined ? ` (Mercado Pago dice ${o.d.marketplace_fee})` : ""}`);
+  await base("mp_cobro_creado", { turno: d.turno, orden, url: o.d.init_point, monto, comision });
+  return { estado, url: o.d.init_point };
 }
 
 // El aviso de Mercado Pago: x-signature = "ts=…,v1=…", HMAC-SHA256 de "id:<data.id>;request-id:<x-request-id>;ts:<ts>;"
@@ -309,16 +344,46 @@ async function aviso(req: Request): Promise<Datos> {
     console.warn(`mp: aviso con una firma que no coincide (cobro ${id || "?"}): ¿MP_WEBHOOK_SECRET es la firma secreta de esta aplicación?`);
     throw new Falla("firma", 401);
   }
-  console.log(`mp: aviso de Mercado Pago: ${b.action || tipo || "?"} ${id}${b.live_mode !== undefined ? ` · live_mode ${b.live_mode}` : ""}`);
-  if (!secreto) console.error("mp: falta MP_WEBHOOK_SECRET: el aviso no se puede comprobar (igual se consulta a Mercado Pago)");
-  if (tipo !== "order" || !esOrden(id)) return { ok: true, ignorado: true };
-  const k = await base("mp_cobro", { orden: id });
-  if (!k || !k.negocio) return { ok: true, ignorado: true }; // no es un cobro de Bookea (o es un aviso de prueba)
-  const ll = await llavesDe(k.negocio);
-  const r = await consultar(ll.llave, id, k.turno || undefined);
-  if (!r) throw new Falla("mercado-pago", 502); // Mercado Pago lo vuelve a mandar
+  console.log(`mp: aviso de Mercado Pago: ${b.action || tipo || "?"} ${id} · cuenta ${b.user_id ?? "?"}${b.live_mode !== undefined ? ` · live_mode ${b.live_mode}` : ""}`);
+  if (!secreto) console.error("mp: falta la firma secreta de los avisos: el aviso no se puede comprobar (igual se consulta a Mercado Pago)");
+  if (tipo !== "payment" || !esPago(id)) return { ok: true, ignorado: true }; // otros eventos (o el de prueba del panel)
+  // De qué negocio es: el aviso dice de qué cuenta de Mercado Pago es el pago; el pago se le pide a Mercado Pago con sus
+  // llaves (si el aviso mintiera la cuenta, Mercado Pago no lo encuentra) y su referencia dice qué cobro es
+  const usuario = String(b.user_id ?? "");
+  const negocios: string[] = /^[0-9]{1,20}$/.test(usuario) ? (await base("mp_negocios_de_cuenta", { usuario })) || [] : [];
+  if (!negocios.length) return { ok: true, ignorado: true }; // no es de un negocio de Bookea (igual se repasa cada 5 minutos)
+  const ll = await llavesDe(negocios[0]);
+  const p = await pagoDe(ll.llave, id);
+  if (p.estado === 404) return { ok: true, ignorado: true };
+  if (!p.ok) throw new Falla("mercado-pago", 502); // Mercado Pago lo vuelve a mandar
+  const k = esOrden(p.d.external_reference) ? await base("mp_cobro", { orden: p.d.external_reference }) : null;
+  if (!k || !k.negocio || !negocios.includes(k.negocio)) return { ok: true, ignorado: true }; // no es un cobro de Bookea
+  const llk = k.negocio === negocios[0] ? ll : await llavesDe(k.negocio);
+  const r = await consultar(llk.llave, k.orden, k.turno || undefined, [p.d]);
+  if (!r) throw new Falla("mercado-pago", 502);
   if (r.accion === "devolver") await devolver();
   return { ok: true, accion: r.accion };
+}
+
+// Cada 5 minutos (pg_cron): los cobros abiertos de las últimas 2 horas se le preguntan a Mercado Pago. Si el aviso de un
+// pago no llegó (o el cliente cerró la página antes de volver), el turno se confirma igual, o la seña se devuelve.
+async function revisar(): Promise<Datos> {
+  const lista = await base("mp_por_revisar", {});
+  const llaves = new Map<string, Datos>();
+  let n = 0, devolverAlgo = false;
+  for (const k of Array.isArray(lista) ? lista : []) {
+    if (!esOrden(k.orden) || !esUuid(k.negocio)) continue;
+    try {
+      if (!llaves.has(k.negocio)) llaves.set(k.negocio, await llavesDe(k.negocio));
+      const r = await consultar((llaves.get(k.negocio) as Datos).llave, k.orden, k.turno || undefined);
+      if (r) n++;
+      if (r && r.accion === "devolver") devolverAlgo = true;
+    } catch (e) {
+      console.error(`mp: no se pudo revisar el cobro ${k.orden}: ${(e as Error).message}`);
+    }
+  }
+  if (devolverAlgo) await devolver();
+  return { ok: true, revisados: n };
 }
 
 // Devolver las señas de la cola (lo decidió la base: un turno pagado que se canceló con tiempo, o un pago de más)
@@ -331,9 +396,19 @@ async function devolver(): Promise<Datos> {
     try {
       if (!esUuid(k.negocio)) throw new Falla("sin-cuenta", 409);
       const ll = await llavesDe(k.negocio);
-      const r = await mp(ll.llave, "POST", `/v1/orders/${encodeURIComponent(k.orden)}/refund`, undefined, `bookea-devolver-${k.orden}`);
-      hecha = r.ok;
-      detalle = r.ok ? String(r.d.status || "refunded") : `${r.estado} ${r.d.message || r.d.error || ""}`;
+      if (esPago(k.pago)) { // la devolución entera del pago que se acreditó
+        const r = await mp(ll.llave, "POST", `/v1/payments/${k.pago}/refunds`, {}, `bookea-devolver-${k.orden}`);
+        hecha = r.ok;
+        detalle = r.ok ? `devuelto ${r.d.id || ""} ${r.d.status || ""}`.trim() : `${r.estado} ${r.d.message || r.d.error || ""}`;
+        if (!hecha) { // ¿ya estaba devuelto (por ejemplo, desde Mercado Pago)?
+          const p = await pagoDe(ll.llave, k.pago);
+          if (p.ok && p.d.status === "refunded") { hecha = true; detalle = "ya estaba devuelto"; }
+        }
+      } else if (/^ORD/.test(k.orden)) { // un cobro de antes del 28/11 (API de Orders)
+        const r = await mp(ll.llave, "POST", `/v1/orders/${encodeURIComponent(k.orden)}/refund`, undefined, `bookea-devolver-${k.orden}`);
+        hecha = r.ok;
+        detalle = r.ok ? String(r.d.status || "refunded") : `${r.estado} ${r.d.message || r.d.error || ""}`;
+      } else throw new Falla("sin-pago", 409);
     } catch (e) {
       detalle = e instanceof Falla ? e.codigo : String((e && (e as Error).message) || e);
     }
@@ -366,6 +441,7 @@ export async function atender(req: Request): Promise<Response> {
     if (ruta === "cobrar") return responder(req, await cobrar(req));
     if (ruta === "avisos") return responder(req, await aviso(req));
     if (ruta === "devolver") return responder(req, await devolver());
+    if (ruta === "revisar") return responder(req, await revisar());
     if (ruta === "renovar") return responder(req, await renovarTodas());
     return responder(req, { error: "ruta" }, 404);
   } catch (e) {

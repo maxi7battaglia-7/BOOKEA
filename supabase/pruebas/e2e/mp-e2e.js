@@ -1,7 +1,8 @@
 // Prueba de punta a punta del cobro de señas con Mercado Pago: la función "mp" (supabase/functions/mp/index.ts) tal cual
 // se publica, contra el Postgres local con supabase/esquema.sql y un Mercado Pago de juguete (mp-falso.js).
-// Conectar la cuenta (PKCE), cobrar la seña con la comisión, el aviso firmado, pagos rechazados y tardíos,
-// devoluciones (y sin saldo), renovar las llaves y reconectar. Uso: node supabase/pruebas/e2e/mp-e2e.js
+// Conectar la cuenta (PKCE), cobrar la seña con la comisión (preferencia de Checkout Pro), el aviso firmado del pago,
+// la vuelta con el id del pago, el repaso de cada 5 minutos, pagos rechazados, tardíos y dobles, devoluciones (y sin
+// saldo, y ya devueltas desde Mercado Pago), renovar las llaves y reconectar. Uso: node supabase/pruebas/e2e/mp-e2e.js
 const { spawn, execFileSync } = require('child_process');
 const AQUI = __dirname, B = 'http://localhost:8787';
 const ok = (c, m) => { console.log((c ? 'OK  ' : 'FALLA ') + m); if (!c) process.exitCode = 1; };
@@ -78,72 +79,112 @@ const conectar = async (token, negocio, cambiar) => {
     ok(panel.data && panel.data.conectado && panel.data.cuenta === '4242' && !JSON.stringify(panel.data).includes('PRUEBA_'), 'el panel ve la cuenta conectada, sin las llaves');
 
     // ---------- Cobrar la seña ----------
+    const cobro = async (t) => sql(`select row_to_json(k) from mp_cobros k where k.orden = 'bk-${t.id}-0'`);
+    const prefDe = async (t, n = 0) => (await mp()).prefs.filter((x) => x.external_reference === `bk-${t.id}-${n}`)[0];
+    const estadoDe = async (t) => sql(`select to_json(estado) from turnos where id = '${t.id}'`);
     const t1 = await reservar(20 * 60);
     ok(t1 && t1.estado === 'pendiente' && t1.sena === 12500 && t1.comision === 1250, 'Juli reserva: el turno espera el pago (seña $ 12.500, comisión $ 1.250)');
     ok((await fn('cobrar', { cuerpo: { turno: t1.id } })).estado === 401, 'cobrar: sin sesión, no');
     ok((await fn('cobrar', { token: ana, cuerpo: { turno: t1.id } })).estado === 404, 'cobrar: nadie más que el cliente cobra su turno');
     const c1 = await fn('cobrar', { token: juli, cuerpo: { turno: t1.id } });
     let est = await mp();
-    const o1 = est.ordenes[0], p1 = est.pedidos.find((p) => p.ruta === '/mp-api/v1/orders');
-    ok(c1.estado === 200 && c1.d.url === o1.checkout_url && /^https:\/\/www\.mercadopago\.com\.ar\//.test(c1.d.url), 'cobrar: devuelve la dirección de Mercado Pago para pagar');
-    ok(o1.total_amount === '12500.00' && o1.marketplace_fee === '1250.00' && o1.external_reference === t1.id && o1.items[0].unit_price === '12500.00'
-      && /^Seña · Cancha Ana · /.test(o1.items[0].title) && o1.payer.email === 'juli@prueba.com', 'el cobro sale de la base: la seña, la comisión de Bookea y el turno');
-    ok(/^PT1[5-8]M$/.test(o1.expiration_time) && o1.config.online.success_url === `${B}/?pago=ok&turno=${t1.id}` && o1.config.online.auto_return === 'approved'
-      && o1.config.payment_method.not_allowed_types.join() === 'ticket,atm', 'el cobro vence antes que el turno, vuelve a la página y no acepta pagos en efectivo');
+    const o1 = est.prefs[0], p1 = est.pedidos.find((p) => p.ruta === '/mp-api/checkout/preferences');
+    ok(c1.estado === 200 && c1.d.url === o1.init_point && /^https:\/\/www\.mercadopago\.com\.ar\//.test(c1.d.url), 'cobrar: devuelve la dirección de Mercado Pago para pagar (la preferencia)');
+    ok(o1.items[0].unit_price === 12500 && o1.marketplace_fee === 1250 && o1.external_reference === `bk-${t1.id}-0` && o1.items[0].currency_id === 'ARS'
+      && /^Seña · Cancha Ana · /.test(o1.items[0].title) && o1.payer.email === 'juli@prueba.com' && p1.cuerpo.marketplace === undefined,
+      'el cobro sale de la base: la seña, la comisión de Bookea (marketplace_fee) y la referencia del turno');
+    const dura = (Date.parse(o1.expiration_date_to) - Date.now()) / 60e3;
+    ok(o1.expires && dura > 14 && dura < 18.5 && o1.back_urls.success === `${B}/?pago=ok&turno=${t1.id}` && o1.auto_return === 'approved' && o1.binary_mode === true
+      && o1.payment_methods.excluded_payment_types.map((x) => x.id).join() === 'ticket,atm' && o1.payment_methods.installments === 1,
+      'el link vence antes que el turno, vuelve a la página, se aprueba o rechaza en el momento y no acepta pagos en efectivo');
     ok(p1.idem === `bookea-${t1.id}-0` && p1.llave.startsWith('PRUEBA_LLAVE_1'), 'el cobro se arma con la cuenta del negocio y una clave para no repetirlo');
     const c1b = await fn('cobrar', { token: juli, cuerpo: { turno: t1.id } });
-    ok(c1b.d.url === c1.d.url && (await mp()).ordenes.length === 1, 'si vuelve a tocar "Pagar", usa el mismo cobro (no arma dos)');
+    ok(c1b.d.url === c1.d.url && (await mp()).prefs.length === 1, 'si vuelve a tocar "Pagar", usa el mismo link (no arma dos)');
     ok((await fn('cobrar', { token: juli, cuerpo: { turno: t1.id, revisar: true } })).d.estado === 'pendiente', 'revisar antes de pagar: sigue esperando el pago');
 
-    // ---------- El aviso de Mercado Pago ----------
-    const mala = await mp('/pagar', { orden: o1.id, firma: 'mala' });
-    ok(mala.estado === 401 && (await sql(`select to_json(estado) from turnos where id = '${t1.id}'`)) === 'pendiente', 'un aviso mal firmado no confirma nada');
-    const buena = await mp('/avisar', { orden: o1.id });
-    ok(buena.estado === 200 && buena.cuerpo.accion === 'confirmado', 'el aviso firmado: la función le pregunta a Mercado Pago y el turno queda confirmado');
+    // ---------- El aviso de Mercado Pago (evento "Pagos") ----------
+    const mala = await mp('/pagar', { pref: o1.id, firma: 'mala' });
+    ok(mala.estado === 401 && (await estadoDe(t1)) === 'pendiente', 'un aviso mal firmado no confirma nada');
+    ok((await mp('/avisar', { pago: mala.pago, usuario: '999' })).cuerpo.ignorado && (await estadoDe(t1)) === 'pendiente',
+      'un aviso de otra cuenta de Mercado Pago se ignora');
+    const buena = await mp('/avisar', { pago: mala.pago });
+    ok(buena.estado === 200 && buena.cuerpo.accion === 'confirmado', 'el aviso firmado: la función le pregunta a Mercado Pago por el pago y el turno queda confirmado');
     const r1 = await sql(`select row_to_json(r) from reservas r join turnos t on t.reserva_id = r.id where t.id = '${t1.id}'`);
     ok(r1.sena === 12500 && /pagada con Mercado Pago/.test(r1.nota) && (await sql(`select to_json(pago) from turnos where id = '${t1.id}'`)) === 'aprobado', 'la seña pagada aparece en la agenda del negocio');
-    ok((await mp('/avisar', { orden: o1.id })).cuerpo.accion === 'nada', 'si Mercado Pago avisa dos veces, no pasa nada más');
+    const k1 = await cobro(t1);
+    ok(k1.estado === 'aprobado' && k1.pago === mala.pago && k1.pagos[0].comision === '1250', 'el cobro queda aprobado con el pago y la comisión de Bookea que dice Mercado Pago');
+    ok((await mp('/avisar', { pago: mala.pago })).cuerpo.accion === 'nada', 'si Mercado Pago avisa dos veces, no pasa nada más');
     ok((await fn('cobrar', { token: juli, cuerpo: { turno: t1.id, revisar: true } })).d.estado === 'confirmado', 'al volver de Mercado Pago, la página ve el turno confirmado');
-    ok((await fn('cobrar', { token: juli, cuerpo: { turno: t1.id } })).d.estado === 'confirmado' && (await mp()).ordenes.length === 1, 'un turno ya pagado no se vuelve a cobrar');
-    ok((await mp('/avisar', { orden: 'ORDTST01NOESDEBOOKEA' })).cuerpo.ignorado, 'un aviso de un cobro que no es de Bookea se ignora');
+    ok((await fn('cobrar', { token: juli, cuerpo: { turno: t1.id } })).d.estado === 'confirmado' && (await mp()).prefs.length === 1, 'un turno ya pagado no se vuelve a cobrar');
+    ok((await mp('/avisar', { pago: '999999' })).cuerpo.ignorado && (await mp('/avisar', { pago: mala.pago, tipo: 'merchant_order' })).cuerpo.ignorado,
+      'un aviso de un pago que no es de Bookea, o de otro evento, se ignora');
 
-    // Sin aviso (el webhook tarda): al volver, "revisar" le pregunta a Mercado Pago
+    // El mismo link se paga dos veces: el segundo pago se devuelve solo y el turno sigue confirmado
+    const doble = await mp('/pagar', { pref: o1.id });
+    const kd = await sql(`select row_to_json(k) from mp_cobros k where k.pago = '${doble.pago}'`);
+    ok(doble.cuerpo.accion === 'devolver' && kd && kd.orden === `bk-${t1.id}-0-${doble.pago}` && kd.devolucion === 'hecha'
+      && (await mp()).pagos.find((x) => String(x.id) === doble.pago).status === 'refunded' && (await estadoDe(t1)) === 'confirmado'
+      && (await mp()).pagos.find((x) => String(x.id) === mala.pago).status === 'approved', 'si se paga dos veces el mismo link, el segundo pago se devuelve solo');
+
+    // Sin aviso (el webhook tarda): al volver, "revisar" le pregunta a Mercado Pago; con el id del pago, aunque la búsqueda no lo muestre todavía
     const t2 = await reservar(21 * 60);
     const c2 = await fn('cobrar', { token: juli, cuerpo: { turno: t2.id } });
-    const o2 = (await mp()).ordenes.find((o) => o.external_reference === t2.id);
-    await mp('/pagar', { orden: o2.id, avisar: false });
-    ok(c2.estado === 200 && (await fn('cobrar', { token: juli, cuerpo: { turno: t2.id, revisar: true } })).d.estado === 'confirmado',
-      'sin el aviso, al volver de Mercado Pago la función pregunta y el turno queda confirmado');
+    const o2 = await prefDe(t2);
+    await mp('/ajustes', { sinBusqueda: true });
+    const pg2 = await mp('/pagar', { pref: o2.id, avisar: false });
+    ok(c2.estado === 200 && (await fn('cobrar', { token: juli, cuerpo: { turno: t2.id, revisar: true } })).d.estado === 'pendiente',
+      'sin el aviso y sin que la búsqueda de Mercado Pago lo muestre, sigue esperando');
+    ok((await fn('cobrar', { token: juli, cuerpo: { turno: t2.id, revisar: true, pago: pg2.pago } })).d.estado === 'confirmado'
+      && new URL(pg2.vuelta).searchParams.get('payment_id') === pg2.pago,
+      'al volver de Mercado Pago con el id del pago, la función lo trae y el turno queda confirmado');
+    await mp('/ajustes', { sinBusqueda: false });
+    ok((await fn('cobrar', { token: beto, cuerpo: { turno: t2.id, revisar: true, pago: pg2.pago } })).estado === 404, 'nadie más revisa el turno de Juli');
 
-    // Pago rechazado: puede volver a intentar con otro cobro
+    // El cliente paga y cierra la página (y el aviso no llega): el repaso de cada 5 minutos lo confirma igual
+    const t5 = await reservar(17 * 60);
+    await fn('cobrar', { token: juli, cuerpo: { turno: t5.id } });
+    await mp('/pagar', { pref: (await prefDe(t5)).id, avisar: false });
+    const rv = await fn('revisar');
+    ok(rv.estado === 200 && rv.d.revisados >= 1 && (await estadoDe(t5)) === 'confirmado', 'el repaso de cada 5 minutos confirma un pago cuyo aviso no llegó');
+
+    // Pago rechazado: el mismo link sigue sirviendo para probar con otra tarjeta
     const t3 = await reservar(22 * 60);
     await fn('cobrar', { token: juli, cuerpo: { turno: t3.id } });
-    const o3 = (await mp()).ordenes.find((o) => o.external_reference === t3.id);
-    await mp('/pagar', { orden: o3.id, estado: 'failed', detalle: 'failed', avisar: false });
+    const o3 = await prefDe(t3);
+    const rz = await mp('/pagar', { pref: o3.id, rechazo: 'cc_rejected_high_risk' });
     const c3b = await fn('cobrar', { token: juli, cuerpo: { turno: t3.id } });
-    const o3b = (await mp()).ordenes.filter((o) => o.external_reference === t3.id);
-    ok(c3b.estado === 200 && o3b.length === 2 && c3b.d.url === o3b[1].checkout_url && (await sql(`select to_json(estado) from mp_cobros where orden = '${o3.id}'`)) === 'rechazado'
-      && (await mp()).pedidos.some((p) => p.idem === `bookea-${t3.id}-1`), 'si el pago se rechaza, el cliente vuelve a intentar con un cobro nuevo');
+    ok(rz.cuerpo.accion === 'rechazado' && c3b.estado === 200 && c3b.d.url === o3.init_point && (await mp()).prefs.filter((x) => x.external_reference.includes(t3.id)).length === 1
+      && (await sql(`select to_json(pagos -> 0 ->> 'detalle') from mp_cobros where orden = 'bk-${t3.id}-0'`)) === 'cc_rejected_high_risk' && (await estadoDe(t3)) === 'pendiente',
+      'si el pago se rechaza, queda anotado el motivo y "Pagar" vuelve al mismo link para probar otra vez');
     // Paga tarde (el turno ya se liberó): la seña se devuelve sola
     await sql(`update turnos set vence = now() - interval '1 minute' where id = '${t3.id}'; select public.vencer_pendientes()`);
-    const tarde = await mp('/pagar', { orden: o3b[1].id });
-    ok(tarde.cuerpo && tarde.cuerpo.accion === 'devolver' && (await mp()).ordenes.find((o) => o.id === o3b[1].id).status === 'refunded'
-      && (await sql(`select to_json(devolucion) from mp_cobros where orden = '${o3b[1].id}'`)) === 'hecha', 'si paga cuando el turno ya se liberó, la seña se devuelve sola');
+    const tarde = await mp('/pagar', { pref: o3.id });
+    ok(tarde.cuerpo && tarde.cuerpo.accion === 'devolver' && (await mp()).pagos.find((x) => String(x.id) === tarde.pago).status === 'refunded'
+      && (await sql(`select to_json(devolucion) from mp_cobros where orden = 'bk-${t3.id}-0'`)) === 'hecha', 'si paga cuando el turno ya se liberó, la seña se devuelve sola');
+    const t6 = await reservar(16 * 60);
+    await fn('cobrar', { token: juli, cuerpo: { turno: t6.id } });
+    await mp('/pagar', { pref: (await prefDe(t6)).id, pagado: 100, avisar: false });
+    ok((await fn('revisar')).estado === 200 && (await estadoDe(t6)) === 'pendiente' && (await cobro(t6)).estado === 'creado',
+      'un pago de menos que la seña no confirma nada (ni rompe el repaso)');
 
     // ---------- Devolver la seña al cancelar con tiempo ----------
     await rpc(juli, 'cancelar_turno', { turno: t1.id });
-    ok((await sql(`select to_json(devolucion) from mp_cobros where orden = '${o1.id}'`)) === 'pendiente', 'Juli cancela con tiempo: la seña queda para devolver');
+    ok((await cobro(t1)).devolucion === 'pendiente', 'Juli cancela con tiempo: la seña queda para devolver');
     const dv = await fn('devolver');
-    ok(dv.estado === 200 && dv.d.devueltas === 1 && (await mp()).ordenes.find((o) => o.id === o1.id).status === 'refunded'
+    ok(dv.estado === 200 && dv.d.devueltas === 1 && (await mp()).pagos.find((x) => String(x.id) === mala.pago).status === 'refunded'
       && (await sql(`select to_json(pago) from turnos where id = '${t1.id}'`)) === 'devuelto'
-      && (await mp()).pedidos.some((p) => p.idem === `bookea-devolver-${o1.id}`), 'la función devuelve la seña por Mercado Pago (una sola vez)');
+      && (await mp()).pedidos.some((p) => p.idem === `bookea-devolver-bk-${t1.id}-0` && p.ruta === `/mp-api/v1/payments/${mala.pago}/refunds`),
+      'la función devuelve la seña por Mercado Pago (el pago entero, una sola vez)');
     await mp('/ajustes', { sinSaldo: true });
     await rpc(juli, 'cancelar_turno', { turno: t2.id });
     const dv2 = await fn('devolver');
-    ok(dv2.d.devueltas === 0 && (await sql(`select to_json(intentos) from mp_cobros where orden = '${o2.id}'`)) === 1
-      && (await sql(`select to_json(devolucion) from mp_cobros where orden = '${o2.id}'`)) === 'pendiente', 'sin saldo en la cuenta del negocio: queda para volver a intentar');
+    ok(dv2.d.devueltas === 0 && (await cobro(t2)).intentos === 1 && (await cobro(t2)).devolucion === 'pendiente', 'sin saldo en la cuenta del negocio: queda para volver a intentar');
     await mp('/ajustes', { sinSaldo: false });
     ok((await fn('devolver')).d.devueltas === 1 && (await sql(`select to_json(pago) from turnos where id = '${t2.id}'`)) === 'devuelto', 'en la próxima vuelta se devuelve');
+    // El negocio ya la devolvió desde su Mercado Pago: queda como devuelta
+    await mp('/devolver-en-mp', { pago: (await cobro(t5)).pago });
+    await rpc(juli, 'cancelar_turno', { turno: t5.id });
+    ok((await fn('devolver')).d.devueltas === 1 && (await cobro(t5)).devolucion === 'hecha', 'si ya se había devuelto desde Mercado Pago, queda como devuelta');
 
     // ---------- Renovar las llaves y reconectar ----------
     await sql(`update mp_cuentas set vence = now() + interval '10 days'`);
@@ -235,33 +276,35 @@ const conectar = async (token, negocio, cambiar) => {
       await elegir('20:00');
       ok(/Pagás la seña en Mercado Pago/.test(await fr.textContent('#pago-root')) && !/Bookea está en prueba/.test(await fr.textContent('#pago-root')), 'página: con Mercado Pago conectado, avisa que la seña se paga en Mercado Pago');
       await Promise.all([fr.waitForURL(/mercadopago\.com\.ar\/checkout/, { timeout: 10000 }), fr.click('.chk__side [data-act="pay"]')]);
-      const orden = new URL(fr.url()).searchParams.get('order_id');
-      const o = (await mp()).ordenes.find((x) => x.id === orden);
-      const tp = await sql(`select row_to_json(t) from turnos t where t.id = '${o && o.external_reference}'`);
-      ok(o && tp && tp.estado === 'pendiente' && o.total_amount === `${tp.sena}.00`, 'página: "Pagar seña" lleva a Mercado Pago con el cobro de la seña; el turno espera el pago');
+      const orden = new URL(fr.url()).searchParams.get('pref_id');
+      const o = (await mp()).prefs.find((x) => x.id === orden);
+      const tp = await sql(`select row_to_json(t) from turnos t where t.id = '${o && o.external_reference.slice(3, 39)}'`);
+      ok(o && tp && tp.estado === 'pendiente' && o.items[0].unit_price === tp.sena, 'página: "Pagar seña" lleva a Mercado Pago con el cobro de la seña; el turno espera el pago');
       // En la agenda de Ana: "Esperando la seña"
       await an.click('.menu__i[data-vista="agenda"]'); await an.waitForTimeout(300);
       await an.evaluate(() => document.dispatchEvent(new Event('visibilitychange'))); await an.waitForTimeout(800);
       await an.click('[data-mover="1"]'); await an.waitForTimeout(400);
       ok(/Esperando la seña/.test(await an.textContent('#vista')), 'panel: en la agenda, el turno que se está pagando dice "Esperando la seña"');
-      // Mercado Pago cobra, avisa y vuelve a la página
-      await mp('/pagar', { orden });
-      await fr.goto(o.config.online.success_url);
+      // Mercado Pago cobra y vuelve a la página (el aviso todavía no llegó y la búsqueda no lo muestra: con el id del pago alcanza)
+      await mp('/ajustes', { sinBusqueda: true });
+      const pg = await mp('/pagar', { pref: orden, avisar: false });
+      await fr.goto(pg.vuelta);
       await fr.waitForSelector('#page-turnos:not([hidden]) .okban:not(.okban--espera)', { timeout: 15000 });
       ok(/Listo, tu turno está confirmado/.test(await fr.textContent('.okban')) && /Confirmado/.test(await fr.textContent('.tcard.is-new')) && !(await fr.isVisible('.tcard--espera')),
         'página: al volver de Mercado Pago, el turno está confirmado en Mis turnos');
       ok(new URL(fr.url()).search === '', 'al volver, la dirección queda limpia');
+      await mp('/ajustes', { sinBusqueda: false });
       await fr.screenshot({ path: `${out}/mp-pagado.png` });
 
       // Si el pago no sale: vuelve y el turno sigue esperando, con "Pagar seña" (usa el mismo cobro)
       await elegir('21:00');
       await Promise.all([fr.waitForURL(/mercadopago\.com\.ar\/checkout/, { timeout: 10000 }), fr.click('.chk__side [data-act="pay"]')]);
-      const orden2 = new URL(fr.url()).searchParams.get('order_id');
-      const o2 = (await mp()).ordenes.find((x) => x.id === orden2);
-      await mp('/pagar', { orden: orden2, rechazo: 'high_risk' }); // Mercado Pago rechaza la tarjeta: el cobro sigue abierto
-      await fr.goto(o2.config.online.failure_url);
+      const orden2 = new URL(fr.url()).searchParams.get('pref_id');
+      const o2 = (await mp()).prefs.find((x) => x.id === orden2);
+      const rech = await mp('/pagar', { pref: orden2, rechazo: 'cc_rejected_high_risk', avisar: false }); // Mercado Pago rechaza la tarjeta: el link sigue abierto
+      await fr.goto(rech.vuelta);
       await fr.waitForSelector('.okban--espera', { timeout: 15000 });
-      ok((await sql(`select to_json(pagos -> 0 ->> 'detalle') from mp_cobros where orden = '${orden2}'`)) === 'high_risk',
+      ok((await sql(`select to_json(pagos -> 0 ->> 'detalle') from mp_cobros where orden = '${o2.external_reference}'`)) === 'cc_rejected_high_risk',
         'el motivo del pago rechazado (lo que "No pudimos procesar tu pago" no dice) queda anotado en mp_cobros.pagos');
       ok(/La seña todavía no se pagó/.test(await fr.textContent('.okban--espera')) && /Esperando el pago/.test(await fr.textContent('.tcard--espera'))
         && await fr.isVisible('.tcard--espera [data-act="mp-pagar"]'), 'página: si el pago no sale, el turno sigue esperando en Mis turnos, con "Pagar seña"');
@@ -273,9 +316,9 @@ const conectar = async (token, negocio, cambiar) => {
       ok(await cel.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'en el celular, Mis turnos con uno esperando el pago entra a lo ancho');
       await cel.locator('.tcard--espera').screenshot({ path: `${out}/mp-espera-celu.png` });
       await Promise.all([fr.waitForURL(/mercadopago\.com\.ar\/checkout/, { timeout: 10000 }), fr.click('.tcard--espera [data-act="mp-pagar"]')]);
-      ok(new URL(fr.url()).searchParams.get('order_id') === orden2, 'página: "Pagar seña" vuelve al mismo cobro de Mercado Pago');
-      await mp('/pagar', { orden: orden2 });
-      await fr.goto(o2.config.online.success_url);
+      ok(new URL(fr.url()).searchParams.get('pref_id') === orden2, 'página: "Pagar seña" vuelve al mismo link de Mercado Pago');
+      const pg2b = await mp('/pagar', { pref: orden2 });
+      await fr.goto(pg2b.vuelta);
       await fr.waitForSelector('#page-turnos:not([hidden]) .okban:not(.okban--espera)', { timeout: 15000 });
       ok((await fr.locator('.tcard--espera').count()) === 0, 'después de pagar, ya no queda ninguno esperando');
       // ---------- Sin seña (pregunta del dueño, 27/11): con la seña en 0 %, el turno se confirma sin pasar por Mercado Pago ----------
@@ -296,11 +339,11 @@ const conectar = async (token, negocio, cambiar) => {
       ok((await fr.textContent('.chk__side [data-act="pay"]')).trim() === 'Confirmar turno' && /Sin seña/.test(lado) && !/Mercado Pago|en prueba/.test(lado)
         && (await fr.title()) === 'Confirmá tu turno · Bookea', 'página: sin seña, "Confirmar turno", sin Mercado Pago ni "en prueba"');
       await fr.screenshot({ path: `${out}/sin-sena-confirmar.png` });
-      const antes = (await mp()).ordenes.length;
+      const antes = (await mp()).prefs.length;
       await fr.click('.chk__side [data-act="pay"]');
       await fr.waitForSelector('#page-turnos:not([hidden]) .okban:not(.okban--espera)', { timeout: 15000 });
       const ts = await sql(`select row_to_json(t) from turnos t where t.negocio_id = '${neg}' and t.hora = '22:00' and t.estado = 'confirmado'`);
-      ok(new URL(fr.url()).host === new URL(B).host && (await mp()).ordenes.length === antes && ts && ts.sena === 0 && ts.pago === ''
+      ok(new URL(fr.url()).host === new URL(B).host && (await mp()).prefs.length === antes && ts && ts.sena === 0 && ts.pago === ''
         && !(await sql(`select to_json(count(*)) from mp_cobros where turno_id = '${ts && ts.id}'`)),
         'página: "Confirmar turno" confirma en el momento, sin ir a Mercado Pago ni armar un cobro');
       ok(/Listo, tu turno está confirmado/.test(await fr.textContent('.okban')) && /Lo pagás en el lugar/.test(await fr.textContent('.okban'))

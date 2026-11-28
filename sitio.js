@@ -1227,7 +1227,7 @@
     document.body.appendChild(ov);
     let c = null;
     for (let i = 0; i < (p.estado === "error" ? 1 : 8); i++) {
-      c = await CU.cobrar(p.turno, true);
+      c = await CU.cobrar(p.turno, true, p.mp);
       if (!c.ok || c.estado !== "pendiente") break;
       await espera(reduce ? 400 : 2000);
     }
@@ -1513,10 +1513,12 @@
   badges(); reloj(); // si quedó un turno guardado de antes, sigue corriendo su tiempo
   // En pantallas táctiles, que :active (el apretado de botones y tarjetas) funcione también en iPhone
   document.addEventListener("touchstart", () => {}, { passive: true });
-  // Vuelve de pagar la seña en Mercado Pago: ?pago=ok|error|pendiente&turno=… (la dirección la arma la función "mp")
+  // Vuelve de pagar la seña en Mercado Pago: ?pago=ok|error|pendiente&turno=… (la dirección la arma la función "mp";
+  // Mercado Pago le agrega payment_id, el id del pago, que la función comprueba con Mercado Pago)
   const PAGO = (() => {
-    const q = new URLSearchParams(location.search), p = q.get("pago") || "", t = q.get("turno") || "";
-    return /^(ok|error|pendiente)$/.test(p) && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(t) ? { estado: p, turno: t } : null;
+    const q = new URLSearchParams(location.search), p = q.get("pago") || "", t = q.get("turno") || "", id = q.get("payment_id") || "";
+    return /^(ok|error|pendiente)$/.test(p) && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(t)
+      ? { estado: p, turno: t, mp: /^[0-9]{1,24}$/.test(id) ? id : "" } : null;
   })();
   // Links que llegan con datos: resultados de un rubro, o una sección de la parte para negocios
   const inicial = (() => {

@@ -225,11 +225,14 @@ Cómo anda:
    La función `mp` (`functions/mp/index.ts`) guarda las llaves de su cuenta en **Vault**, cifradas (tabla
    `mp_cuentas`, que solo guarda dónde están). Con PKCE y un "estado" que sirve una vez: nadie puede colarle otra cuenta.
 2. **Cobrar:** el cliente reserva y toca "Pagar seña": el turno queda **esperando el pago 20 minutos** (en su agenda
-   dice "Esperando la seña") y la función arma el cobro en Mercado Pago (Checkout Pro, API de Orders) con la cuenta del
-   negocio y la comisión de Bookea. El cliente paga en Mercado Pago y vuelve a bookea.ar.
-3. **Confirmar:** Mercado Pago avisa (aviso firmado); la función le pregunta a Mercado Pago cómo salió (nunca le cree
-   al navegador) y el turno queda **confirmado**: llegan los dos mails y la seña aparece en la agenda. Si nadie paga a
-   tiempo, el horario se libera solo.
+   dice "Esperando la seña") y la función arma el link para pagar (Checkout Pro con **preferencias**, desde el 28/11) con
+   la cuenta del negocio y la comisión de Bookea (`marketplace_fee`). El cliente paga en Mercado Pago y vuelve a bookea.ar.
+   Si la tarjeta se rechaza, el mismo link sirve para probar con otra.
+3. **Confirmar:** Mercado Pago avisa (aviso firmado del evento **Pagos**), la página pregunta al volver (con el id del
+   pago que trae la dirección) y, por si el aviso no llegó, la función repasa cada 5 minutos los cobros abiertos. Siempre
+   le pregunta a Mercado Pago cómo salió (nunca le cree al navegador) y el turno queda **confirmado**: llegan los dos
+   mails y la seña aparece en la agenda. Si nadie paga a tiempo, el horario se libera solo. Si el mismo turno se paga dos
+   veces, el segundo pago se devuelve solo.
 4. **Devolver:** si un turno pagado se cancela con tiempo (o lo cancela el negocio sin quedarse con la seña), la seña
    se devuelve sola por Mercado Pago, desde la cuenta del negocio. Si Mercado Pago no deja (por ejemplo, sin saldo), se
    vuelve a intentar; después de 48 intentos el panel le avisa al negocio que la devuelva él.
@@ -247,12 +250,13 @@ aparece en la lista (`en_la_lista()`). De esos turnos Bookea no cobra comisión:
    - **Configuración avanzada → URL de redireccionamiento:** cambiala por
      `https://vpxzuutavdjwglglbvdt.supabase.co/functions/v1/mp/oauth` (PKCE: Sí). Tiene que ser exactamente esa.
    - **Webhooks → Configurar notificaciones:** en la URL (la de prueba y la de producción) poné
-     `https://vpxzuutavdjwglglbvdt.supabase.co/functions/v1/mp/avisos` y marcá el evento **Order (Mercado Pago)**.
+     `https://vpxzuutavdjwglglbvdt.supabase.co/functions/v1/mp/avisos` y marcá el evento **Pagos** (desde el 28/11;
+     el de **Order (Mercado Pago)** ya no hace falta).
      Al guardar aparece la **clave secreta** de los avisos: la vas a pegar en Supabase en el paso 4.
    - **Credenciales de producción:** ahí están el **Client ID** (el número de la aplicación) y el **Client Secret**.
 2. **Supabase → Database → Extensions:** activá **pg_cron** (pg_net ya está, por los mails). Con pg_cron, cada minuto
-   se liberan los turnos que nadie pagó, cada 15 minutos se reintentan las devoluciones y una vez por día se renuevan
-   las llaves.
+   se liberan los turnos que nadie pagó, cada 5 minutos se repasan los cobros abiertos, cada 15 minutos se reintentan
+   las devoluciones y una vez por día se renuevan las llaves.
 3. **Supabase → SQL Editor:** pegá todo `esquema.sql` → **Run**; después todo `avisos-por-mail.sql` → **Run**.
 4. **Supabase → Edge Functions → Secrets:** agregá tres secretos (los valores se pegan ahí, nunca en un chat ni en el
    repo): `MP_CLIENT_ID` (el Client ID), `MP_CLIENT_SECRET` (el Client Secret) y `MP_WEBHOOK_SECRET` (la clave secreta
@@ -260,9 +264,28 @@ aparece en la lista (`en_la_lista()`). De esos turnos Bookea no cobra comisión:
 5. **Supabase → Edge Functions → Deploy a new function → Via Editor:** nombre **`mp`**, borrá el ejemplo, pegá todo
    `functions/mp/index.ts` y tocá **Deploy**. Después, en la función → **Details** (o Settings): apagá **Verify JWT**
    ("Enforce JWT verification"): cada ruta controla quién la llama (la página, el panel, Mercado Pago o la base).
-6. **La comisión de Bookea:** en `esquema.sql`, `bookea_comision_pct()`: hoy **1 %** de cada seña. Para cambiarla
-   (por ejemplo a `0.5`), cambiá el número y corré de nuevo `esquema.sql`. Vale para los cobros que se armen desde ese
-   momento.
+6. **La comisión de Bookea:** en `esquema.sql`, `bookea_comision_pct()`: hoy **1 %** de cada seña (redondeado a pesos:
+   en una seña de $ 1.000, $ 10). Para cambiarla (por ejemplo a `0.5`), cambiá el número y corré de nuevo `esquema.sql`.
+   Vale para los turnos que se reserven desde ese momento (cada turno guarda su comisión al reservarse).
+
+### Pasar a preferencias (28/11, una vez)
+
+El cobro pasó de la API de Orders a **preferencias** de Checkout Pro, la forma que Mercado Pago documenta para
+marketplaces, y con eso vuelve la comisión del 1 %. Para que quede andando, en este orden y seguido:
+
+1. **Supabase → SQL Editor:** pegá todo `esquema.sql` → **Run** (suma la columna `pago`, el repaso de cada 5 minutos y
+   la comisión en 1 %).
+2. **Supabase → Edge Functions → mp → Code:** reemplazá todo `index.ts` por el nuevo → **Deploy** (Verify JWT sigue
+   apagado). Entre el paso 1 y este, un cobro en curso podría fallar: hacelos seguidos.
+3. **Mercado Pago → Tus integraciones → BOOKEA → Webhooks:** marcá el evento **Pagos** (en producción) y guardá. La
+   clave secreta no cambia.
+4. **Mercado Pago → Tus integraciones → BOOKEA → Detalles de la aplicación:** si dice **API integrada: Orders** y deja
+   cambiarla, pasala a **Preferencias**.
+5. Probalo como el 27/11 (abajo, "A"): un turno nuevo, una seña chica pagada con una tarjeta de verdad, y cancelarlo.
+   En el SQL Editor, `select orden, estado, pago, comision, pagos from mp_cobros order by creado desc limit 3;` tiene
+   que mostrar el cobro `aprobado` y, en `pagos`, la `comision` que dice Mercado Pago (la parte de Bookea). En **Edge
+   Functions → mp → Logs**, "cobro bk-… armado: preferencia … · comisión 10 · MP-MKT-…" dice que Mercado Pago tomó la
+   comisión. Los cobros viejos (`ORD…`) son de la API de Orders y quedan como registro.
 
 ### Probarlo (27/11: lo que aprendimos)
 
@@ -274,8 +297,8 @@ sin comisión, con y sin mail, sin sesión o con el comprador de prueba, y con `
 bien (Mercado Pago rechaza al crearla lo que esté mal armado, y las órdenes se crean). Hay dos formas de probarlo:
 
 **A. Con plata de verdad, chiquito (la recomendada):**
-1. En Supabase → Edge Functions → Secrets, que **no** esté `MP_TEST_TOKEN` (no sirve para esto: con la API de Orders
-   la llave de un vendedor es siempre `APP_USR-`).
+1. En Supabase → Edge Functions → Secrets, que **no** esté `MP_TEST_TOKEN` (no sirve para esto: la llave de un
+   vendedor conectado es siempre `APP_USR-`).
 2. Un negocio de prueba en Bookea conecta la cuenta **real** de Mercado Pago de alguien de confianza (no la dueña de
    BOOKEA). Precio bajo y seña chica: por ejemplo, turno de $ 1.000 con seña del 10 % = $ 100.
 3. Otra persona reserva y paga con su tarjeta. Tiene que volver con el turno **confirmado**, llegar los dos mails y verse
@@ -285,7 +308,7 @@ bien (Mercado Pago rechaza al crearla lo que esté mal armado, y las órdenes se
 **B. Todo de prueba (sin plata, más trabajo):** todas las partes tienen que ser de prueba, también la aplicación.
 1. En Cuentas de prueba, usá tres cuentas de Argentina: **Integrador** (o "Marketplace"), **Vendedor** y **Comprador**.
 2. En una ventana de incógnito, entrá a Mercado Pago Developers con el **Integrador** y creá otra aplicación (Checkout
-   Pro, API de Orders, marketplace) con la misma URL de redireccionamiento y el mismo webhook que BOOKEA; activá
+   Pro, preferencias, marketplace) con la misma URL de redireccionamiento y el mismo webhook que BOOKEA; activá
    producción para tener su Client ID y su Client Secret.
 3. Por un rato, cambiá en los Secrets `MP_CLIENT_ID`, `MP_CLIENT_SECRET` y `MP_WEBHOOK_SECRET` por los de esa aplicación
    (anotá antes los de BOOKEA). Mientras tanto, ningún negocio real puede conectar.
@@ -298,19 +321,17 @@ bien (Mercado Pago rechaza al crearla lo que esté mal armado, y las órdenes se
 confirmado, llegaron los dos mails, y al cancelarlo desde Mis turnos la seña se devolvió sola ("Devuelto" en el
 Mercado Pago del negocio) y llegó el mail de cancelación.
 
-**Lo que se encontró (27/11, con cuentas reales):** el pago anduvo **sin comisión**; **con** `marketplace_fee` Mercado
-Pago muestra "No pudimos procesar tu pago" y no registra ningún pago (`pagos = []`). Por eso `bookea_comision_pct()`
-va en 0 hasta pasar el cobro a **Preferences** (`/checkout/preferences` con `marketplace_fee`), la forma que Mercado Pago
-documenta para marketplaces.
+**Lo que se encontró (27/11, con cuentas reales):** con la API de Orders el pago anduvo **sin comisión**; **con**
+`marketplace_fee` Mercado Pago mostraba "No pudimos procesar tu pago" y no registraba ningún pago (`pagos = []`). Por
+eso el 28/11 el cobro pasó a **preferencias** (`/checkout/preferences` con `marketplace_fee`), la forma que Mercado Pago
+documenta para marketplaces, y la comisión volvió al 1 % (ver "Pasar a preferencias", arriba).
 
 **En las dos:** cada prueba con un **turno nuevo**: la comisión queda fija al reservar y, si el turno ya tiene un cobro
 abierto, se vuelve a usar ese mismo. **Para ver por qué no se pudo pagar**, en el SQL Editor:
 `select orden, estado, detalle, pagos, creado from mp_cobros order by creado desc limit 5;` — `pagos` tiene cada
-intento con su motivo (`detalle`: por ejemplo `high_risk`, `rejected_by_issuer`, `processing_error`). También lo dice
-**Edge Functions → mp → Logs** (nunca muestra llaves): el cobro con sus intentos, qué llave dio Mercado Pago al
-conectar (solo `APP_USR` o `TEST`) y los avisos mal firmados. Si Mercado Pago sigue rechazando con todas las partes
-reales o todas de prueba, el plan B es cobrar con **Preferences** (`/checkout/preferences` con `marketplace_fee`), el
-único camino de marketplace que Mercado Pago documenta para Checkout Pro.
+intento con su motivo (`detalle`: por ejemplo `cc_rejected_high_risk`, `cc_rejected_other_reason`) y la comisión que
+tomó Mercado Pago. También lo dice **Edge Functions → mp → Logs** (nunca muestra llaves): el cobro armado, sus
+intentos, qué llave dio Mercado Pago al conectar (solo `APP_USR` o `TEST`) y los avisos mal firmados.
 
 ## Que Supabase no pause el proyecto (25/11)
 
@@ -343,4 +364,5 @@ clave publishable de `config.js`).
 - `node supabase/pruebas/e2e/nube-e2e.js`: prueba el panel real y la cuenta de los clientes en el frente contra ese Postgres (ver `pruebas/e2e/LEEME.md`).
 - `node supabase/pruebas/e2e/mp-e2e.js`: el cobro de la seña con Mercado Pago de punta a punta: la función `mp` tal
   cual se publica, contra ese Postgres y un Mercado Pago de juguete (conectar con PKCE, cobrar con la comisión, el
-  aviso firmado, pagos rechazados y tardíos, devoluciones, renovar las llaves), y en el navegador el panel y la página.
+  aviso firmado, la vuelta con el id del pago, el repaso de cada 5 minutos, pagos rechazados, tardíos y dobles,
+  devoluciones, renovar las llaves), y en el navegador el panel y la página.

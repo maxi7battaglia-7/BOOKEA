@@ -962,7 +962,8 @@ declare f text;
 begin
   foreach f in array array['mp_empezar_conexion(''' || current_setting('prueba.neg_eva') || '''::uuid, auth.uid())',
       'mp_tomar_estado(''x'')', 'mp_llaves(''' || current_setting('prueba.neg_eva') || '''::uuid)', 'mp_por_devolver()',
-      'mp_resultado(''ORD1'', ''processed'', ''accredited'', 1)', 'mp_guardar_cuenta(''' || current_setting('prueba.neg_eva') || '''::uuid, null, ''{}''::jsonb)'] loop
+      'mp_resultado(''bk-1'', ''1'', ''approved'', ''accredited'', 1)', 'mp_negocios_de_cuenta(''555'')', 'mp_por_revisar()',
+      'mp_guardar_cuenta(''' || current_setting('prueba.neg_eva') || '''::uuid, null, ''{}''::jsonb)'] loop
     begin
       execute 'select public.' || f;
       raise exception 'FALLA: un cliente usó public.%', f;
@@ -1116,9 +1117,9 @@ begin
   assert d ->> 'estado' = 'pendiente' and (d ->> 'monto')::int = 12500 and (d ->> 'comision')::int = 1250 and d ->> 'email' = 'juli@prueba.com'
      and (d ->> 'cobra')::boolean and (d ->> 'minutos')::int between 18 and 20 and d -> 'abiertos' = '[]'::jsonb
      and d ->> 'titulo' like 'Seña · Cancha Eva · %22:00 · Cancha 2 · techada', 'datos del cobro: ' || d::text;
-  perform public.mp_cobro_creado(current_setting('prueba.mp_turno')::uuid, 'ORDTST01', 'https://www.mercadopago.com.ar/checkout/v1/redirect?order_id=ORDTST01', 12500, 1250);
+  perform public.mp_cobro_creado(current_setting('prueba.mp_turno')::uuid, 'bk-prueba-01', 'https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=1-prueba', 12500, 1250);
   d := public.mp_datos_cobro(current_setting('prueba.mp_turno')::uuid, '00000000-0000-0000-0000-0000000000e1');
-  assert d -> 'abiertos' -> 0 ->> 'orden' = 'ORDTST01' and (d ->> 'intento')::int = 1, 'cobro abierto: ' || d::text;
+  assert d -> 'abiertos' -> 0 ->> 'orden' = 'bk-prueba-01' and (d ->> 'intento')::int = 1, 'cobro abierto: ' || d::text;
   -- con una cuenta de prueba de Mercado Pago no va el mail del cliente (en modo prueba, Mercado Pago rechaza un mail real)
   reset role;
   update public.mp_cuentas set real = false where negocio_id = current_setting('prueba.neg_eva')::uuid;
@@ -1128,21 +1129,34 @@ begin
   reset role;
   update public.mp_cuentas set real = true where negocio_id = current_setting('prueba.neg_eva')::uuid;
   set role service_role;
-  assert public.mp_cobro('ORDTST01') ->> 'negocio' = current_setting('prueba.neg_eva'), 'cobro: ' || public.mp_cobro('ORDTST01')::text;
+  assert public.mp_cobro('bk-prueba-01') ->> 'negocio' = current_setting('prueba.neg_eva'), 'cobro: ' || public.mp_cobro('bk-prueba-01')::text;
   -- los intentos de pago, con su motivo (lo que "No pudimos procesar tu pago" no dice)
-  perform public.mp_anotar_pagos('ORDTST01', '[{"id": "PAY1", "estado": "failed", "detalle": "high_risk", "medio": "master", "tipo": "credit_card", "monto": "12500.00"}]');
-  perform public.mp_anotar_pagos('ORDTST01', '"no es una lista"');
+  perform public.mp_anotar_pagos('bk-prueba-01', '[{"id": "PAY1", "estado": "failed", "detalle": "high_risk", "medio": "master", "tipo": "credit_card", "monto": "12500.00"}]');
+  perform public.mp_anotar_pagos('bk-prueba-01', '"no es una lista"');
   reset role;
-  assert (select pagos -> 0 ->> 'detalle' from public.mp_cobros where orden = 'ORDTST01') = 'high_risk', 'no quedó anotado el motivo del pago';
+  assert (select pagos -> 0 ->> 'detalle' from public.mp_cobros where orden = 'bk-prueba-01') = 'high_risk', 'no quedó anotado el motivo del pago';
   set role service_role;
   -- mientras no se acredite, nada cambia; si dice que se pagó menos que la seña, no se confirma
-  assert public.mp_resultado('ORDTST01', 'action_required', 'waiting_payment', 0) ->> 'accion' = 'nada', 'en curso';
+  assert public.mp_resultado('bk-prueba-01', '', '', '', null) @> '{"accion": "nada", "estado": "pendiente", "cobro": "creado"}', 'sin pago';
+  assert public.mp_resultado('bk-prueba-01', '100', 'in_process', 'pending_contingency', 12500) ->> 'accion' = 'nada', 'en curso';
+  assert public.mp_resultado('bk-prueba-01', '100', 'rejected', 'cc_rejected_other_reason', 12500) @> '{"accion": "rechazado", "cobro": "creado"}',
+    'un pago rechazado cerró el link';
   begin
-    perform public.mp_resultado('ORDTST01', 'processed', 'accredited', 100);
+    perform public.mp_resultado('bk-prueba-01', 'x1', 'approved', 'accredited', 12500);
+    raise exception 'FALLA: se aceptó un pago con un id que no es de Mercado Pago';
+  exception when invalid_parameter_value then null;
+  end;
+  begin
+    perform public.mp_resultado('bk-prueba-01', '101', 'approved', 'accredited', 100);
     raise exception 'FALLA: se confirmó un pago menor que la seña';
   exception when invalid_parameter_value then null;
   end;
-  assert public.mp_resultado('ORDTST99', 'processed', 'accredited', 12500) ->> 'accion' = 'desconocido', 'una orden que no es de Bookea';
+  assert public.mp_resultado('bk-prueba-99', '101', 'approved', 'accredited', 12500) ->> 'accion' = 'desconocido', 'un cobro que no es de Bookea';
+  -- el aviso de un pago dice de qué cuenta de Mercado Pago es: así se sabe de qué negocio
+  assert public.mp_negocios_de_cuenta('555') = jsonb_build_array(current_setting('prueba.neg_eva')::uuid)
+     and public.mp_negocios_de_cuenta('556') = '[]'::jsonb, 'negocios de la cuenta: ' || public.mp_negocios_de_cuenta('555')::text;
+  -- el repaso de cada 5 minutos ve el cobro abierto
+  assert public.mp_por_revisar() @> '[{"orden": "bk-prueba-01"}]'::jsonb, 'repaso: ' || public.mp_por_revisar()::text;
   raise notice 'OK  la función cobra solo el turno del cliente, con la seña y la comisión de la base, y anota el cobro';
 end $$;
 reset role;
@@ -1152,9 +1166,10 @@ set role service_role;
 do $$
 declare r jsonb;
 begin
-  r := public.mp_resultado('ORDTST01', 'processed', 'accredited', 12500);
+  r := public.mp_resultado('bk-prueba-01', '101', 'approved', 'accredited', 12500);
   assert r ->> 'accion' = 'confirmado' and r ->> 'turno' = current_setting('prueba.mp_turno'), 'resultado: ' || r::text;
-  assert public.mp_resultado('ORDTST01', 'processed', 'accredited', 12500) ->> 'accion' = 'nada', 'el mismo pago se procesó dos veces';
+  assert public.mp_resultado('bk-prueba-01', '101', 'approved', 'accredited', 12500) ->> 'accion' = 'nada', 'el mismo pago se procesó dos veces';
+  assert not public.mp_por_revisar() @> '[{"orden": "bk-prueba-01"}]'::jsonb, 'el repaso sigue mirando un cobro pagado';
 end $$;
 reset role;
 do $$
@@ -1164,17 +1179,21 @@ begin
   select * into r from public.reservas where id = t.reserva_id;
   assert t.estado = 'confirmado' and t.pago = 'aprobado' and t.pagado is not null and t.vence is null, 'turno pagado: ' || to_jsonb(t)::text;
   assert r.sena = 12500 and r.nota like '%Seña de $ 12500 pagada con Mercado Pago%', 'agenda pagada: ' || to_jsonb(r)::text;
-  assert (select estado from public.mp_cobros where orden = 'ORDTST01') = 'aprobado', 'el cobro no quedó aprobado';
+  assert (select estado || ' ' || pago from public.mp_cobros where orden = 'bk-prueba-01') = 'aprobado 101', 'el cobro no quedó aprobado con su pago';
   raise notice 'OK  al acreditarse la seña el turno queda confirmado y la seña aparece en la agenda (una sola vez)';
 end $$;
 
 -- Si alguien paga dos veces el mismo turno, el segundo pago se devuelve
 set role service_role;
-select public.mp_cobro_creado(current_setting('prueba.mp_turno')::uuid, 'ORDTST02', 'https://x', 12500, 1250) \g /dev/null
+select public.mp_cobro_creado(current_setting('prueba.mp_turno')::uuid, 'bk-prueba-02', 'https://x', 12500, 1250) \g /dev/null
 do $$ begin
-  assert public.mp_resultado('ORDTST02', 'processed', 'accredited', 12500) ->> 'accion' = 'devolver', 'doble pago';
-  assert public.mp_por_devolver() @> '[{"orden": "ORDTST02"}]'::jsonb, 'el doble pago no quedó para devolver: ' || public.mp_por_devolver()::text;
-  raise notice 'OK  si se paga dos veces el mismo turno, el segundo pago queda para devolver';
+  assert public.mp_resultado('bk-prueba-02', '102', 'approved', 'accredited', 12500) ->> 'accion' = 'devolver', 'doble pago';
+  assert public.mp_por_devolver() @> '[{"orden": "bk-prueba-02", "pago": "102"}]'::jsonb, 'el doble pago no quedó para devolver: ' || public.mp_por_devolver()::text;
+  -- el mismo link pagado dos veces: el segundo pago va en su propia fila, para devolverlo (una sola vez)
+  assert public.mp_resultado('bk-prueba-01', '103', 'approved', 'accredited', 12500) ->> 'accion' = 'devolver', 'mismo link dos veces';
+  assert public.mp_resultado('bk-prueba-01', '103', 'approved', 'accredited', 12500) ->> 'accion' = 'nada', 'el segundo pago se anotó dos veces';
+  assert public.mp_por_devolver() @> '[{"orden": "bk-prueba-01-103", "pago": "103"}]'::jsonb, 'el segundo pago del link no quedó para devolver';
+  raise notice 'OK  si se paga dos veces el mismo turno (o el mismo link), el segundo pago queda para devolver';
 end $$;
 reset role;
 
@@ -1189,24 +1208,27 @@ set role service_role;
 do $$
 declare p jsonb := public.mp_por_devolver();
 begin
-  assert p @> '[{"orden": "ORDTST01"}, {"orden": "ORDTST02"}]'::jsonb and p -> 0 ->> 'negocio' = current_setting('prueba.neg_eva'), 'cola: ' || p::text;
-  perform public.mp_devolucion('ORDTST01', true, 'refunded');
-  perform public.mp_devolucion('ORDTST02', false, 'sin saldo');
+  assert p @> '[{"orden": "bk-prueba-01"}, {"orden": "bk-prueba-02"}]'::jsonb and p -> 0 ->> 'negocio' = current_setting('prueba.neg_eva'), 'cola: ' || p::text;
+  perform public.mp_devolucion('bk-prueba-01', true, 'refunded');
+  perform public.mp_devolucion('bk-prueba-02', false, 'sin saldo');
+  perform public.mp_devolucion('bk-prueba-01-103', true, 'refunded');
+  -- Mercado Pago avisa después que ese pago se devolvió: ya se sabía
+  assert public.mp_resultado('bk-prueba-01', '101', 'refunded', 'refunded', 12500) ->> 'accion' = 'nada', 'devuelto dos veces';
   p := public.mp_por_devolver();
-  assert not p @> '[{"orden": "ORDTST01"}]'::jsonb and p @> '[{"orden": "ORDTST02", "intentos": 1}]'::jsonb, 'cola después: ' || p::text;
+  assert not p @> '[{"orden": "bk-prueba-01"}]'::jsonb and p @> '[{"orden": "bk-prueba-02", "intentos": 1}]'::jsonb, 'cola después: ' || p::text;
 end $$;
 reset role;
 do $$ begin
   assert (select pago from public.turnos where id = current_setting('prueba.mp_turno')::uuid) = 'devuelto', 'el turno no dice que se devolvió';
-  assert (select estado || devolucion from public.mp_cobros where orden = 'ORDTST01') = 'devueltohecha', 'el cobro no dice que se devolvió';
-  update public.mp_cobros set intentos = 47 where orden = 'ORDTST02';
+  assert (select estado || devolucion from public.mp_cobros where orden = 'bk-prueba-01') = 'devueltohecha', 'el cobro no dice que se devolvió';
+  update public.mp_cobros set intentos = 47 where orden = 'bk-prueba-02';
 end $$;
 set role service_role;
-select public.mp_devolucion('ORDTST02', false, 'sin saldo') \g /dev/null
+select public.mp_devolucion('bk-prueba-02', false, 'sin saldo') \g /dev/null
 reset role;
 do $$ begin
-  assert (select devolucion from public.mp_cobros where orden = 'ORDTST02') = 'fallo', 'después de 48 intentos sigue en la cola';
-  update public.mp_cobros set devolucion = 'hecha' where orden = 'ORDTST02';
+  assert (select devolucion from public.mp_cobros where orden = 'bk-prueba-02') = 'fallo', 'después de 48 intentos sigue en la cola';
+  update public.mp_cobros set devolucion = 'hecha' where orden = 'bk-prueba-02';
   raise notice 'OK  al cancelar con tiempo la seña queda para devolver; la función la devuelve o reintenta (48 veces y queda para el negocio)';
 end $$;
 
@@ -1217,7 +1239,7 @@ select set_config('prueba.mp_vence', (public.reservar_turno(jsonb_build_object('
   'fecha_agenda', current_setting('prueba.dia_eva'), 'minuto', 1380)) ->> 'id'), false) \g /dev/null
 reset role;
 set role service_role;
-select public.mp_cobro_creado(current_setting('prueba.mp_vence')::uuid, 'ORDTST03', 'https://x', 12500, 1250) \g /dev/null
+select public.mp_cobro_creado(current_setting('prueba.mp_vence')::uuid, 'bk-prueba-03', 'https://x', 12500, 1250) \g /dev/null
 reset role;
 update public.turnos set vence = now() - interval '1 minute' where id = current_setting('prueba.mp_vence')::uuid;
 select set_config('prueba.mp_vence_r', (select reserva_id::text from public.turnos where id = current_setting('prueba.mp_vence')::uuid), false) \g /dev/null
@@ -1242,11 +1264,15 @@ begin
 end $$;
 set role service_role;
 do $$ begin
-  assert public.mp_resultado('ORDTST03', 'processed', 'accredited', 12500) ->> 'accion' = 'devolver', 'pago tardío';
+  assert public.mp_resultado('bk-prueba-03', '104', 'approved', 'accredited', 12500) ->> 'accion' = 'devolver', 'pago tardío';
+  -- el negocio la devuelve desde su Mercado Pago: queda como devuelta
+  assert public.mp_resultado('bk-prueba-03', '104', 'refunded', 'refunded', 12500) ->> 'accion' = 'devuelto', 'devuelta desde Mercado Pago';
   raise notice 'OK  si nadie paga a tiempo, el horario se libera solo (y sale de la agenda); si el pago llega igual, se devuelve';
 end $$;
 reset role;
-update public.mp_cobros set devolucion = 'hecha' where orden = 'ORDTST03';
+do $$ begin
+  assert (select estado || ' ' || devolucion from public.mp_cobros where orden = 'bk-prueba-03') = 'devuelto hecha', 'el pago tardío no quedó devuelto';
+end $$;
 
 -- Cancelar uno que espera el pago: sale de la agenda y no hay nada que devolver. El negocio también puede sacarlo.
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000e1', false) \g /dev/null

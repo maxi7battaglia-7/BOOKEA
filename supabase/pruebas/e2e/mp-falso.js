@@ -4,7 +4,8 @@
 //   · /functions/v1/mp/…  → la función, tal cual se publica (con Deno simulado)
 //   · /auth/v1/user       → quién es la sesión (como Supabase Auth: acá el token es el id de la cuenta)
 //   · /rest/v1/rpc/mp_…   → las funciones de la base con la clave secreta (rol service_role)
-//   · /mp-auth/authorization, /mp-api/oauth/token, /mp-api/v1/orders… → Mercado Pago (permiso con PKCE, cobros, devoluciones)
+//   · /mp-auth/authorization, /mp-api/oauth/token, /mp-api/checkout/preferences, /mp-api/v1/payments… → Mercado Pago
+//     (permiso con PKCE, el link para pagar, los pagos, buscarlos por su referencia y devolverlos)
 //   · /api/mp…            → para que la prueba mire y maneje el Mercado Pago de juguete (pagar, romper, etc.)
 const crypto = require('crypto');
 const path = require('path');
@@ -25,9 +26,10 @@ module.exports = function montar({ psql, lit, puerto, raiz }) {
   globalThis.Deno = { env: { get: (k) => ENV[k] }, serve: () => {} };
   const funcion = import(pathToFileURL(path.join(raiz, 'supabase/functions/mp/index.ts')).href);
 
-  const MP = { codigos: new Map(), llaves: new Set(), renovar: new Set(), ordenes: new Map(), idem: new Map(), pedidos: [], avisos: [],
-    romperRenovar: false, sinSaldo: false, negar: false, n: 0 };
-  const nuevoId = () => 'ORDTST01' + crypto.randomBytes(9).toString('hex').toUpperCase();
+  const MP = { codigos: new Map(), llaves: new Set(), renovar: new Set(), prefs: new Map(), pagos: new Map(), idem: new Map(), pedidos: [], avisos: [],
+    romperRenovar: false, sinSaldo: false, negar: false, sinBusqueda: false, n: 0, np: 0 };
+  const nuevaPref = () => `${USUARIO_MP}-${crypto.randomUUID()}`;
+  const FECHA = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}-03:00$/;
   const llaves = () => {
     MP.n++;
     const d = { access_token: `PRUEBA_LLAVE_${MP.n}_${crypto.randomBytes(6).toString('hex')}`, refresh_token: `PRUEBA_RENOVAR_${MP.n}`,
@@ -42,17 +44,27 @@ module.exports = function montar({ psql, lit, puerto, raiz }) {
   const enviar = (res, st, o, h = {}) => { res.writeHead(st, { 'content-type': 'application/json', ...h }); res.end(JSON.stringify(o)); };
   const llaveDe = (req) => { const m = /^Bearer (\S+)$/.exec(req.headers.authorization || ''); return m && MP.llaves.has(m[1]) ? m[1] : null; };
 
-  // Mandar el aviso de Mercado Pago a la función (firmado como lo hace Mercado Pago, o mal firmado si se pide)
-  const avisar = async (id, firma = 'buena') => {
+  // Mandar el aviso de Mercado Pago a la función (evento "Pagos", firmado como lo hace Mercado Pago, o mal firmado si se pide)
+  const avisar = async (id, firma = 'buena', usuario = USUARIO_MP, tipo = 'payment') => {
+    id = String(id);
     const ts = String(Date.now()), rid = crypto.randomUUID();
     const v1 = firma === 'buena' ? firmar(id, rid, ts) : 'f'.repeat(64);
-    const r = await fetch(`${base}/functions/v1/mp/avisos?data.id=${encodeURIComponent(id)}&type=order`, {
+    const r = await fetch(`${base}/functions/v1/mp/avisos?data.id=${encodeURIComponent(id)}&type=${tipo}`, {
       method: 'POST', headers: { 'content-type': 'application/json', 'x-signature': `ts=${ts},v1=${v1}`, 'x-request-id': rid },
-      body: JSON.stringify({ action: 'order.processed', api_version: 'v1', data: { id }, type: 'order', user_id: USUARIO_MP, live_mode: false }),
+      body: JSON.stringify({ action: `${tipo}.created`, api_version: 'v1', data: { id }, date_created: new Date().toISOString(), id: Date.now(),
+        live_mode: true, type: tipo, user_id: +usuario }),
     });
     const res = { estado: r.status, cuerpo: await r.json().catch(() => null) };
     MP.avisos.push({ id, firma, ...res });
     return res;
+  };
+  // Adónde vuelve el cliente, con lo que agrega Mercado Pago a la dirección
+  const vuelta = (pref, pago) => {
+    const u = new URL(pago.status === 'approved' ? pref.back_urls.success : pref.back_urls.failure);
+    for (const [k, v] of Object.entries({ collection_id: pago.id, collection_status: pago.status, payment_id: pago.id, status: pago.status,
+      external_reference: pref.external_reference, payment_type: 'credit_card', merchant_order_id: '99' + pago.id, preference_id: pref.id,
+      site_id: 'MLA', processing_mode: 'aggregator', merchant_account_id: 'null' })) u.searchParams.set(k, String(v));
+    return u.href;
   };
 
   return async function manejar(req, res, url) {
@@ -131,40 +143,57 @@ module.exports = function montar({ psql, lit, puerto, raiz }) {
       enviar(res, 400, { error: 'unsupported_grant_type' });
       return true;
     }
-    // ---------- Mercado Pago: los cobros (API de Orders) ----------
-    const mo = /^\/mp-api\/v1\/orders(?:\/([A-Za-z0-9_-]+))?(\/refund)?$/.exec(ruta);
-    if (mo) {
+    // ---------- Mercado Pago: el link para pagar (preferencias de Checkout Pro), los pagos y las devoluciones ----------
+    if (ruta === '/mp-api/checkout/preferences' && req.method === 'POST') {
       const llave = llaveDe(req);
       if (!llave) { enviar(res, 401, { message: 'invalid access token' }); return true; }
       const idem = req.headers['x-idempotency-key'] || '';
-      if (!mo[1] && req.method === 'POST') { // crear el cobro
-        const b = JSON.parse((await leerCuerpo(req)).toString() || '{}');
-        MP.pedidos.push({ ruta, cuerpo: b, idem, llave });
-        if (!idem) { enviar(res, 400, { message: 'X-Idempotency-Key requerido' }); return true; }
-        if (MP.idem.has(idem)) { enviar(res, 201, MP.ordenes.get(MP.idem.get(idem))); return true; }
-        const total = +b.total_amount, items = (b.items || []).reduce((s, i) => s + +i.unit_price * i.quantity, 0);
-        if (b.type !== 'online' || b.processing_mode !== 'manual' || !/^\d+\.\d{2}$/.test(b.total_amount || '') || total !== items
-            || (b.marketplace_fee !== undefined && !(+b.marketplace_fee < total))) {
-          enviar(res, 400, { message: 'pedido inválido' });
-          return true;
-        }
-        const o = { id: nuevoId(), type: 'online', processing_mode: 'manual', status: 'created', status_detail: 'created', total_amount: b.total_amount,
-          total_paid_amount: '0.00', external_reference: b.external_reference, marketplace_fee: b.marketplace_fee, config: b.config,
-          expiration_time: b.expiration_time, user_id: USUARIO_MP, items: b.items, payer: b.payer };
-        o.checkout_url = `https://www.mercadopago.com.ar/checkout/v1/redirect?order_id=${o.id}`;
-        MP.ordenes.set(o.id, o); MP.idem.set(idem, o.id);
-        enviar(res, 201, o);
+      const b = JSON.parse((await leerCuerpo(req)).toString() || '{}');
+      MP.pedidos.push({ ruta, cuerpo: b, idem, llave });
+      if (idem && MP.idem.has(idem)) { enviar(res, 201, MP.prefs.get(MP.idem.get(idem))); return true; }
+      const it = Array.isArray(b.items) ? b.items : [];
+      const total = it.reduce((s, i) => s + i.unit_price * i.quantity, 0);
+      // como Mercado Pago: números (no textos), las fechas con su zona, la comisión menor que el total y nada de "marketplace"
+      // (con las llaves de un vendedor conectado por OAuth, Mercado Pago lo completa solo: MP-MKT-<aplicación>)
+      if (!it.length || it.some((i) => typeof i.unit_price !== 'number' || i.quantity !== 1 || i.currency_id !== 'ARS' || !i.title)
+          || !b.external_reference || !b.back_urls || !b.back_urls.success || b.auto_return !== 'approved' || b.binary_mode !== true
+          || b.expires !== true || !FECHA.test(b.expiration_date_from || '') || !FECHA.test(b.expiration_date_to || '')
+          || (b.marketplace_fee !== undefined && !(typeof b.marketplace_fee === 'number' && b.marketplace_fee < total)) || b.marketplace !== undefined) {
+        enviar(res, 400, { message: 'preferencia inválida', status: 400 });
         return true;
       }
-      const o = MP.ordenes.get(mo[1]);
-      if (!o) { enviar(res, 404, { message: 'order not found' }); return true; }
-      if (!mo[2] && req.method === 'GET') { enviar(res, 200, o); return true; }
-      if (mo[2] && req.method === 'POST') { // devolver
+      const id = nuevaPref();
+      const p = { ...b, id, collector_id: +USUARIO_MP, marketplace: `MP-MKT-${APP.id}`, marketplace_fee: b.marketplace_fee || 0, operation_type: 'regular_payment',
+        init_point: `https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=${id}`,
+        sandbox_init_point: `https://sandbox.mercadopago.com.ar/checkout/v1/redirect?pref_id=${id}`, total, llave };
+      MP.prefs.set(id, p);
+      if (idem) MP.idem.set(idem, id);
+      enviar(res, 201, p);
+      return true;
+    }
+    if (ruta === '/mp-api/v1/payments/search' && req.method === 'GET') {
+      if (!llaveDe(req)) { enviar(res, 401, { message: 'invalid access token' }); return true; }
+      const ref = url.searchParams.get('external_reference') || '';
+      const lista = MP.sinBusqueda ? [] : [...MP.pagos.values()].filter((p) => p.external_reference === ref);
+      if (url.searchParams.get('criteria') === 'desc') lista.reverse();
+      enviar(res, 200, { paging: { total: lista.length, limit: 30, offset: 0 }, results: lista });
+      return true;
+    }
+    const mpg = /^\/mp-api\/v1\/payments\/([0-9]+)(\/refunds)?$/.exec(ruta);
+    if (mpg) {
+      const llave = llaveDe(req);
+      if (!llave) { enviar(res, 401, { message: 'invalid access token' }); return true; }
+      const pg = MP.pagos.get(mpg[1]);
+      if (!pg) { enviar(res, 404, { message: 'Payment not found', status: 404 }); return true; }
+      if (!mpg[2] && req.method === 'GET') { enviar(res, 200, pg); return true; }
+      if (mpg[2] && req.method === 'POST') { // devolver el pago entero
+        const idem = req.headers['x-idempotency-key'] || '';
         MP.pedidos.push({ ruta, idem, llave });
+        if (!idem) { enviar(res, 400, { message: "Header X-Idempotency-Key can't be null" }); return true; }
         if (MP.sinSaldo) { enviar(res, 400, { message: 'insufficient balance' }); return true; }
-        if (o.status !== 'processed' && o.status !== 'refunded') { enviar(res, 400, { message: 'order not processed' }); return true; }
-        o.status = 'refunded'; o.status_detail = 'refunded';
-        enviar(res, 201, o);
+        if (pg.status !== 'approved') { enviar(res, 400, { message: 'The action requested is not valid for the current payment state' }); return true; }
+        pg.status = 'refunded'; pg.status_detail = 'refunded'; pg.transaction_amount_refunded = pg.transaction_amount;
+        enviar(res, 201, { id: 5000 + MP.np, payment_id: +pg.id, amount: pg.transaction_amount, status: 'approved', refund_mode: 'standard' });
         return true;
       }
       enviar(res, 405, { message: 'método' });
@@ -172,37 +201,43 @@ module.exports = function montar({ psql, lit, puerto, raiz }) {
     }
     // ---------- Para la prueba ----------
     if (ruta === '/api/mp' && req.method === 'GET') {
-      enviar(res, 200, { ordenes: [...MP.ordenes.values()], pedidos: MP.pedidos, avisos: MP.avisos });
+      enviar(res, 200, { prefs: [...MP.prefs.values()], pagos: [...MP.pagos.values()], pedidos: MP.pedidos, avisos: MP.avisos });
       return true;
     }
     if (ruta === '/api/mp/ajustes' && req.method === 'POST') {
       const b = JSON.parse((await leerCuerpo(req)).toString() || '{}');
-      for (const k of ['romperRenovar', 'sinSaldo', 'negar']) if (k in b) MP[k] = !!b[k];
+      for (const k of ['romperRenovar', 'sinSaldo', 'negar', 'sinBusqueda']) if (k in b) MP[k] = !!b[k];
       enviar(res, 200, { ok: true });
       return true;
     }
-    // El cliente paga en el Mercado Pago de juguete: el cobro queda como dice la prueba y llega el aviso firmado
+    // El cliente paga en el Mercado Pago de juguete: queda un pago (acreditado, o rechazado si se pide), llega el aviso
+    // firmado (si no se pide que no) y se devuelve adónde vuelve el cliente, con lo que agrega Mercado Pago a la dirección
     if (ruta === '/api/mp/pagar' && req.method === 'POST') {
       const b = JSON.parse((await leerCuerpo(req)).toString() || '{}');
-      const o = MP.ordenes.get(b.orden);
-      if (!o) { enviar(res, 404, { error: 'orden' }); return true; }
-      // cada intento queda en transactions.payments, como en la API de Orders; uno rechazado deja el cobro abierto
-      const pagos = ((o.transactions = o.transactions || {}).payments = o.transactions.payments || []);
-      const id = 'PAY' + (pagos.length + 1);
-      if (b.rechazo) {
-        pagos.push({ id, status: 'failed', status_detail: b.rechazo, amount: o.total_amount, payment_method: { id: 'master', type: 'credit_card' } });
-        enviar(res, 200, { ok: true });
-        return true;
-      }
-      o.status = b.estado || 'processed'; o.status_detail = b.detalle || 'accredited';
-      pagos.push({ id, status: o.status, status_detail: o.status_detail, amount: o.total_amount, payment_method: { id: 'master', type: 'credit_card' } });
-      o.total_paid_amount = b.pagado !== undefined ? String(b.pagado) : o.total_amount;
-      enviar(res, 200, b.avisar === false ? { ok: true } : await avisar(o.id, b.firma || 'buena'));
+      const pref = MP.prefs.get(b.pref);
+      if (!pref) { enviar(res, 404, { error: 'preferencia' }); return true; }
+      MP.np++;
+      const pg = { id: 1000000000 + MP.np, status: b.rechazo ? 'rejected' : b.estado || 'approved', status_detail: b.rechazo || b.detalle || 'accredited',
+        external_reference: pref.external_reference, transaction_amount: b.pagado !== undefined ? +b.pagado : pref.total, currency_id: 'ARS',
+        payment_method_id: 'master', payment_type_id: 'credit_card', collector_id: +USUARIO_MP, marketplace_owner: +APP.id,
+        fee_details: pref.marketplace_fee ? [{ type: 'application_fee', amount: pref.marketplace_fee, fee_payer: 'collector' }] : [],
+        date_created: new Date().toISOString(), payer: { email: 'comprador@prueba.com' } };
+      MP.pagos.set(String(pg.id), pg);
+      const aviso = b.avisar === false ? null : await avisar(pg.id, b.firma || 'buena');
+      enviar(res, 200, { pago: String(pg.id), vuelta: vuelta(pref, pg), ...(aviso || {}) });
       return true;
     }
     if (ruta === '/api/mp/avisar' && req.method === 'POST') {
       const b = JSON.parse((await leerCuerpo(req)).toString() || '{}');
-      enviar(res, 200, await avisar(b.orden, b.firma || 'buena'));
+      enviar(res, 200, await avisar(b.pago, b.firma || 'buena', b.usuario || USUARIO_MP, b.tipo || 'payment'));
+      return true;
+    }
+    // El negocio devuelve un pago desde su Mercado Pago (sin pasar por Bookea)
+    if (ruta === '/api/mp/devolver-en-mp' && req.method === 'POST') {
+      const b = JSON.parse((await leerCuerpo(req)).toString() || '{}');
+      const pg = MP.pagos.get(String(b.pago));
+      if (pg) { pg.status = 'refunded'; pg.status_detail = 'refunded'; }
+      enviar(res, pg ? 200 : 404, { ok: !!pg });
       return true;
     }
     return false;

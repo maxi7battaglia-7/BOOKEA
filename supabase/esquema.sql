@@ -815,9 +815,10 @@ grant execute on function public.borrar_mi_cuenta() to authenticated;
 --      el panel las ven nunca. (OAuth con PKCE: mp_empezar_conexion, mp_tomar_estado, mp_guardar_cuenta.)
 --   2. Un cliente reserva en un negocio conectado: el turno queda "pendiente" 20 minutos (también en la agenda del
 --      negocio) y la función arma el cobro de la seña con la cuenta del negocio y la comisión de Bookea (mp_cobros).
---   3. Mercado Pago avisa que hubo un pago (aviso firmado). La función se lo pregunta a Mercado Pago (nunca le cree al
---      navegador) y, si se acreditó, el turno queda confirmado (mp_resultado): llegan los mails y la seña aparece en la
---      agenda. Si nadie paga a tiempo, el horario se libera solo (vencer_pendientes).
+--   3. Mercado Pago avisa que hubo un pago (aviso firmado, evento "Pagos"), la página pregunta al volver y, por las dudas,
+--      la función repasa cada 5 minutos los cobros abiertos (mp_por_revisar). Siempre se lo pregunta a Mercado Pago (nunca
+--      le cree al navegador) y, si se acreditó, el turno queda confirmado (mp_resultado): llegan los mails y la seña
+--      aparece en la agenda. Si nadie paga a tiempo, el horario se libera solo (vencer_pendientes).
 --   4. Si se cancela un turno pagado y la seña se devuelve, queda en la cola (mp_cobros.devolucion) y la función la
 --      devuelve por Mercado Pago (también si alguien pagó un turno que ya no estaba esperando el pago).
 -- La plata va directo a la cuenta del negocio: Mercado Pago le descuenta su costo y la comisión de Bookea, que llega a
@@ -827,12 +828,11 @@ grant execute on function public.borrar_mi_cuenta() to authenticated;
 
 -- La comisión de Bookea: qué parte de cada seña cobrada se queda Bookea (en %). Para cambiarla, cambiá el número y
 -- volvé a correr este archivo (vale para los cobros que se armen desde ese momento). No se muestra en la página.
--- El dueño pidió el 1 % (27/11: "tendría que ser muy bajo, un 1 o 0,5"), pero por ahora va en 0: con la API de Orders,
--- un cobro con marketplace_fee no se puede pagar (Mercado Pago muestra "No pudimos procesar tu pago" sin registrar ningún
--- pago; probado el 27/11 con cuentas reales: con comisión falla siempre y sin comisión anda). La comisión vuelve cuando
--- el cobro pase a la forma que Mercado Pago documenta para marketplaces (Preferences). Ver LEEME, "Probarlo".
+-- El dueño pidió el 1 % (27/11: "tendría que ser muy bajo, un 1 o 0,5"). Del 27 al 28/11 estuvo en 0: con la API de
+-- Orders, un cobro con comisión (marketplace_fee) no se podía pagar ("No pudimos procesar tu pago"). Desde el 28/11 el
+-- cobro es una preferencia de Checkout Pro, la forma que Mercado Pago documenta para marketplaces, y la comisión vuelve.
 create or replace function public.bookea_comision_pct() returns numeric language sql immutable as $$
-  select 0::numeric
+  select 1::numeric
 $$;
 -- La comisión de una seña, en pesos: redondeada, hasta la mitad de la seña y nunca la seña entera
 create or replace function public.comision_de(sena integer) returns integer
@@ -868,8 +868,11 @@ create table if not exists public.mp_estados (
   verificador text not null check (verificador ~ '^[0-9a-f]{64}$'),
   creado      timestamptz not null default now()
 );
--- Cada cobro de una seña (una "orden" de Mercado Pago). Un turno puede tener más de uno (si volvió a intentar).
--- Queda aunque se borre el turno o el negocio: es el registro de la plata.
+-- Cada cobro de una seña: el link para pagarla (una preferencia de Checkout Pro; "orden" es la referencia que la
+-- función le pone, bk-<turno>-<intento>, y con la que después busca sus pagos). Un turno puede tener más de uno (si volvió
+-- a intentar). "pago" es el pago de Mercado Pago que se acreditó (con ese se devuelve). Si un mismo link se paga dos
+-- veces, el segundo pago queda en su propia fila (<orden>-<pago>) para devolverlo. Los de antes del 28/11 (ORD…) son
+-- órdenes de la API de Orders. Queda aunque se borre el turno o el negocio: es el registro de la plata.
 create table if not exists public.mp_cobros (
   orden       text primary key check (orden ~ '^[A-Za-z0-9_-]{1,64}$'),
   turno_id    uuid references public.turnos (id) on delete set null,
@@ -886,6 +889,9 @@ create table if not exists public.mp_cobros (
 );
 -- Los intentos de pago de cada cobro, como los dice Mercado Pago (estado y motivo de cada uno; mp_anotar_pagos)
 alter table public.mp_cobros add column if not exists pagos jsonb not null default '[]'::jsonb check (jsonb_typeof(pagos) = 'array');
+alter table public.mp_cobros add column if not exists pago text not null default '' check (pago ~ '^[0-9]{0,24}$');
+create index if not exists mp_cobros_por_pago on public.mp_cobros (pago) where pago <> '';
+create index if not exists mp_cobros_abiertos on public.mp_cobros (creado) where estado = 'creado';
 create index if not exists mp_cobros_por_turno on public.mp_cobros (turno_id);
 create index if not exists mp_cobros_por_negocio on public.mp_cobros (negocio_id);
 create index if not exists mp_cobros_a_devolver on public.mp_cobros (actualizado) where devolucion = 'pendiente';
@@ -1087,7 +1093,7 @@ begin
   return jsonb_build_object('turno', t.id, 'estado', t.estado, 'pago', t.pago, 'negocio', t.negocio_id, 'codigo', t.codigo,
     'monto', t.sena, 'comision', t.comision,
     -- el mail del cliente, para que Mercado Pago lo complete; con una cuenta de prueba de Mercado Pago, uno de prueba:
-    -- en modo prueba no puede intervenir una persona real (probado el 27/11), y la referencia lo pide en todo cobro
+    -- en modo prueba no puede intervenir una persona real (probado el 27/11)
     'email', case when exists (select 1 from public.mp_cuentas k where k.negocio_id = t.negocio_id and k.real) then c.email
                   else 'test_user_bookea@testuser.com' end,
     'titulo', left('Seña · ' || t.lugar || ' · ' || to_char(t.fecha, 'DD/MM') || ' ' || to_char(t.hora, 'HH24:MI') || ' · ' || t.cancha, 120),
@@ -1096,7 +1102,7 @@ begin
     'cobra', t.negocio_id is not null and public.tiene_mercado_pago(t.negocio_id),
     'intento', (select count(*) from public.mp_cobros k where k.turno_id = t.id),
     'abiertos', (select coalesce(jsonb_agg(jsonb_build_object('orden', k.orden, 'url', k.url) order by k.creado desc), '[]'::jsonb)
-                   from public.mp_cobros k where k.turno_id = t.id and k.estado = 'creado'));
+                   from public.mp_cobros k where k.turno_id = t.id and k.estado = 'creado' and k.orden like 'bk-%'));
 end $$;
 -- Los intentos de pago de un cobro, con el motivo de cada uno (status_detail): "No pudimos procesar tu pago" no le dice
 -- a nadie por qué (27/11). La función los anota cada vez que consulta el cobro. Para verlos, en el SQL Editor:
@@ -1116,58 +1122,90 @@ language sql security definer set search_path = '' as $$
       from public.turnos t where t.id = mp_cobro_creado.turno
   on conflict (orden) do update set url = excluded.url, actualizado = now()
 $$;
--- Un cobro, por su orden (para el aviso de Mercado Pago: de qué negocio es, así se consulta con sus llaves)
+-- Un cobro, por su referencia (para el aviso de Mercado Pago: de qué negocio es, así se consulta con sus llaves)
 create or replace function public.mp_cobro(orden text) returns jsonb
 language sql stable security definer set search_path = '' as $$
   select jsonb_build_object('orden', k.orden, 'negocio', k.negocio_id, 'turno', k.turno_id, 'estado', k.estado, 'monto', k.monto)
     from public.mp_cobros k where k.orden = mp_cobro.orden
 $$;
--- Lo que dice Mercado Pago de un cobro (la función se lo pregunta a Mercado Pago con las llaves del negocio):
--- su estado y su detalle ("processed" y "accredited" = se acreditó) y lo que se pagó.
--- Devuelve qué pasó: "confirmado" (el turno quedó confirmado), "devolver" (se pagó un turno que ya no esperaba el pago:
--- queda en la cola para devolverlo), "devuelto", "rechazado" o "nada" (sigue en curso, o ya se sabía).
-create or replace function public.mp_resultado(orden text, estado text, detalle text, pagado numeric) returns jsonb
+-- Los negocios conectados con una cuenta de Mercado Pago (el aviso de un pago dice de qué cuenta es: user_id)
+create or replace function public.mp_negocios_de_cuenta(usuario text) returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select coalesce(jsonb_agg(c.negocio_id order by c.conectado desc), '[]'::jsonb) from public.mp_cuentas c
+   where c.mp_usuario = mp_negocios_de_cuenta.usuario and not c.reconectar
+$$;
+-- Los cobros abiertos de las últimas 2 horas: la función se los pregunta a Mercado Pago cada 5 minutos (pg_cron, abajo),
+-- por si el aviso no llegó (así un pago no se pierde aunque el cliente cierre la página antes de volver)
+create or replace function public.mp_por_revisar() returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select coalesce(jsonb_agg(jsonb_build_object('orden', k.orden, 'negocio', k.negocio_id, 'turno', k.turno_id) order by k.creado), '[]'::jsonb)
+    from (select * from public.mp_cobros x where x.estado = 'creado' and x.negocio_id is not null and x.orden like 'bk-%'
+            and x.creado > now() - interval '2 hours' order by x.creado desc limit 50) k
+$$;
+-- Lo que dice Mercado Pago de un pago de un cobro (la función se lo pregunta a Mercado Pago con las llaves del negocio):
+-- el id del pago, su estado y su detalle ("approved" y "accredited" = se acreditó) y lo que se pagó. Sin pago (todavía
+-- nadie pagó), solo dice cómo está el turno. Devuelve qué pasó: "confirmado" (el turno quedó confirmado), "devolver" (se
+-- pagó un turno que ya no esperaba el pago, o se pagó dos veces: queda en la cola para devolverlo), "devuelto",
+-- "rechazado" (ese intento no salió; el link sigue sirviendo para probar con otra tarjeta) o "nada" (sigue en curso, o
+-- ya se sabía). "cobro" es cómo quedó el cobro ("creado" = el link sigue abierto).
+drop function if exists public.mp_resultado(text, text, text, numeric);
+create or replace function public.mp_resultado(orden text, pago text, estado text, detalle text, pagado numeric) returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare
   k  public.mp_cobros%rowtype;
   t  public.turnos%rowtype;
+  pa text := coalesce(mp_resultado.pago, '');
   st text := coalesce(mp_resultado.estado, '');
   de text := coalesce(mp_resultado.detalle, '');
+  re jsonb;
 begin
   select * into k from public.mp_cobros x where x.orden = mp_resultado.orden for update;
   if not found then return jsonb_build_object('accion', 'desconocido'); end if;
-  update public.mp_cobros x set detalle = left(st || ' / ' || de, 200), actualizado = now() where x.orden = k.orden;
   if k.turno_id is not null then select * into t from public.turnos x where x.id = k.turno_id for update; end if;
+  re := jsonb_build_object('turno', t.id, 'estado', t.estado, 'cobro', k.estado);
+  if pa = '' then return re || jsonb_build_object('accion', 'nada'); end if;
+  if pa !~ '^[0-9]{1,24}$' then raise exception 'Mercado Pago no devolvió un pago válido' using errcode = '22023'; end if;
+  update public.mp_cobros x set detalle = left(pa || ': ' || st || ' / ' || de, 200), actualizado = now() where x.orden = k.orden;
   -- Se devolvió entero (desde Bookea o desde Mercado Pago)
   if st = 'refunded' then
     update public.mp_cobros x set estado = 'devuelto', devolucion = case when x.devolucion = '' then '' else 'hecha' end
-     where x.orden = k.orden;
+     where x.pago = pa and (x.orden = k.orden or x.orden = left(k.orden || '-' || pa, 64)) and x.estado <> 'devuelto';
+    if not found then return re || jsonb_build_object('accion', 'nada'); end if;
     update public.turnos x set pago = 'devuelto' where x.id = t.id and x.pago = 'aprobado' and x.estado = 'cancelado';
-    return jsonb_build_object('accion', 'devuelto', 'turno', t.id, 'estado', t.estado);
+    return jsonb_build_object('accion', 'devuelto', 'turno', t.id, 'estado', t.estado,
+                              'cobro', (select x.estado from public.mp_cobros x where x.orden = k.orden));
   end if;
-  if st = 'processed' and de = 'accredited' then
-    if k.estado <> 'creado' then return jsonb_build_object('accion', 'nada', 'turno', t.id, 'estado', t.estado); end if;
+  if st = 'approved' and de = 'accredited' then
+    if k.pago = pa then return re || jsonb_build_object('accion', 'nada'); end if;
     if coalesce(mp_resultado.pagado, k.monto) < k.monto then
       raise exception 'Mercado Pago dice que se pagó menos que la seña' using errcode = '22023';
     end if;
-    update public.mp_cobros x set estado = 'aprobado' where x.orden = k.orden;
+    -- El mismo link se pagó otra vez (o un cobro que ya no estaba abierto): ese pago va en su propia fila y se devuelve
+    if k.pago <> '' or k.estado not in ('creado', 'rechazado') then
+      insert into public.mp_cobros (orden, turno_id, negocio_id, monto, comision, estado, devolucion, pago, detalle)
+        values (left(k.orden || '-' || pa, 64), k.turno_id, k.negocio_id, k.monto, k.comision, 'aprobado', 'pendiente', pa,
+                left('Pagado otra vez: ' || pa, 200))
+        on conflict do nothing;
+      if not found then return re || jsonb_build_object('accion', 'nada'); end if;
+      perform public.mp_avisar_devolucion();
+      return re || jsonb_build_object('accion', 'devolver');
+    end if;
+    update public.mp_cobros x set estado = 'aprobado', pago = pa where x.orden = k.orden;
     if t.id is not null and t.estado = 'pendiente' then
       update public.turnos x set estado = 'confirmado', pago = 'aprobado', pagado = now(), vence = null where x.id = t.id;
       update public.reservas r set sena = t.sena,
              nota = left('Reservó en bookea.ar · código ' || t.codigo || ' · Seña de $ ' || t.sena || ' pagada con Mercado Pago.', 500)
        where r.id = t.reserva_id;
-      return jsonb_build_object('accion', 'confirmado', 'turno', t.id, 'estado', 'confirmado');
+      return jsonb_build_object('accion', 'confirmado', 'turno', t.id, 'estado', 'confirmado', 'cobro', 'aprobado');
     end if;
     -- Se pagó un turno que ya no esperaba el pago (venció, se canceló, o ya estaba pago con otro cobro): se devuelve
     update public.mp_cobros x set devolucion = 'pendiente' where x.orden = k.orden;
     perform public.mp_avisar_devolucion();
-    return jsonb_build_object('accion', 'devolver', 'turno', t.id, 'estado', t.estado);
+    return jsonb_build_object('accion', 'devolver', 'turno', t.id, 'estado', t.estado, 'cobro', 'aprobado');
   end if;
-  if st in ('canceled', 'failed') then
-    update public.mp_cobros x set estado = 'rechazado' where x.orden = k.orden and x.estado = 'creado';
-    return jsonb_build_object('accion', 'rechazado', 'turno', t.id, 'estado', t.estado);
-  end if;
-  return jsonb_build_object('accion', 'nada', 'turno', t.id, 'estado', t.estado);  -- created, processing, action_required…
+  -- Ese intento no salió (tarjeta rechazada, por ejemplo): el link sigue abierto para probar otra vez
+  if st in ('rejected', 'cancelled') then return re || jsonb_build_object('accion', 'rechazado'); end if;
+  return re || jsonb_build_object('accion', 'nada');  -- pending, in_process, authorized, in_mediation…
 end $$;
 
 -- ---------- Devolver la seña ----------
@@ -1199,8 +1237,8 @@ end $$;
 -- La cola, para la función: los cobros a devolver, de a 20
 create or replace function public.mp_por_devolver() returns jsonb
 language sql stable security definer set search_path = '' as $$
-  select coalesce(jsonb_agg(jsonb_build_object('orden', k.orden, 'negocio', k.negocio_id, 'monto', k.monto, 'intentos', k.intentos)
-                            order by k.actualizado), '[]'::jsonb)
+  select coalesce(jsonb_agg(jsonb_build_object('orden', k.orden, 'pago', k.pago, 'negocio', k.negocio_id, 'monto', k.monto,
+                                               'intentos', k.intentos) order by k.actualizado), '[]'::jsonb)
     from (select * from public.mp_cobros x where x.devolucion = 'pendiente' order by x.actualizado limit 20) k
 $$;
 -- La función devolvió la seña (o no pudo: se vuelve a intentar en la próxima vuelta, hasta 48 veces)
@@ -1219,8 +1257,8 @@ begin
   end if;
 end $$;
 
--- Cada minuto, los turnos que nadie pagó; cada 15 minutos, las devoluciones que quedaron sin hacer; y una vez por día,
--- renovar las llaves que están por vencer. Hacen falta las extensiones pg_cron y pg_net (Supabase → Database →
+-- Cada minuto, los turnos que nadie pagó; cada 5 minutos, los cobros abiertos (por si el aviso de un pago no llegó); cada
+-- 15 minutos, las devoluciones que quedaron sin hacer; y una vez por día, renovar las llaves que están por vencer. Hacen falta las extensiones pg_cron y pg_net (Supabase → Database →
 -- Extensions); sin pg_cron, los turnos vencidos igual se liberan al reservar y al abrir la agenda, y las llaves se
 -- renuevan al cobrar.
 do $$ begin
@@ -1231,6 +1269,9 @@ do $$ begin
     perform cron.schedule('bookea-renovar-mercado-pago', '17 6 * * *',
       'select net.http_post(url := public.bookea_url_funciones() || ''/mp/renovar'', body := ''{}''::jsonb, headers := ''{"Content-Type": "application/json"}''::jsonb)'
       || ' where exists (select 1 from public.mp_cuentas where not reconectar and vence < now() + interval ''30 days'')');
+    perform cron.schedule('bookea-revisar-cobros', '*/5 * * * *',
+      'select net.http_post(url := public.bookea_url_funciones() || ''/mp/revisar'', body := ''{}''::jsonb, headers := ''{"Content-Type": "application/json"}''::jsonb)'
+      || ' where exists (select 1 from public.mp_cobros where estado = ''creado'' and orden like ''bk-%'' and creado > now() - interval ''2 hours'')');
   end if;
 exception when others then
   raise warning 'Bookea: no se pudieron programar las tareas de pg_cron: %', sqlerrm;
@@ -1258,8 +1299,8 @@ declare f text;
 begin
   foreach f in array array['mp_empezar_conexion(uuid, uuid)', 'mp_tomar_estado(text)', 'mp_guardar_cuenta(uuid, uuid, jsonb)',
     'mp_llaves(uuid)', 'mp_marcar_reconectar(uuid)', 'mp_datos_cobro(uuid, uuid)', 'mp_cobro_creado(uuid, text, text, integer, integer)',
-    'mp_cobro(text)', 'mp_resultado(text, text, text, numeric)', 'mp_por_devolver()', 'mp_devolucion(text, boolean, text)',
-    'mp_por_renovar()', 'mp_anotar_pagos(text, jsonb)'] loop
+    'mp_cobro(text)', 'mp_resultado(text, text, text, text, numeric)', 'mp_por_devolver()', 'mp_devolucion(text, boolean, text)',
+    'mp_por_renovar()', 'mp_anotar_pagos(text, jsonb)', 'mp_negocios_de_cuenta(text)', 'mp_por_revisar()'] loop
     execute format('revoke all on function public.%s from public, anon, authenticated', f);
     execute format('grant execute on function public.%s to service_role', f);
   end loop;
