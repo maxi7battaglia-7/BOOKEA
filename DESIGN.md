@@ -520,6 +520,14 @@ El dueño mandó una página de referencia ("mirá lo limpia que se ve, así qui
 - **Textos:** todo lo que decía WhatsApp para avisarle al cliente ahora dice mail (pago, ficha, Mis turnos y la parte para negocios). El link del negocio por WhatsApp ("lo mandás por WhatsApp") queda.
 - **`privacidad.html`:** política de privacidad, tus derechos (con la leyenda de la AAIP) y condiciones de uso, con la estética del frente, a lo ancho de lectura (760 px) y un índice arriba. Link en el pie del inicio. Es un borrador para que lo revise un abogado; cuando se inscriba la base en la AAIP, se suman el nombre, el domicilio y el número de registro.
 
+## Ficha: lo de abajo en tarjetas (28/11)
+
+Pedido del dueño, mirando la ficha de su negocio de prueba en el celular: "tiene que dejar apretar directamente la dirección y que te lleve a Google Maps, no un botón aparte; además hay demasiado espacio debajo de donde sacar los turnos, tal vez deberíamos compactar un poco en forma de tarjetas". Y del mapa de los lugares de ejemplo: "que se vea así está muy bueno".
+
+- **Tarjetas:** "Sobre el lugar", "Horarios" (o "Lo que ofrece"), "Precios por horario", "Dónde queda" e "Información adicional" van cada una en una tarjeta blanca con borde gris claro y esquinas de 20 px (`.ficha__rest .blk`), en vez de bloques separados por rayas. En el celular, una debajo de otra con 10 px entre ellas; en la compu, tres por fila (el lugar, horarios, precios) y abajo "Dónde queda" e "Información adicional", que ocupa dos y pone sus cuatro datos en dos columnas. Las de una fila terminan a la misma altura. Títulos de 16–17 px.
+- **Dónde queda:** el mismo mapa dibujado de los ejemplos para todos, con el punto a la derecha y el rótulo blanco abajo a la izquierda (no lo tapa). En un negocio de verdad, el rótulo dice su dirección, la ciudad y "Abrir en Google Maps ›" en naranja oscuro, y **toda la tarjeta del mapa es el link** (su link de Google Maps de Mi negocio, o uno armado con el nombre, la dirección y la ciudad); abajo, "Tocá el mapa para ver cómo llegar." Ya no está el botón "Cómo llegar". En los de ejemplo, la zona y "Ubicación aproximada…". La pantalla de pago usa la misma tarjeta.
+- **Sin aire de más:** la ficha deja 150 px abajo solo mientras está el aviso verde "Ir a pagar" (para que no tape nada); sin horario elegido, 56 px.
+
 ## Negocios de verdad en la página (20/11)
 
 "Arrancá con los negocios": que lo que un dueño carga en el panel se vea en bookea.ar y que el turno le llegue a su agenda. Los lugares de ejemplo quedan como están ("la página no la tiene nadie").
@@ -527,7 +535,7 @@ El dueño mandó una página de referencia ("mirá lo limpia que se ve, así qui
 - **Cuáles se ven:** cada negocio aprobado, con su link `bookea.ar/su-link` (el de Mi negocio; `404.html` lo lleva a `?lugar=su-link`). En la lista (inicio y resultados) entran recién cuando cobran la seña con Mercado Pago: así nadie encuentra un negocio que todavía no puede cobrar.
 - **Ficha:** la misma de los de ejemplo, con sus datos de Mi negocio. Cambia:
   - **Arriba:** su foto de perfil, o sus iniciales en un cuadrado noche con letras crema, al lado del nombre (como "Así te ven" en el panel). Sin la foto grande: la foto del panel es chica (320 px) y estirada se vería borrosa, y una foto genérica del rubro haría pensar que es su lugar. Así los días y los horarios suben y llenan la pantalla. En las tarjetas y en la pantalla de pago, lo mismo: su foto, o sus iniciales en noche y crema (`.portada`), nunca la foto genérica del rubro.
-  - **Bloques de abajo:** "Horarios" (por día, con los días iguales juntos: "Lun a vie · 18:00 a 01:00", "Dom · Cerrado") en lugar de "Lo que ofrece", sus precios por franja con la seña de cada una, y "Dónde queda" con la dirección y "Cómo llegar" (su link de Google Maps o uno armado con nombre, dirección y ciudad), sin el mapa dibujado.
+  - **Bloques de abajo:** "Horarios" (por día, con los días iguales juntos: "Lun a vie · 18:00 a 01:00", "Dom · Cerrado") en lugar de "Lo que ofrece", sus precios por franja con la seña de cada una, y "Dónde queda" con el mapa dibujado y su dirección en el rótulo; toda la tarjeta abre Google Maps (ver "Ficha: lo de abajo en tarjetas", 28/11).
   - Sin el cartel "Negocio de ejemplo · demo".
 - **Horarios libres:** los de su agenda; los ocupados (turnos de la página, cargados a mano o bloqueos) los manda la base sin nombres. Se vuelven a pedir al abrir la ficha. Un turno de las 00:30 que sigue a la noche se muestra en esa noche, y para el cliente es del día siguiente.
 - **Seña y cancelación:** las de su panel (por ejemplo, 30 %, redondeada a $ 100 como en el panel; "Si cancelás, el horario se libera, pero en este lugar la seña no se devuelve" si eligió no devolverla).

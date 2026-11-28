@@ -235,8 +235,6 @@
   };
   // "Cómo llegar": su link de Google Maps, o uno armado con el nombre, la dirección y la ciudad (como el panel)
   const comoLlegar = (v) => v.mapa || (v.direccion || v.ciudad ? "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent([v.name, v.direccion, v.ciudad].filter(Boolean).join(", ")) : "");
-  const dondeReal = (v) => `<div class="dir"><svg class="icon" aria-hidden="true"><use href="#i-pin"/></svg><div><b>${esc(v.direccion || ZONAS[v.zona])}</b>${v.direccion && v.ciudad ? `<span>${esc(v.ciudad)}</span>` : ""}</div></div>
-    ${comoLlegar(v) ? `<a class="btn btn--line btn--s dir__ir" href="${esc(comoLlegar(v))}" target="_blank" rel="noopener">Cómo llegar</a>` : ""}`;
   // La foto de tapa de un lugar en las tarjetas: la suya, o (uno de verdad sin foto) sus iniciales en noche y crema.
   // Nunca la foto genérica del rubro, que haría pensar que es su lugar.
   const portada = (v, alt = "", extra = "") => (v.fotos.length ? img(v.fotos[0], alt, extra) : `<span class="portada" aria-hidden="true">${esc(iniciales(v.name))}</span>`);
@@ -589,11 +587,24 @@
   // ---------- Ficha: perfil del lugar ----------
   const curSvc = () => venue(S.f.v).svcs.find((s) => s.id === S.f.svc);
   const AMI = `<svg class="icon" aria-hidden="true"><use href="#i-check"/></svg>`;
+  // El mapa dibujado (no es el lugar exacto): el punto va a la derecha para que el rótulo de abajo a la izquierda no lo tape
   const mapSVG = (seed) => {
     const h = hash(seed), r = (i, m) => ((h >>> (i * 4)) & 255) / 255 * m;
     const roads = [0, 1, 2, 3, 4].map((i) => `<path d="M${r(i, 200) - 40} ${r(i + 1, 240)} Q ${200 + r(i + 2, 300)} ${r(i + 3, 240)} ${660 + r(i, 40)} ${r(i + 5, 240)}" stroke="#fff" stroke-width="${8 + (i % 3) * 5}" fill="none" stroke-linecap="round"/>`).join("");
     const cross = [0, 1, 2, 3].map((i) => `<path d="M${80 + i * 150 + r(i, 70)} -10 L ${120 + i * 150 + r(i + 2, 90)} 250" stroke="#fff" stroke-width="${6 + (i % 2) * 4}" fill="none"/>`).join("");
-    return `<svg viewBox="0 0 640 240" role="img" aria-label="Zona aproximada del lugar"><rect width="640" height="240" fill="#e9eef0"/><rect x="${40 + r(7, 300)}" y="${20 + r(8, 80)}" width="150" height="80" rx="30" fill="#d3e8e1"/><rect x="${360 + r(9, 100)}" y="${130 + r(6, 40)}" width="120" height="70" rx="26" fill="#d3e8e1"/>${roads}${cross}<circle cx="320" cy="122" r="58" fill="#e4572e" fill-opacity=".16" stroke="#e4572e" stroke-opacity=".5"/><circle cx="320" cy="122" r="11" fill="#e4572e" stroke="#fff" stroke-width="4"/></svg>`;
+    return `<svg viewBox="0 0 640 240" role="img" aria-label="Zona aproximada del lugar"><rect width="640" height="240" fill="#e9eef0"/><rect x="${40 + r(7, 300)}" y="${20 + r(8, 80)}" width="150" height="80" rx="30" fill="#d3e8e1"/><rect x="${360 + r(9, 100)}" y="${130 + r(6, 40)}" width="120" height="70" rx="26" fill="#d3e8e1"/>${roads}${cross}<circle cx="470" cy="112" r="58" fill="#e4572e" fill-opacity=".16" stroke="#e4572e" stroke-opacity=".5"/><circle cx="470" cy="112" r="11" fill="#e4572e" stroke="#fff" stroke-width="4"/></svg>`;
+  };
+  // "Dónde queda": el mapa dibujado con el rótulo encima, en todos (pedido del dueño, 28/11: el de los ejemplos "está muy
+  // bueno"). En uno de verdad el rótulo lleva su dirección y toda la tarjeta abre Google Maps ("que se pueda apretar
+  // directamente la dirección, no un botón aparte"); en los de ejemplo, la zona.
+  const dondeQueda = (v) => {
+    const ir = v.real ? comoLlegar(v) : "";
+    const t1 = v.real ? v.direccion || v.ciudad || ZONAS[v.zona] : ZONAS[v.zona];
+    const t2 = v.real ? (v.direccion && v.ciudad ? v.ciudad : "") : "Valle de Uco, Mendoza";
+    const rotulo = `<span class="mapbox__t"><b>${esc(t1)}</b>${t2 ? `<span>${esc(t2)}</span>` : ""}${ir ? `<span class="mapbox__ir">Abrir en Google Maps<svg class="icon" aria-hidden="true"><use href="#i-back"/></svg></span>` : ""}</span>`;
+    return ir
+      ? `<a class="mapbox mapbox--ir" href="${esc(ir)}" target="_blank" rel="noopener" aria-label="${esc(`${t1}${t2 ? ", " + t2 : ""}: abrir en Google Maps`)}">${mapSVG(v.id).replace('role="img" aria-label="Zona aproximada del lugar"', 'aria-hidden="true"')}${rotulo}</a>`
+      : `<div class="mapbox">${mapSVG(v.id)}${rotulo}</div>`;
   };
   const horarios = (v) => v.bloques.map(([a, b]) => `${a} a ${fmt(toMin(b))}`).join(" y ");
   // Las filas de la tabla de precios: por franja (los de verdad), por servicio (barberías de ejemplo) o día, noche y finde
@@ -608,7 +619,8 @@
   function renderFicha() {
     const v = venue(S.f.v), R = RUBROS[v.rubro], sv0 = v.svcs[0], fotos = v.fotos.slice(0, 3);
     const filas = preciosHTML(v);
-    // Todo a lo ancho (pedido del dueño, 19/11): fotos, días y, al tocar un día, sus horarios. El resto, en dos columnas.
+    // Todo a lo ancho (pedido del dueño, 19/11): fotos, días y, al tocar un día, sus horarios. El resto, en tarjetas
+    // compactas (28/11: "hay demasiado espacio debajo de donde sacar los turnos"): en la compu, tres por fila.
     $("#ficha-root").innerHTML = `
       <a class="back" href="#" data-act="back"><svg class="icon"><use href="#i-back"/></svg>Volver</a>
       <div class="ficha">
@@ -624,7 +636,7 @@
           ${v.real ? `<div class="blk"><h2>Horarios</h2><table class="ptable"><caption class="sr-only">Horarios</caption><tbody>${horariosDe(v).map(([d, h]) => `<tr><th scope="row">${d}</th><td>${esc(h)}</td></tr>`).join("")}</tbody></table></div>`
             : `<div class="blk"><h2>Lo que ofrece</h2><ul class="ame">${v.ame.map((k) => `<li>${AMI}${AM[k]}</li>`).join("")}</ul></div>`}
           <div class="blk"><h2>${v.rubro === "barberia" ? "Servicios y precios" : "Precios por horario"}</h2><table class="ptable"><caption class="sr-only">Precios</caption><tbody>${filas}</tbody></table></div>
-          <div class="blk"><h2>Dónde queda</h2>${v.real ? dondeReal(v) : `<div class="mapbox">${mapSVG(v.id)}<div class="mapbox__t"><b>${ZONAS[v.zona]}</b>Valle de Uco, Mendoza</div></div><p class="mapnote">Ubicación aproximada. La dirección exacta te llega al confirmar el turno.</p>`}</div>
+          <div class="blk blk--donde"><h2>Dónde queda</h2>${dondeQueda(v)}<p class="mapnote">${v.real ? (comoLlegar(v) ? "Tocá el mapa para ver cómo llegar." : "La dirección te llega al confirmar el turno.") : "Ubicación aproximada. La dirección exacta te llega al confirmar el turno."}</p></div>
           <div class="blk blk--ancho"><h2>Información adicional</h2><dl class="dl">
             ${v.real ? "" : `<div><dt>Horarios</dt><dd>Todos los días · ${horarios(v)}</dd></div>`}
             <div><dt>Llegada</dt><dd>Llegá 10 minutos antes para empezar a horario.</dd></div>
@@ -956,7 +968,7 @@
           <button type="button" class="btn btn--primary btn--lg btn--block" data-act="pay" style="margin-top:18px"><span class="mp">Pagar seña con Mercado Pago</span></button>`}
           <p class="note note--ok"><svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg><span>${sin ? SIN_SENA_CANCELAR : r.devuelve === false ? "Si cancelás, el horario se libera, pero en este lugar la seña no se devuelve." : r.cancel ? `Podés cancelar hasta ${r.cancel} h antes y la seña se devuelve.` : "Podés cancelar hasta que empiece y la seña se devuelve."}</span></p>
           <p class="note">${sin ? "Este lugar no pide seña: no pagás nada ahora y el turno queda confirmado en el momento." : v.real && v.cobra ? "Pagás la seña en Mercado Pago, con tarjeta o con el dinero de tu cuenta. El turno queda confirmado apenas se acredita." : v.real ? "Bookea está en prueba: todavía no se cobra la seña. El turno queda reservado igual en la agenda del lugar." : "Demo: los negocios son de ejemplo y no se cobra nada. En la versión real, acá se abre el pago de Mercado Pago."}</p></div>
-          <div class="panel chk__mapa"><h2>Dónde queda</h2>${v.real ? dondeReal(v) : `<div class="mapbox">${mapSVG(v.id)}<div class="mapbox__t"><b>${ZONAS[v.zona]}</b>Valle de Uco, Mendoza</div></div>`}<p class="mapnote">Los datos del turno te llegan por mail al confirmar.</p></div></aside>
+          <div class="panel chk__mapa"><h2>Dónde queda</h2>${dondeQueda(v)}<p class="mapnote">Los datos del turno te llegan por mail al confirmar.</p></div></aside>
         <div class="pasos"><h2>Cómo sigue</h2><ol>
           <li><span class="pasos__n">1</span>${sin ? "<b>Confirmás el turno</b><span>Sin seña: no pagás nada ahora. Queda confirmado en el momento.</span>" : `<b>Pagás la seña</b><span>${money(r.sena)} con Mercado Pago. El turno queda confirmado en el momento.</span>`}</li>
           <li><span class="pasos__n">2</span><b>Te llega por mail</b><span>La confirmación con el día, la hora, ${v.rubro === "barberia" ? "con quién" : "la cancha"} y el código del turno. También queda en Mis turnos.</span></li>
@@ -1395,12 +1407,20 @@
         }
         case "f-slot": {
           S.f.t = d.t; S.f.unit = "any"; renderBook();
-          // la elección de cancha no queda abajo del aviso verde ni fuera de la pantalla
-          const el = $("#f-eleccion"), ir = $("#ir-pagar");
-          if (el) requestAnimationFrame(() => {
+          // la elección de cancha no queda abajo del aviso verde ni fuera de la pantalla. Si la página todavía se está
+          // moviendo (por ejemplo, hacia los horarios del día recién tocado), se vuelve a mirar cuando termina; pasado un
+          // segundo y medio ya no, así no tironea si después la persona sube sola.
+          const t0 = performance.now();
+          const asomar = () => {
+            const el = $("#f-eleccion"), ir = $("#ir-pagar");
+            if (!el || performance.now() - t0 > 1500) return;
             const tope = innerHeight - (ir && !ir.hidden ? ir.offsetHeight + 28 : 12), abajo = el.getBoundingClientRect().bottom;
-            if (abajo > tope) window.scrollBy({ top: abajo - tope, behavior: reduce ? "auto" : "smooth" });
-          });
+            if (abajo > tope + 1) window.scrollBy({ top: abajo - tope, behavior: reduce ? "auto" : "smooth" });
+          };
+          if ($("#f-eleccion")) {
+            requestAnimationFrame(asomar);
+            if ("onscrollend" in window) addEventListener("scrollend", asomar, { once: true }); else setTimeout(asomar, 600);
+          }
           break;
         }
         case "f-unit": S.f.unit = d.u; renderBook(); break;

@@ -435,8 +435,9 @@ const espera = (ms) => new Promise((r) => setTimeout(r, ms));
     ok(/Los Álamos Pádel/.test(await f4.textContent('#ficha-root h1').catch(() => '')) && /Tunuyán/.test(ficha) && /Turnos de 60 min/.test(ficha) && /Sin seña/.test(ficha) && !/Seña 25 %/.test(ficha),
       'negocio de verdad: bookea.ar/nombre/reservar abre su ficha con su nombre, su ciudad y la duración (sin Mercado Pago, "Sin seña")');
     ok(/Todos los días/.test(ficha) && /08:00 a 23:00/.test(ficha) && /Belgrano 450/.test(ficha) && /\$\s20\.000/.test(ficha) && /\$\s26\.000/.test(ficha) && !/Negocio de ejemplo/.test(ficha)
-      && (await f4.getAttribute('.dir__ir', 'href') || '').startsWith('https://www.google.com/maps/search/'),
-      'negocio de verdad: sus horarios, sus precios por franja, su dirección con "Cómo llegar" y sin el cartel de ejemplo');
+      && (await f4.getAttribute('.blk--donde a.mapbox--ir', 'href') || '').startsWith('https://www.google.com/maps/search/')
+      && /Belgrano 450/.test(await f4.textContent('.blk--donde .mapbox__t')) && !(await f4.locator('#ficha-root .btn', { hasText: 'Cómo llegar' }).count()),
+      'negocio de verdad: sus horarios, sus precios por franja, su dirección sobre el mapa (toda la tarjeta abre Google Maps, sin botón aparte) y sin el cartel de ejemplo');
     await f4.click('.cupo[data-i="1"]'); await f4.waitForSelector('#book-panel');
     await entera(f4, `${out}/nb-ficha-real.png`);
     const cel = await nueva(390, 844);
