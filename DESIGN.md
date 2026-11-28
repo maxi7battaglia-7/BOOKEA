@@ -520,6 +520,10 @@ El dueño mandó una página de referencia ("mirá lo limpia que se ve, así qui
 - **Textos:** todo lo que decía WhatsApp para avisarle al cliente ahora dice mail (pago, ficha, Mis turnos y la parte para negocios). El link del negocio por WhatsApp ("lo mandás por WhatsApp") queda.
 - **`privacidad.html`:** política de privacidad, tus derechos (con la leyenda de la AAIP) y condiciones de uso, con la estética del frente, a lo ancho de lectura (760 px) y un índice arriba. Link en el pie del inicio. Es un borrador para que lo revise un abogado; cuando se inscriba la base en la AAIP, se suman el nombre, el domicilio y el número de registro.
 
+## Preguntas frecuentes cerradas (28/11)
+
+En la parte para negocios, todas las preguntas arrancan cerradas (antes la primera aparecía abierta): "debería ser al revés". Se abre una a la vez al tocarla.
+
 ## Ficha: lo de abajo en tarjetas (28/11)
 
 Pedido del dueño, mirando la ficha de su negocio de prueba en el celular: "tiene que dejar apretar directamente la dirección y que te lleve a Google Maps, no un botón aparte; además hay demasiado espacio debajo de donde sacar los turnos, tal vez deberíamos compactar un poco en forma de tarjetas". Y del mapa de los lugares de ejemplo: "que se vea así está muy bueno".
@@ -527,6 +531,8 @@ Pedido del dueño, mirando la ficha de su negocio de prueba en el celular: "tien
 - **Tarjetas:** "Sobre el lugar", "Horarios" (o "Lo que ofrece"), "Precios por horario", "Dónde queda" e "Información adicional" van cada una en una tarjeta blanca con borde gris claro y esquinas de 20 px (`.ficha__rest .blk`), en vez de bloques separados por rayas. En el celular, una debajo de otra con 10 px entre ellas; en la compu, tres por fila (el lugar, horarios, precios) y abajo "Dónde queda" e "Información adicional", que ocupa dos y pone sus cuatro datos en dos columnas. Las de una fila terminan a la misma altura. Títulos de 16–17 px.
 - **Dónde queda:** el mismo mapa dibujado de los ejemplos para todos, con el punto a la derecha y el rótulo blanco abajo a la izquierda (no lo tapa). En un negocio de verdad, el rótulo dice su dirección, la ciudad y "Abrir en Google Maps ›" en naranja oscuro, y **toda la tarjeta del mapa es el link** (su link de Google Maps de Mi negocio, o uno armado con el nombre, la dirección y la ciudad); abajo, "Tocá el mapa para ver cómo llegar." Ya no está el botón "Cómo llegar". En los de ejemplo, la zona y "Ubicación aproximada…". La pantalla de pago usa la misma tarjeta.
 - **Sin aire de más:** la ficha deja 150 px abajo solo mientras está el aviso verde "Ir a pagar" (para que no tape nada); sin horario elegido, 56 px.
+- **Información adicional con más onda** (28/11: "se ve espaciado y simplemente como si fuese todo texto, ponele más onda"): cada dato es una tarjetita gris clara (`.info`) con su ícono en naranja y el título en negrita (Llegada con el pin, Pagos con el escudo, Cancelación con el calendario, Cómo reservás con el tilde; en los de ejemplo también Horarios con el reloj), y lo importante del texto en negrita ("**10 minutos antes**", "**Seña del 10 %**", "**Este lugar no pide seña:**"). En la compu, dos por fila.
+- **Días cerrados** (28/11: "en vez de decir cerrado dice que está completo"): un día sin horario en Mi negocio dice **"Cerrado"** (no "Completo"), con el fondo gris claro y el número en gris; al tocarlo, "Cerrado los viernes. Elegí otro día con turnos libres." "Completo" queda para un día con horario y todo ocupado, y "Sin horarios" para hoy pasada la última hora. En la tarjeta "Horarios", las filas cerradas van en gris.
 
 ## Negocios de verdad en la página (20/11)
 

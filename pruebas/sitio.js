@@ -258,6 +258,7 @@ const medir = () => {
       ok((await p.textContent('#hrs')) === '7 h', `${w} negocios: + suma una hora a la regla de cancelación`);
       await p.toca('.switch'); await espera(p, 100);
       ok((await p.getAttribute('.switch', 'aria-checked')) === 'false' && /queda para vos/.test(await p.textContent('#rule-note')), `${w} negocios: el interruptor cambia la regla`);
+      ok(await p.evaluate(() => [...document.querySelectorAll('#preguntas details')].every((d) => !d.open)), `${w} negocios: las preguntas arrancan cerradas`);
       await p.toca('#preguntas details:nth-of-type(2) summary'); await espera(p, 200);
       ok(await p.evaluate(() => document.querySelectorAll('#preguntas details')[1].open), `${w} negocios: las preguntas se abren`);
       await p.toca('.band [data-scroll="sumate"]'); await espera(p, 900);

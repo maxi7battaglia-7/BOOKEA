@@ -607,6 +607,8 @@
       : `<div class="mapbox">${mapSVG(v.id)}${rotulo}</div>`;
   };
   const horarios = (v) => v.bloques.map(([a, b]) => `${a} a ${fmt(toMin(b))}`).join(" y ");
+  // Cada dato de "Información adicional", con su ícono (28/11: "que no sea todo texto, ponele más onda")
+  const INFO = (ic, t) => `<dt><svg class="icon" aria-hidden="true"><use href="#i-${ic}"/></svg>${t}</dt>`;
   // Las filas de la tabla de precios: por franja (los de verdad), por servicio (barberías de ejemplo) o día, noche y finde
   const preciosHTML = (v) => {
     const sv0 = v.svcs[0];
@@ -633,16 +635,16 @@
         <section class="reserva" id="book" aria-labelledby="book-t"></section>
         <div class="ficha__rest">
           <div class="blk"><h2>Sobre el lugar</h2><p>${esc(v.desc)} ${v.units.length} ${R.uns}: ${v.units.map(esc).join(", ")}.</p></div>
-          ${v.real ? `<div class="blk"><h2>Horarios</h2><table class="ptable"><caption class="sr-only">Horarios</caption><tbody>${horariosDe(v).map(([d, h]) => `<tr><th scope="row">${d}</th><td>${esc(h)}</td></tr>`).join("")}</tbody></table></div>`
+          ${v.real ? `<div class="blk"><h2>Horarios</h2><table class="ptable"><caption class="sr-only">Horarios</caption><tbody>${horariosDe(v).map(([d, h]) => `<tr${h === "Cerrado" ? ' class="is-cerrado"' : ""}><th scope="row">${d}</th><td>${esc(h)}</td></tr>`).join("")}</tbody></table></div>`
             : `<div class="blk"><h2>Lo que ofrece</h2><ul class="ame">${v.ame.map((k) => `<li>${AMI}${AM[k]}</li>`).join("")}</ul></div>`}
           <div class="blk"><h2>${v.rubro === "barberia" ? "Servicios y precios" : "Precios por horario"}</h2><table class="ptable"><caption class="sr-only">Precios</caption><tbody>${filas}</tbody></table></div>
           <div class="blk blk--donde"><h2>Dónde queda</h2>${dondeQueda(v)}<p class="mapnote">${v.real ? (comoLlegar(v) ? "Tocá el mapa para ver cómo llegar." : "La dirección te llega al confirmar el turno.") : "Ubicación aproximada. La dirección exacta te llega al confirmar el turno."}</p></div>
-          <div class="blk blk--ancho"><h2>Información adicional</h2><dl class="dl">
-            ${v.real ? "" : `<div><dt>Horarios</dt><dd>Todos los días · ${horarios(v)}</dd></div>`}
-            <div><dt>Llegada</dt><dd>Llegá 10 minutos antes para empezar a horario.</dd></div>
-            <div><dt>Pagos</dt><dd>${pideSena(v) ? `Seña del ${pctDe(v)} % online con Mercado Pago. El resto lo abonás en el lugar.` : "Este lugar no pide seña: no pagás nada al reservar y el turno lo abonás en el lugar."}</dd></div>
-            <div><dt>Cancelación</dt><dd>${pideSena(v) ? reglaCancelar(v.devuelve, v.cancel) : SIN_SENA_CANCELAR}</dd></div>
-            <div><dt>Cómo reservás</dt><dd>${pideSena(v) ? "Elegís día y horario, entrás con tu cuenta y pagás la seña." : "Elegís día y horario, entrás con tu cuenta y confirmás."} El turno queda en Mis turnos y te llega la confirmación por mail.</dd></div></dl>
+          <div class="blk blk--ancho"><h2>Información adicional</h2><dl class="dl info">
+            ${v.real ? "" : `<div>${INFO("clock", "Horarios")}<dd><b>Todos los días</b> · ${horarios(v)}</dd></div>`}
+            <div>${INFO("pin", "Llegada")}<dd>Llegá <b>10 minutos antes</b> para empezar a horario.</dd></div>
+            <div>${INFO("shield", "Pagos")}<dd>${pideSena(v) ? `<b>Seña del ${pctDe(v)} %</b> online con Mercado Pago. El resto lo abonás en el lugar.` : "<b>Este lugar no pide seña:</b> no pagás nada al reservar y el turno lo abonás en el lugar."}</dd></div>
+            <div>${INFO("cal", "Cancelación")}<dd>${pideSena(v) ? reglaCancelar(v.devuelve, v.cancel) : SIN_SENA_CANCELAR}</dd></div>
+            <div>${INFO("check", "Cómo reservás")}<dd>${pideSena(v) ? "Elegís día y horario, entrás con tu cuenta y <b>pagás la seña</b>." : "Elegís día y horario, entrás con tu cuenta y <b>confirmás</b>."} El turno queda en Mis turnos y te llega la confirmación por mail.</dd></div></dl>
             ${v.real ? "" : `<span class="demo">Negocio de ejemplo · demo</span>`}</div>
         </div>
       </div>
@@ -661,16 +663,19 @@
     const qu = v.rubro === "barberia" ? "con quién" : `${R.un.toLowerCase()}`;
     const eleccion = sel && sel.libres.length > 1 ? `<div class="eleccion" id="f-eleccion"><p class="slots__g">${v.rubro === "barberia" ? "¿Con quién?" : `¿En qué ${qu}?`} · ${sel.t}</p>
       <div class="slots" role="group" aria-label="Elegí ${v.rubro === "barberia" ? qu : `la ${qu}`} para las ${sel.t}">${sel.libres.map((u) => { const [nom, det] = u.split(" · "); return `<button type="button" class="slot slot--u${f.unit === u ? " is-on" : ""}" data-act="f-unit" data-u="${esc(u)}" aria-pressed="${f.unit === u}"><b>${esc(nom)}</b><small>${det ? esc(cap(det)) : "Libre"}</small></button>`; }).join("")}</div></div>` : "";
+    // Un día sin horario en su Mi negocio dice "Cerrado", no "Completo" (pedido del dueño, 28/11); hoy, pasada la última
+    // hora, "Sin horarios"
+    const cerradoDia = (i) => !iniciosDe(v, dayInfo(i).dow).length;
     const dias = Array.from({ length: 7 }, (_, i) => {
-      const s7 = slotsFicha(v, i), n = s7.filter((s) => s.libres.length).length, tot = s7.length || 1, d = dayInfo(i), on = f.abierto && i === f.dia;
-      return `<button type="button" class="cupo${on ? " is-on" : ""}${n ? "" : " is-zero"}" data-act="f-dia" data-i="${i}" aria-pressed="${on}"><span>${i === 0 ? "Hoy" : i === 1 ? "Mañana" : DOW3[d.dow]}</span><b>${d.d}</b><i style="--p:${Math.round((n / tot) * 100)}%"></i><small>${n ? `${n} ${n === 1 ? "libre" : "libres"}` : "Completo"}</small></button>`;
+      const s7 = slotsFicha(v, i), n = s7.filter((s) => s.libres.length).length, tot = s7.length || 1, d = dayInfo(i), on = f.abierto && i === f.dia, cerrado = cerradoDia(i);
+      return `<button type="button" class="cupo${on ? " is-on" : ""}${n ? "" : " is-zero"}${cerrado ? " is-cerrado" : ""}" data-act="f-dia" data-i="${i}" aria-pressed="${on}"><span>${i === 0 ? "Hoy" : i === 1 ? "Mañana" : DOW3[d.dow]}</span><b>${d.d}</b><i style="--p:${Math.round((n / tot) * 100)}%"></i><small>${n ? `${n} ${n === 1 ? "libre" : "libres"}` : cerrado ? "Cerrado" : s7.length ? "Completo" : "Sin horarios"}</small></button>`;
     }).join("");
     const grupos = ["manana", "tarde", "noche"].map((g) => [g, sl.filter((s) => s.franja === g)]).filter(([, a]) => a.length);
     const titulo = f.dia < 2 ? `Horarios de ${diaCorto(f.dia)}` : `Horarios del ${DOWL[di.dow]} ${di.d}/${di.m}`;
     const panel = !f.abierto ? `<p class="reserva__hint">Tocá un día para ver sus horarios libres.</p>` : `
       <div class="reserva__panel" id="book-panel">
         <div class="reserva__ph"><h3>${titulo}</h3>${tamsV.length > 1 ? `<label class="reserva__svc"><span class="eyebrow">Cancha</span><select class="sel" id="b-tam"><option value="">Fútbol 5 o 7</option>${tamsV.map((t) => `<option value="${t}"${S.tam === t ? " selected" : ""}>Fútbol ${t}</option>`).join("")}</select></label>` : ""}${v.svcs.length > 1 ? `<label class="reserva__svc"><span class="eyebrow">Servicio</span><select class="sel" id="f-svc">${v.svcs.map((s) => `<option value="${s.id}"${s.id === f.svc ? " selected" : ""}>${s.n} · ${s.min} min · ${money(precioDe(s, di, 18 * 60))}</option>`).join("")}</select></label>` : ""}</div>
-        ${sl.length ? grupos.map(([g, a]) => `${grupos.length > 1 ? `<p class="slots__g">${FRANJAS[g]}</p>` : ""}<div class="slots">${a.map((s) => `<button type="button" class="slot${s.t === f.t ? " is-on" : ""}" data-act="f-slot" data-t="${s.t}" ${s.libres.length ? "" : "disabled"} aria-pressed="${s.t === f.t}"><b>${s.t}</b><small class="${s.libres.length === 1 ? "last" : ""}">${s.libres.length ? quedan(s, v) : "Completo"}</small></button>`).join("")}</div>${sel && a.includes(sel) ? eleccion : ""}`).join("") : `<p class="book__empty">Ya no quedan turnos para ${dayFull(f.dia).toLowerCase()}. Probá otro día.</p>`}
+        ${sl.length ? grupos.map(([g, a]) => `${grupos.length > 1 ? `<p class="slots__g">${FRANJAS[g]}</p>` : ""}<div class="slots">${a.map((s) => `<button type="button" class="slot${s.t === f.t ? " is-on" : ""}" data-act="f-slot" data-t="${s.t}" ${s.libres.length ? "" : "disabled"} aria-pressed="${s.t === f.t}"><b>${s.t}</b><small class="${s.libres.length === 1 ? "last" : ""}">${s.libres.length ? quedan(s, v) : "Completo"}</small></button>`).join("")}</div>${sel && a.includes(sel) ? eleccion : ""}`).join("") : `<p class="book__empty">${cerradoDia(f.dia) ? `Cerrado los ${/s$/.test(DOWL[di.dow]) ? DOWL[di.dow] : DOWL[di.dow] + "s"}. Elegí otro día con turnos libres.` : `Ya no quedan turnos para ${dayFull(f.dia).toLowerCase()}. Probá otro día.`}</p>`}
       </div>`;
     $("#book").innerHTML = `
       <div class="reserva__top"><div><p class="eyebrow">Reservá tu turno</p><h2 id="book-t">Elegí el día</h2></div><p class="reserva__nota">${pideSena(v) ? "Cada horario tiene su propio cupo. Al reservar, te lo guardamos 10 minutos para pagar la seña." : "Cada horario tiene su propio cupo. Este lugar no pide seña: elegís el horario, confirmás y listo."}</p></div>

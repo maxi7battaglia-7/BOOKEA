@@ -259,11 +259,20 @@ body.con-irpagar .ficha { padding-bottom: 150px; } /* lugar para el aviso verde,
 .ficha__rest .blk { padding: 18px 18px 16px; border: 1px solid var(--ink-200); border-radius: var(--r-l); background: var(--paper); }
 .ficha__rest .blk h2 { font-size: 17px; margin-bottom: 10px; }
 .ficha__rest .ptable { max-width: none; }
+.ficha__rest .ptable th, .ficha__rest .ptable td { padding-block: 9px; }
+.ficha__rest .ptable tr.is-cerrado th, .ficha__rest .ptable tr.is-cerrado td { color: var(--ink-400); }
 .ficha__rest .ptable tr:last-child th, .ficha__rest .ptable tr:last-child td { border-bottom: 0; padding-bottom: 2px; }
 .ficha__rest .ame { max-width: none; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px 18px; }
 .ficha__rest .dl { max-width: none; gap: 12px; }
 .ficha__rest .dl div { grid-template-columns: 1fr; gap: 2px; padding: 0; align-content: start; }
 .ficha__rest .dl dt { font-size: 13.5px; }
+/* Información adicional: cada dato en una tarjetita gris clara, con su ícono en naranja y lo importante en negrita */
+.ficha__rest .info { gap: 8px; }
+.ficha__rest .info div { gap: 4px; padding: 12px 14px; background: var(--ink-50); border-radius: var(--r-m); }
+.ficha__rest .info dt { display: flex; align-items: center; gap: 8px; font-size: 14.5px; font-weight: 600; color: var(--ink-900); }
+.ficha__rest .info dt .icon { flex: none; width: 17px; height: 17px; color: var(--accent); }
+.ficha__rest .info dd { color: var(--ink-600); font-size: 14.5px; line-height: 1.5; }
+.ficha__rest .info dd b { color: var(--ink-900); font-weight: 600; }
 .ficha__rest .mapbox { max-width: none; border: 0; border-radius: var(--r-m); }
 .ficha__rest .mapnote { margin-top: 8px; font-size: 13.5px; }
 @media (max-width: 899px) {
@@ -276,7 +285,7 @@ body.con-irpagar .ficha { padding-bottom: 150px; } /* lugar para el aviso verde,
 @media (min-width: 900px) {
   .ficha__rest { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: stretch; }
   .ficha__rest .blk--ancho { grid-column: span 2; }
-  .ficha__rest .blk--ancho .dl { grid-template-columns: 1fr 1fr; gap: 14px 28px; }
+  .ficha__rest .blk--ancho .dl { grid-template-columns: 1fr 1fr; gap: 10px; }
 }
 @media (max-width: 600px) { .ficha__desde { justify-items: start; } }
 /* Reservar: días a lo ancho con su cupo; al tocar uno, sus horarios en un panel a lo ancho (no una tarjeta al costado) */
@@ -729,6 +738,8 @@ dialog .row { margin-top: 6px; }
 .cupo:hover { border-color: var(--ink-900); }
 .cupo.is-on { border-color: var(--accent); background: var(--accent-50); }
 .cupo.is-zero small { color: var(--ink-400); }
+.cupo.is-cerrado b, .cupo.is-cerrado span { color: var(--ink-400); }
+.cupo.is-cerrado:not(.is-on) { background: var(--ink-50); }
 .ame { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px 24px; max-width: 640px; }
 .ame li { display: flex; align-items: center; gap: 12px; color: var(--ink-800); }
 .ame .icon { color: var(--ok-ink); }
